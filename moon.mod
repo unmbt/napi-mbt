@@ -19,7 +19,7 @@ repository = ""
 
 license = "MIT"
 
-keywords = []
+keywords = [ ]
 
 supported_targets = "native"
 
