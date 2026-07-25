@@ -1,0 +1,16 @@
+{
+  "is-main": false,
+  "native-stub": [
+    "stub.c"
+  ],
+  "link": {
+    "native": {
+      "stub-cc-flags": "-I./node_modules/node-api-headers/include",
+      "cc-link-flags": "/LD \"E:\\project\\moonbit\\unmbt\\napi-mbt\\node_modules\\.cache\\napi-mbt\\napi.lib\"",
+      "exports": [
+        "moonbit_napi_init",
+        "moonbit_add_wrapper"
+      ]
+    }
+  }
+}

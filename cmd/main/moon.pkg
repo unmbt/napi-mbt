@@ -1,0 +1,7 @@
+// import {
+//   "Wyatex/moon-mbt" @lib,
+// }
+
+options(
+  "is-main": true,
+)
