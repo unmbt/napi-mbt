@@ -3,7 +3,7 @@ const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const PKG_JSON_PATH = path.join(__dirname, '..', 'moon.pkg.json');
+const PKG_PATH = path.join(__dirname, '..', 'moon.pkg');
 const CACHE_DIR = path.join(__dirname, '..', 'node_modules', '.cache', 'napi-mbt');
 const NAPI_LIB_PATH = path.join(CACHE_DIR, 'napi.lib');
 
@@ -58,27 +58,36 @@ async function main() {
 
   if (platform === 'win32') {
     generateNapiLib();
-    // 链接我们自己伪造的极简 napi.lib，而不是庞大的 node.lib
-    ccLinkFlags = `/LD "${NAPI_LIB_PATH}"`;
+    // Use relative path for cc-link-flags to avoid absolute paths in moon.pkg
+    const relativeLibPath = path.relative(path.join(__dirname, '..'), NAPI_LIB_PATH).replace(/\\/g, '/');
+    ccLinkFlags = `/LD "./${relativeLibPath}"`;
   } else if (platform === 'darwin') {
     ccLinkFlags = "-shared -undefined dynamic_lookup";
   } else {
     ccLinkFlags = "-shared";
   }
 
-  const pkgConfig = {
-    "is-main": false,
-    "native-stub": ["stub.c"],
-    "link": {
-      "native": {
-        "stub-cc-flags": "-I./node_modules/node-api-headers/include",
-        "cc-link-flags": ccLinkFlags,
-        "exports": ["moonbit_napi_init", "moonbit_add_wrapper"]
-      }
+  // Generate moon.pkg in KDL format
+  const pkgContent = `options(
+  "is-main": false,
+  "native-stub": ["stub.c"],
+  link: {
+    "native": {
+      "stub-cc-flags": "-I./node_modules/node-api-headers/include",
+      "cc-link-flags": "${ccLinkFlags.replace(/"/g, '\\"')}",
+      "exports": ["moonbit_napi_init", "moonbit_add_wrapper"]
     }
-  };
+  }
+)
+`;
 
-  fs.writeFileSync(PKG_JSON_PATH, JSON.stringify(pkgConfig, null, 2));
+  fs.writeFileSync(PKG_PATH, pkgContent);
+  
+  // Remove moon.pkg.json if it exists to avoid conflicts
+  const pkgJsonPath = path.join(__dirname, '..', 'moon.pkg.json');
+  if (fs.existsSync(pkgJsonPath)) {
+    fs.unlinkSync(pkgJsonPath);
+  }
 
   console.log(`[构建] 正在执行 moon build --target native...`);
   execSync('moon build --target native', { stdio: 'inherit', cwd: path.join(__dirname, '..') });

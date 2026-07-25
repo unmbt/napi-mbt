@@ -1,4 +1,5 @@
 // Dummy placeholder to represent a null value temporarily
+
 ///|
 extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
 
