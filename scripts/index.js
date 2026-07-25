@@ -4,7 +4,7 @@ const path = require('path');
 const platform = os.platform();
 const arch = os.arch();
 
-const addonPath = path.join(__dirname, 'dist', `${platform}-${arch}`, 'napi_mbt.node');
+const addonPath = path.join(__dirname, '..', 'dist', `${platform}-${arch}`, 'napi_mbt.node');
 
 try {
   const addon = require(addonPath);

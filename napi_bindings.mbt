@@ -35,15 +35,74 @@ extern "c" fn napi_set_named_property(
 ) -> Int = "napi_set_named_property"
 
 ///|
+#borrow(buf, result)
+extern "c" fn napi_get_value_string_utf8(
+  env : NapiEnv,
+  value : NapiValue,
+  buf : Bytes,
+  bufsize : Int,
+  result : Ref[Int],
+) -> Int = "napi_get_value_string_utf8"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_string_utf8_length(
+  env : NapiEnv,
+  value : NapiValue,
+  buf : UnmanagedBuffer,
+  bufsize : Int,
+  result : Ref[Int],
+) -> Int = "napi_get_value_string_utf8"
+
+///|
+#borrow(str, result)
+extern "c" fn napi_create_string_utf8(
+  env : NapiEnv,
+  str : Bytes,
+  length : Int,
+  result : Ref[NapiValue],
+) -> Int = "napi_create_string_utf8"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_external(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Int],
+) -> Int = "napi_get_value_external"
+
+///|
+#borrow(result)
+extern "c" fn moonbit_napi_create_external_id(
+  env : NapiEnv,
+  id : Int,
+  result : Ref[NapiValue],
+) -> Int = "moonbit_napi_create_external_id"
+
+///|
+#borrow(data, length)
+extern "c" fn napi_get_buffer_info(
+  env : NapiEnv,
+  value : NapiValue,
+  data : Ref[UnmanagedBuffer],
+  length : Ref[Int],
+) -> Int = "napi_get_buffer_info"
+
+///|
+extern "c" fn UnmanagedBuffer::load8(
+  self : UnmanagedBuffer,
+  offset : Int,
+) -> Int = "moonbit_ptr_load8"
+
+///|
+extern "c" fn UnmanagedBuffer::store8(
+  self : UnmanagedBuffer,
+  offset : Int,
+  val : Int,
+) = "moonbit_ptr_store8"
+
+///|
 #borrow(code, msg)
 extern "c" fn napi_throw_error(env : NapiEnv, code : Bytes, msg : Bytes) -> Int = "napi_throw_error"
 
 // C 层的代理工具函数
-
-///|
-#borrow(name, result)
-extern "c" fn moonbit_napi_create_add_function(
-  env : NapiEnv,
-  name : Bytes,
-  result : Ref[NapiValue],
-) -> Int = "moonbit_napi_create_add_function"

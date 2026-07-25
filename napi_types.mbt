@@ -11,3 +11,7 @@ pub type NapiValue
 ///|
 #external
 pub type NapiCallbackInfo
+
+///|
+#external
+pub type UnmanagedBuffer

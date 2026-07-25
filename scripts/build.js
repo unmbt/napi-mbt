@@ -67,26 +67,38 @@ async function main() {
     ccLinkFlags = "-shared";
   }
 
-  // Generate moon.pkg in KDL format
-  const pkgContent = `options(
+  // Generate moon.pkg in KDL format natively
+  const pkgContent = `import {
+  "moonbitlang/core/encoding/utf8",
+}
+
+options(
   "is-main": false,
-  "native-stub": ["stub.c"],
+  "native-stub": [ "stub.c" ],
   link: {
     "native": {
       "stub-cc-flags": "-I./node_modules/node-api-headers/include",
       "cc-link-flags": "${ccLinkFlags.replace(/"/g, '\\"')}",
-      "exports": ["moonbit_napi_init", "moonbit_add_wrapper"]
-    }
-  }
+      "exports": [
+        "moonbit_napi_init",
+        "moonbit_add_wrapper",
+        "moonbit_concat_wrapper",
+        "moonbit_create_obj_wrapper",
+        "moonbit_read_obj_wrapper",
+        "moonbit_mutate_buf_wrapper",
+        "moonbit_release_handle",
+      ],
+    },
+  },
 )
 `;
 
   fs.writeFileSync(PKG_PATH, pkgContent);
   
   // Remove moon.pkg.json if it exists to avoid conflicts
-  const pkgJsonPath = path.join(__dirname, '..', 'moon.pkg.json');
-  if (fs.existsSync(pkgJsonPath)) {
-    fs.unlinkSync(pkgJsonPath);
+  const oldPkgJsonPath = path.join(__dirname, '..', 'moon.pkg.json');
+  if (fs.existsSync(oldPkgJsonPath)) {
+    fs.unlinkSync(oldPkgJsonPath);
   }
 
   console.log(`[构建] 正在执行 moon build --target native...`);

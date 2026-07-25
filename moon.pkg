@@ -1,11 +1,23 @@
+import {
+  "moonbitlang/core/encoding/utf8",
+}
+
 options(
   "is-main": false,
-  "native-stub": ["stub.c"],
+  "native-stub": [ "stub.c" ],
   link: {
     "native": {
       "stub-cc-flags": "-I./node_modules/node-api-headers/include",
       "cc-link-flags": "/LD \"./node_modules/.cache/napi-mbt/napi.lib\"",
-      "exports": ["moonbit_napi_init", "moonbit_add_wrapper"]
-    }
-  }
+      "exports": [
+        "moonbit_napi_init",
+        "moonbit_add_wrapper",
+        "moonbit_concat_wrapper",
+        "moonbit_create_obj_wrapper",
+        "moonbit_read_obj_wrapper",
+        "moonbit_mutate_buf_wrapper",
+        "moonbit_release_handle",
+      ],
+    },
+  },
 )
