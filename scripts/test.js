@@ -1,24 +1,53 @@
-const addon = require('./index.js');
+const test = require('node:test');
+const assert = require('node:assert');
+const path = require('node:path');
+const os = require('node:os');
 
-console.log('Testing add(2, 3) =', addon.add(2, 3));
-console.log('Testing concat("Hello ", "MoonBit") =', addon.concat("Hello ", "MoonBit"));
+const arch = os.arch();
+const platform = os.platform();
+const addonPath = path.join(__dirname, '..', 'dist', `${platform}-${arch}`, 'napi_mbt.node');
+const addon = require(addonPath);
 
-console.log('Testing Dual GC (External Object)...');
-let ext = addon.create_obj("My Secret MoonBit Data");
-console.log('Read obj:', addon.read_obj(ext));
+test('N-API Addon Tests', async (t) => {
+  await t.test('Number addition', () => {
+    assert.strictEqual(addon.add(10, 20), 30);
+  });
 
-console.log('Triggering GC to release the object...');
-ext = null;
-if (global.gc) {
-  global.gc();
-} else {
-  console.log('Run with node --expose-gc to test finalizers fully.');
-}
+  await t.test('String concat', () => {
+    assert.strictEqual(addon.concat("Hello ", "MoonBit"), "Hello MoonBit");
+  });
 
-console.log('Testing Zero-Copy Buffer mutation...');
-let buf = Buffer.from([10, 20, 30]);
-console.log('Before mutate:', buf);
-addon.mutate_buffer(buf);
-console.log('After mutate:', buf);
+  await t.test('Double operations', () => {
+    assert.strictEqual(addon.check_double(2.5), 5.0);
+  });
 
-console.log('All tests passed!');
+  await t.test('Boolean operations', () => {
+    assert.strictEqual(addon.check_bool(true), false);
+    assert.strictEqual(addon.check_bool(false), true);
+  });
+
+  await t.test('Buffer operations (Bytes roundtrip)', () => {
+    const buf = Buffer.from("Hello");
+    const res = addon.roundtrip_bytes(buf);
+    assert.strictEqual(Buffer.isBuffer(res), true);
+    assert.strictEqual(res.toString(), "Hello");
+  });
+
+  await t.test('Zero-copy Buffer mutation (NapiBufferView)', () => {
+    const buf = Buffer.from([10, 20, 30]);
+    addon.mutate_buffer(buf);
+    assert.strictEqual(buf[0], 11);
+  });
+
+  await t.test('Error handling (Missing parameters)', () => {
+    assert.throws(() => {
+      addon.add(10);
+    }, /Missing argument/);
+  });
+
+  await t.test('Error handling (Invalid type)', () => {
+    assert.throws(() => {
+      addon.add("10", 20);
+    }, /Invalid argument, expected Int/);
+  });
+});

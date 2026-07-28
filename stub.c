@@ -3,34 +3,18 @@
 #include <string.h>
 
 extern napi_value moonbit_napi_init(napi_env env, napi_value exports);
-extern napi_value moonbit_add_wrapper(napi_env env, napi_callback_info info);
-extern napi_value moonbit_concat_wrapper(napi_env env, napi_callback_info info);
-extern napi_value moonbit_create_obj_wrapper(napi_env env, napi_callback_info info);
-extern napi_value moonbit_read_obj_wrapper(napi_env env, napi_callback_info info);
-extern napi_value moonbit_mutate_buf_wrapper(napi_env env, napi_callback_info info);
+extern napi_value moonbit_napi_dispatcher(int func_id, napi_env env, napi_callback_info info);
 
-static napi_value c_add_wrapper(napi_env env, napi_callback_info info) { return moonbit_add_wrapper(env, info); }
-static napi_value c_concat_wrapper(napi_env env, napi_callback_info info) { return moonbit_concat_wrapper(env, info); }
-static napi_value c_create_obj_wrapper(napi_env env, napi_callback_info info) { return moonbit_create_obj_wrapper(env, info); }
-static napi_value c_read_obj_wrapper(napi_env env, napi_callback_info info) { return moonbit_read_obj_wrapper(env, info); }
-static napi_value c_mutate_buf_wrapper(napi_env env, napi_callback_info info) { return moonbit_mutate_buf_wrapper(env, info); }
-
-MOONBIT_FFI_EXPORT
-int moonbit_napi_create_func(napi_env env, const char* utf8name, int kind, napi_value* result) {
-    napi_callback cb = NULL;
-    switch(kind) {
-        case 0: cb = c_add_wrapper; break;
-        case 1: cb = c_concat_wrapper; break;
-        case 2: cb = c_create_obj_wrapper; break;
-        case 3: cb = c_read_obj_wrapper; break;
-        case 4: cb = c_mutate_buf_wrapper; break;
-    }
-    return napi_create_function(env, utf8name, NAPI_AUTO_LENGTH, cb, NULL, result);
+static napi_value c_generic_trampoline(napi_env env, napi_callback_info info) {
+    void* data = NULL;
+    napi_get_cb_info(env, info, NULL, NULL, NULL, &data);
+    int func_id = (int)(intptr_t)data;
+    return moonbit_napi_dispatcher(func_id, env, info);
 }
 
 MOONBIT_FFI_EXPORT
-napi_value moonbit_napi_get_value_from_array(napi_value* argv, int32_t index) {
-    return argv[index];
+int moonbit_napi_create_func(napi_env env, const char* utf8name, int id, napi_value* result) {
+    return napi_create_function(env, utf8name, NAPI_AUTO_LENGTH, c_generic_trampoline, (void*)(intptr_t)id, result);
 }
 
 MOONBIT_FFI_EXPORT
@@ -39,13 +23,39 @@ napi_value moonbit_dummy_napi_value() {
 }
 
 MOONBIT_FFI_EXPORT
-int moonbit_napi_get_cb_info_2(napi_env env, napi_callback_info info, napi_value* arg0, napi_value* arg1) {
-    size_t argc = 2;
-    napi_value argv[2];
+void* moonbit_dummy_unmanaged_buffer() {
+    return NULL;
+}
+
+MOONBIT_FFI_EXPORT
+int moonbit_napi_get_cb_info_max(napi_env env, napi_callback_info info, 
+    int* argc_out, 
+    napi_value* a0, napi_value* a1, napi_value* a2, napi_value* a3,
+    napi_value* a4, napi_value* a5, napi_value* a6, napi_value* a7,
+    napi_value* a8, napi_value* a9, napi_value* a10, napi_value* a11,
+    napi_value* a12, napi_value* a13, napi_value* a14, napi_value* a15) 
+{
+    size_t argc = 16;
+    napi_value argv[16] = {0};
     napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
     if (status == napi_ok) {
-        if (argc > 0) *arg0 = argv[0];
-        if (argc > 1) *arg1 = argv[1];
+        if (argc_out) *argc_out = (int)argc;
+        if (argc > 0 && a0) *a0 = argv[0];
+        if (argc > 1 && a1) *a1 = argv[1];
+        if (argc > 2 && a2) *a2 = argv[2];
+        if (argc > 3 && a3) *a3 = argv[3];
+        if (argc > 4 && a4) *a4 = argv[4];
+        if (argc > 5 && a5) *a5 = argv[5];
+        if (argc > 6 && a6) *a6 = argv[6];
+        if (argc > 7 && a7) *a7 = argv[7];
+        if (argc > 8 && a8) *a8 = argv[8];
+        if (argc > 9 && a9) *a9 = argv[9];
+        if (argc > 10 && a10) *a10 = argv[10];
+        if (argc > 11 && a11) *a11 = argv[11];
+        if (argc > 12 && a12) *a12 = argv[12];
+        if (argc > 13 && a13) *a13 = argv[13];
+        if (argc > 14 && a14) *a14 = argv[14];
+        if (argc > 15 && a15) *a15 = argv[15];
     }
     return status;
 }
@@ -59,6 +69,10 @@ static void napi_finalizer_callback(napi_env env, void* finalize_data, void* fin
 
 MOONBIT_FFI_EXPORT int moonbit_napi_create_external_id(napi_env env, int id, napi_value* result) {
     return napi_create_external(env, (void*)(intptr_t)id, napi_finalizer_callback, NULL, result);
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_create_external_buffer(napi_env env, int length, void* data, int id, napi_value* result) {
+    return napi_create_external_buffer(env, length, data, napi_finalizer_callback, (void*)(intptr_t)id, result);
 }
 
 MOONBIT_FFI_EXPORT int moonbit_ptr_load8(const unsigned char* ptr, int offset) {

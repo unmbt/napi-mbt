@@ -81,11 +81,7 @@ options(
       "cc-link-flags": "${ccLinkFlags.replace(/"/g, '\\"')}",
       "exports": [
         "moonbit_napi_init",
-        "moonbit_add_wrapper",
-        "moonbit_concat_wrapper",
-        "moonbit_create_obj_wrapper",
-        "moonbit_read_obj_wrapper",
-        "moonbit_mutate_buf_wrapper",
+        "moonbit_napi_dispatcher",
         "moonbit_release_handle",
       ],
     },

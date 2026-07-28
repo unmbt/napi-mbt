@@ -10,6 +10,18 @@ extern "c" fn moonbit_napi_get_cb_info_2(
 ) -> Int = "moonbit_napi_get_cb_info_2"
 
 ///|
+#borrow(argc, a0, a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12, a13, a14, a15)
+extern "c" fn moonbit_napi_get_cb_info_max(
+  env : NapiEnv,
+  info : NapiCallbackInfo,
+  argc : Ref[Int],
+  a0 : Ref[NapiValue], a1 : Ref[NapiValue], a2 : Ref[NapiValue], a3 : Ref[NapiValue],
+  a4 : Ref[NapiValue], a5 : Ref[NapiValue], a6 : Ref[NapiValue], a7 : Ref[NapiValue],
+  a8 : Ref[NapiValue], a9 : Ref[NapiValue], a10 : Ref[NapiValue], a11 : Ref[NapiValue],
+  a12 : Ref[NapiValue], a13 : Ref[NapiValue], a14 : Ref[NapiValue], a15 : Ref[NapiValue]
+) -> Int = "moonbit_napi_get_cb_info_max"
+
+///|
 #borrow(result)
 extern "c" fn napi_get_value_int32(
   env : NapiEnv,
@@ -24,6 +36,45 @@ extern "c" fn napi_create_int32(
   value : Int,
   result : Ref[NapiValue],
 ) -> Int = "napi_create_int32"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_double(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Double],
+) -> Int = "napi_get_value_double"
+
+///|
+#borrow(result)
+extern "c" fn napi_create_double(
+  env : NapiEnv,
+  value : Double,
+  result : Ref[NapiValue],
+) -> Int = "napi_create_double"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_bool(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Bool],
+) -> Int = "napi_get_value_bool"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_boolean(
+  env : NapiEnv,
+  value : Bool,
+  result : Ref[NapiValue],
+) -> Int = "napi_get_boolean"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_undefined(
+  env : NapiEnv,
+  result : Ref[NapiValue],
+) -> Int = "napi_get_undefined"
 
 ///|
 #borrow(utf8name)
@@ -80,6 +131,16 @@ extern "c" fn moonbit_napi_create_external_id(
 ) -> Int = "moonbit_napi_create_external_id"
 
 ///|
+#borrow(result)
+extern "c" fn moonbit_napi_create_external_buffer(
+  env : NapiEnv,
+  length : Int,
+  data : UnmanagedBuffer,
+  id : Int,
+  result : Ref[NapiValue],
+) -> Int = "moonbit_napi_create_external_buffer"
+
+///|
 #borrow(data, length)
 extern "c" fn napi_get_buffer_info(
   env : NapiEnv,
@@ -105,4 +166,28 @@ extern "c" fn UnmanagedBuffer::store8(
 #borrow(code, msg)
 extern "c" fn napi_throw_error(env : NapiEnv, code : Bytes, msg : Bytes) -> Int = "napi_throw_error"
 
-// C 层的代理工具函数
+///|
+#borrow(data, result, result_data)
+extern "c" fn napi_create_buffer_copy(
+  env : NapiEnv,
+  length : Int,
+  data : Bytes,
+  result_data : Ref[UnmanagedBuffer],
+  result : Ref[NapiValue],
+) -> Int = "napi_create_buffer_copy"
+
+///|
+extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
+
+///|
+extern "c" fn moonbit_dummy_unmanaged_buffer() -> UnmanagedBuffer = "moonbit_dummy_unmanaged_buffer"
+
+///|
+#borrow(utf8name, result)
+extern "c" fn moonbit_napi_create_func(
+  env : NapiEnv,
+  utf8name : Bytes,
+  id : Int,
+  result : Ref[NapiValue],
+) -> Int = "moonbit_napi_create_func"
+

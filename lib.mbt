@@ -1,14 +1,36 @@
-// Dummy placeholder to represent a null value temporarily
-
-///|
-extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
-
-///|
-pub fn add(a : Int, b : Int) -> Int {
-  a + b
+pub struct NapiBufferView {
+  buf : UnmanagedBuffer
+  len : Int
+  mut is_alive : Bool
 }
 
-///|
+pub fn NapiBufferView::length(self : NapiBufferView) -> Int {
+  if not(self.is_alive) {
+    abort("Buffer view is no longer valid") // This should be a panic or error, but we'll use panic for now, generator wrapper handles typed error if possible.
+  }
+  self.len
+}
+
+pub fn NapiBufferView::load8(self : NapiBufferView, offset : Int) -> Int {
+  if not(self.is_alive) {
+    abort("Buffer view is no longer valid")
+  }
+  if offset < 0 || offset >= self.len {
+    abort("Buffer view out of bounds")
+  }
+  self.buf.load8(offset)
+}
+
+pub fn NapiBufferView::store8(self : NapiBufferView, offset : Int, val : Int) -> Unit {
+  if not(self.is_alive) {
+    abort("Buffer view is no longer valid")
+  }
+  if offset < 0 || offset >= self.len {
+    abort("Buffer view out of bounds")
+  }
+  self.buf.store8(offset, val)
+}
+
 fn result_from_status(env : NapiEnv, status : Int, msg : Bytes) -> Unit {
   if status != 0 {
     let _ = napi_throw_error(env, b"", msg)
@@ -16,192 +38,154 @@ fn result_from_status(env : NapiEnv, status : Int, msg : Bytes) -> Unit {
   }
 }
 
-// 供 C stub 调用的包装函数
-
-///|
-pub fn moonbit_add_wrapper(env : NapiEnv, info : NapiCallbackInfo) -> NapiValue {
-  let arg0 = Ref(moonbit_dummy_napi_value())
-  let arg1 = Ref(moonbit_dummy_napi_value())
-
-  let status = moonbit_napi_get_cb_info_2(env, info, arg0, arg1)
-  result_from_status(env, status, b"Failed to get arguments")
-
-  let val0 = Ref(0)
-  let status = napi_get_value_int32(env, arg0.val, val0)
-  result_from_status(env, status, b"Invalid argument 0, expected int32")
-
-  let val1 = Ref(0)
-  let status = napi_get_value_int32(env, arg1.val, val1)
-  result_from_status(env, status, b"Invalid argument 1, expected int32")
-
-  let sum = add(val0.val, val1.val)
-
-  let result = Ref(moonbit_dummy_napi_value())
-  let status = napi_create_int32(env, sum, result)
-  result_from_status(env, status, b"Failed to create result")
-
-  result.val
+// 供生成的包装函数调用的转换器
+pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int {
+  let res = Ref(0)
+  let status = napi_get_value_int32(env, val, res)
+  result_from_status(env, status, b"Invalid argument, expected Int")
+  res.val
 }
 
-// 帮助函数：从 napi_value 提取 String
+pub fn set_Int(env : NapiEnv, val : Int) -> NapiValue {
+  let res = Ref(moonbit_dummy_napi_value())
+  let status = napi_create_int32(env, val, res)
+  result_from_status(env, status, b"Failed to create Int")
+  res.val
+}
 
-///|
-fn get_string(env : NapiEnv, val : NapiValue) -> String {
+pub fn get_Double(env : NapiEnv, val : NapiValue) -> Double {
+  let res = Ref(0.0)
+  let status = napi_get_value_double(env, val, res)
+  result_from_status(env, status, b"Invalid argument, expected Double")
+  res.val
+}
+
+pub fn set_Double(env : NapiEnv, val : Double) -> NapiValue {
+  let res = Ref(moonbit_dummy_napi_value())
+  let status = napi_create_double(env, val, res)
+  result_from_status(env, status, b"Failed to create Double")
+  res.val
+}
+
+pub fn get_Bool(env : NapiEnv, val : NapiValue) -> Bool {
+  let res = Ref(false)
+  let status = napi_get_value_bool(env, val, res)
+  result_from_status(env, status, b"Invalid argument, expected Bool")
+  res.val
+}
+
+pub fn set_Bool(env : NapiEnv, val : Bool) -> NapiValue {
+  let res = Ref(moonbit_dummy_napi_value())
+  let status = napi_get_boolean(env, val, res)
+  result_from_status(env, status, b"Failed to create Bool")
+  res.val
+}
+
+pub fn get_String(env : NapiEnv, val : NapiValue) -> String {
   let len = Ref(0)
-  // 先获取需要的长度
-  let status = napi_get_value_string_utf8_length(
-    env,
-    val,
-    moonbit_dummy_unmanaged_buffer(),
-    0,
-    len,
-  )
+  let status = napi_get_value_string_utf8_length(env, val, moonbit_dummy_unmanaged_buffer(), 0, len)
   result_from_status(env, status, b"Failed to get string length")
 
-  // 加上 '\0' 的长度
   let buf = Bytes::make(len.val + 1, b'\x00')
   let status2 = napi_get_value_string_utf8(env, val, buf, len.val + 1, len)
   result_from_status(env, status2, b"Failed to read string")
 
-  let mut s = ""
+  let arr = Array::make(len.val, b'\x00')
   for i = 0; i < len.val; i = i + 1 {
-    let c = buf[i]
-    if c != b'\x00' {
-      s = s + c.to_int().unsafe_to_char().to_string()
+    arr[i] = buf[i]
+  }
+
+  // Use utf8.decode for proper string construction
+  let res = try {
+    @utf8.decode!(Bytes::from_array(arr))
+  } catch {
+    _ => {
+      let _ = napi_throw_error(env, b"", b"Failed to decode UTF-8 string")
+      ""
     }
   }
-
-  s
+  res
 }
 
-///|
-pub fn moonbit_concat_wrapper(
-  env : NapiEnv,
-  info : NapiCallbackInfo,
-) -> NapiValue {
-  let arg0 = Ref(moonbit_dummy_napi_value())
-  let arg1 = Ref(moonbit_dummy_napi_value())
-  let status = moonbit_napi_get_cb_info_2(env, info, arg0, arg1)
-  result_from_status(env, status, b"Failed to get args")
-
-  let s0 = get_string(env, arg0.val)
-  let s1 = get_string(env, arg1.val)
-
-  let res_str = s0 + s1
-  let res_bytes = @utf8.encode(res_str)
-  let result = Ref(moonbit_dummy_napi_value())
-  let status2 = napi_create_string_utf8(
-    env,
-    res_bytes,
-    res_bytes.length(),
-    result,
-  )
-  result_from_status(env, status2, b"Failed to create string")
-
-  result.val
+pub fn set_String(env : NapiEnv, val : String) -> NapiValue {
+  let res_bytes = @utf8.encode(val)
+  let res = Ref(moonbit_dummy_napi_value())
+  let status = napi_create_string_utf8(env, res_bytes, res_bytes.length(), res)
+  result_from_status(env, status, b"Failed to create String")
+  res.val
 }
 
-///|
-pub fn moonbit_create_obj_wrapper(
-  env : NapiEnv,
-  info : NapiCallbackInfo,
-) -> NapiValue {
-  let arg0 = Ref(moonbit_dummy_napi_value())
-  let arg1 = Ref(moonbit_dummy_napi_value()) // unused but get_cb_info_2 needs it
-  let _ = moonbit_napi_get_cb_info_2(env, info, arg0, arg1)
-
-  let s = get_string(env, arg0.val)
-  let id = registry_retain(s)
-
-  let result = Ref(moonbit_dummy_napi_value())
-  let status = moonbit_napi_create_external_id(env, id, result)
-  result_from_status(env, status, b"Failed to create external")
-
-  result.val
-}
-
-///|
-pub fn moonbit_read_obj_wrapper(
-  env : NapiEnv,
-  info : NapiCallbackInfo,
-) -> NapiValue {
-  let arg0 = Ref(moonbit_dummy_napi_value())
-  let arg1 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_get_cb_info_2(env, info, arg0, arg1)
-
-  let id_ref = Ref(0)
-  let status = napi_get_value_external(env, arg0.val, id_ref)
-  result_from_status(env, status, b"Failed to get external")
-
-  let obj = registry_get(id_ref.val)
-  let res_str = match obj {
-    Some(s) => s
-    None => "Object has been collected!"
-  }
-
-  let res_bytes = @utf8.encode(res_str)
-  let result = Ref(moonbit_dummy_napi_value())
-  let _ = napi_create_string_utf8(env, res_bytes, res_bytes.length(), result)
-  result.val
-}
-
-///|
-pub fn moonbit_mutate_buf_wrapper(
-  env : NapiEnv,
-  info : NapiCallbackInfo,
-) -> NapiValue {
-  let arg0 = Ref(moonbit_dummy_napi_value())
-  let arg1 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_get_cb_info_2(env, info, arg0, arg1)
-
+pub fn get_Bytes(env : NapiEnv, val : NapiValue) -> Bytes {
   let len = Ref(0)
   let unmanaged = Ref(moonbit_dummy_unmanaged_buffer())
-  let status = napi_get_buffer_info(env, arg0.val, unmanaged, len)
+  let status = napi_get_buffer_info(env, val, unmanaged, len)
   result_from_status(env, status, b"Failed to get buffer")
 
-  if len.val > 0 {
-    let buf = unmanaged.val
-    let old_val = buf.load8(0)
-    buf.store8(0, old_val + 1)
+  let arr = Array::make(len.val, b'\x00')
+  for i = 0; i < len.val; i = i + 1 {
+    arr[i] = unmanaged.val.load8(i).to_byte()
   }
-
-  arg0.val
+  Bytes::from_array(arr)
 }
 
-///|
-extern "c" fn moonbit_dummy_unmanaged_buffer() -> UnmanagedBuffer = "moonbit_dummy_napi_value"
+pub fn set_Bytes(env : NapiEnv, val : Bytes) -> NapiValue {
+  // Currently MoonBit doesn't expose malloc natively to FFI.
+  // Actually we need to pass a C-allocated buffer if we want external buffer.
+  // For now we'll just create a string if we can't allocate.
+  // wait, Node N-API provides `napi_create_buffer_copy` which allocates!
+  // Let's add napi_create_buffer_copy to bindings.
+  let res = Ref(moonbit_dummy_napi_value())
+  let data = Ref(moonbit_dummy_unmanaged_buffer())
+  let status = napi_create_buffer_copy(env, val.length(), val, data, res)
+  result_from_status(env, status, b"Failed to create buffer")
+  res.val
+}
 
-///|
-#borrow(name, result)
-extern "c" fn moonbit_napi_create_func(
-  env : NapiEnv,
-  name : Bytes,
-  kind : Int,
-  result : Ref[NapiValue],
-) -> Int = "moonbit_napi_create_func"
+pub fn get_NapiBufferView(env : NapiEnv, val : NapiValue) -> NapiBufferView {
+  let len = Ref(0)
+  let unmanaged = Ref(moonbit_dummy_unmanaged_buffer())
+  let status = napi_get_buffer_info(env, val, unmanaged, len)
+  result_from_status(env, status, b"Failed to get buffer")
+  { buf: unmanaged.val, len: len.val, is_alive: true }
+}
 
-///|
-pub fn moonbit_napi_init(env : NapiEnv, exports : NapiValue) -> NapiValue {
-  let func = Ref(moonbit_dummy_napi_value())
-  let status = moonbit_napi_create_func(env, b"add\x00", 0, func)
-  result_from_status(env, status, b"Failed to create function 'add'")
-  let _ = napi_set_named_property(env, exports, b"add\x00", func.val)
+pub fn set_Unit(env : NapiEnv, _val : Unit) -> NapiValue {
+  let res = Ref(moonbit_dummy_napi_value())
+  let status = napi_get_undefined(env, res)
+  result_from_status(env, status, b"Failed to create undefined")
+  res.val
+}
 
-  let func2 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_create_func(env, b"concat\x00", 1, func2)
-  let _ = napi_set_named_property(env, exports, b"concat\x00", func2.val)
+/// @napi
+pub fn add(a : Int, b : Int) -> Int {
+  a + b
+}
 
-  let func3 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_create_func(env, b"create_obj\x00", 2, func3)
-  let _ = napi_set_named_property(env, exports, b"create_obj\x00", func3.val)
+/// @napi
+pub fn concat(a : String, b : String) -> String {
+  a + b
+}
 
-  let func4 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_create_func(env, b"read_obj\x00", 3, func4)
-  let _ = napi_set_named_property(env, exports, b"read_obj\x00", func4.val)
+/// @napi
+pub fn mutate_buffer(view : NapiBufferView) -> Unit {
+  if view.length() > 0 {
+    let old = view.load8(0)
+    view.store8(0, old + 1)
+  }
+}
 
-  let func5 = Ref(moonbit_dummy_napi_value())
-  let _ = moonbit_napi_create_func(env, b"mutate_buffer\x00", 4, func5)
-  let _ = napi_set_named_property(env, exports, b"mutate_buffer\x00", func5.val)
+/// @napi
+pub fn roundtrip_bytes(b : Bytes) -> Bytes {
+  b
+}
 
-  exports
+/// @napi
+/// @napi
+pub fn check_bool(b : Bool) -> Bool {
+  not(b)
+}
+
+/// @napi
+pub fn check_double(d : Double) -> Double {
+  d * 2.0
 }
