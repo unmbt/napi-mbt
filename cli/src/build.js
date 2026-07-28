@@ -3,10 +3,6 @@ const os = require('os');
 const path = require('path');
 const { execSync } = require('child_process');
 
-const PKG_PATH = path.join(__dirname, '..', 'moon.pkg');
-const CACHE_DIR = path.join(__dirname, '..', 'node_modules', '.cache', 'napi-mbt');
-const NAPI_LIB_PATH = path.join(CACHE_DIR, 'napi.lib');
-
 // 探测本机 MSVC 工具链中的 lib.exe
 function findLibExe() {
   try {
@@ -29,37 +25,45 @@ function findLibExe() {
 }
 
 // 通过 .def 动态提炼极简的 napi.lib，干掉臃肿的 node.lib
-function generateNapiLib() {
+async function main(pkgDir = '.') {
+  const isRelease = process.argv.includes('--release');
+  const CACHE_DIR = path.join(pkgDir, 'node_modules', '.cache', 'napi-mbt');
+  const NAPI_LIB_PATH = path.join(CACHE_DIR, 'napi.lib');
+  const PKG_PATH = path.join(pkgDir, 'moon.pkg');
+
   if (!fs.existsSync(CACHE_DIR)) {
     fs.mkdirSync(CACHE_DIR, { recursive: true });
   }
-  
-  if (fs.existsSync(NAPI_LIB_PATH)) {
-    return; // 已经生成过，直接复用万能库
+
+  // Windows: 利用 node-api-headers 中的 node_api.def 生成 import library
+  if (os.platform() === 'win32') {
+    if (!fs.existsSync(NAPI_LIB_PATH)) {
+      const libExe = findLibExe();
+      if (!libExe) {
+        throw new Error('找不到 lib.exe，请确保安装了 Visual Studio 的 C++ 构建工具。');
+      }
+
+      let defPath;
+      try {
+        defPath = path.join(path.dirname(require.resolve('node-api-headers/package.json')), 'def', 'node_api.def');
+      } catch(e) {
+        defPath = path.join(pkgDir, 'node_modules', 'node-api-headers', 'def', 'node_api.def');
+      }
+      if (!fs.existsSync(defPath)) {
+        throw new Error('未找到 node_api.def，请确保已经执行 npm install。');
+      }
+
+      console.log(`\n[魔法炼金] 正在通过 lib.exe 从 node_api.def 极速生成万能存根库...`);
+      execSync(`"${libExe}" /DEF:"${defPath}" /OUT:"${NAPI_LIB_PATH}" /MACHINE:X64`, { stdio: 'inherit' });
+    }
   }
 
-  const libExe = findLibExe();
-  if (!libExe) {
-    throw new Error('找不到 lib.exe，请确保安装了 Visual Studio 的 C++ 构建工具。');
-  }
-
-  const defPath = path.join(__dirname, '..', 'node_modules', 'node-api-headers', 'def', 'node_api.def');
-  if (!fs.existsSync(defPath)) {
-    throw new Error('未找到 node_api.def，请确保已经执行 npm install。');
-  }
-
-  console.log(`\n[魔法炼金] 正在通过 lib.exe 从 node_api.def 极速生成万能存根库...`);
-  execSync(`"${libExe}" /DEF:"${defPath}" /OUT:"${NAPI_LIB_PATH}" /MACHINE:X64`, { stdio: 'inherit' });
-}
-
-async function main() {
   const platform = os.platform();
   let ccLinkFlags = "";
 
   if (platform === 'win32') {
-    generateNapiLib();
     // Use relative path for cc-link-flags to avoid absolute paths in moon.pkg
-    const relativeLibPath = path.relative(path.join(__dirname, '..'), NAPI_LIB_PATH).replace(/\\/g, '/');
+    const relativeLibPath = path.relative(pkgDir, NAPI_LIB_PATH).replace(/\\/g, '/');
     ccLinkFlags = `/LD "./${relativeLibPath}"`;
   } else if (platform === 'darwin') {
     ccLinkFlags = "-shared -undefined dynamic_lookup";
@@ -92,15 +96,22 @@ options(
   fs.writeFileSync(PKG_PATH, pkgContent);
   
   // Remove moon.pkg.json if it exists to avoid conflicts
-  const oldPkgJsonPath = path.join(__dirname, '..', 'moon.pkg.json');
+  const oldPkgJsonPath = path.join(pkgDir, 'moon.pkg.json');
   if (fs.existsSync(oldPkgJsonPath)) {
     fs.unlinkSync(oldPkgJsonPath);
   }
 
-  console.log(`[构建] 正在执行 moon build --target native...`);
-  execSync('moon build --target native', { stdio: 'inherit', cwd: path.join(__dirname, '..') });
+  let cmd = `moon build --target native${isRelease ? ' --release' : ''}`;
+  console.log(`[构建] 正在执行 ${cmd}...`);
+  try {
+    execSync(cmd, { stdio: 'inherit', cwd: pkgDir });
+  } catch (e) {
+    console.error("构建失败");
+    process.exit(1);
+  }
 
-  const buildDir = path.join(__dirname, '..', '_build', 'native', 'debug', 'build');
+  // 复制二进制文件并改名为 .node
+  const buildDir = path.join(pkgDir, '_build', 'native', isRelease ? 'release' : 'debug', 'build');
   if (!fs.existsSync(buildDir)) {
     console.error("未找到构建目录:", buildDir);
     process.exit(1);
@@ -117,7 +128,7 @@ options(
   
   if (artifact) {
     const src = path.join(buildDir, artifact);
-    const targetDir = path.join(__dirname, '..', 'dist', `${platform}-${os.arch()}`);
+    const targetDir = path.join(pkgDir, 'artifacts', `${platform}-${os.arch()}`);
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
     }
@@ -131,7 +142,4 @@ options(
   }
 }
 
-main().catch(err => {
-  console.error(err);
-  process.exit(1);
-});
+module.exports = main;

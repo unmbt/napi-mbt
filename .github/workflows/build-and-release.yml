@@ -1,0 +1,90 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - master
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: napi-mbt-linux-x64
+          - os: macos-latest
+            artifact_name: napi-mbt-darwin-x64
+          - os: windows-latest
+            artifact_name: napi-mbt-win32-x64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Setup MoonBit
+        uses: hustcer/setup-moonbit@v1
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Update Registry & Dependencies
+        run: moon update
+
+      - name: Build Native Module
+        run: npm run build -- --release
+
+      - name: Test
+        run: npm run test
+
+      - name: Prepare Artifact
+        shell: bash
+        run: |
+          mkdir -p artifacts_export
+          # The node module is created at artifacts/[platform]-[arch]/napi_mbt.node
+          # We need to copy it to the export directory
+          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            cp artifacts/linux-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
+          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
+            cp artifacts/darwin-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
+          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp artifacts/win32-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
+          fi
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: artifacts_export/${{ matrix.artifact_name }}.node
+          retention-days: 7
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*.node
+          generate_release_notes: true

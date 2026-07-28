@@ -3,10 +3,7 @@ const assert = require('node:assert');
 const path = require('node:path');
 const os = require('node:os');
 
-const arch = os.arch();
-const platform = os.platform();
-const addonPath = path.join(__dirname, '..', 'dist', `${platform}-${arch}`, 'napi_mbt.node');
-const addon = require(addonPath);
+const addon = require('../index.js');
 
 test('N-API Addon Tests', async (t) => {
   await t.test('Number addition', () => {

@@ -1,0 +1,12 @@
+{
+  "name": "napi-mbt-linux-arm64",
+  "version": "0.1.0",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "main": "napi_mbt.node",
+  "description": "linux arm64 binary for napi-mbt"
+}

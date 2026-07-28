@@ -1,16 +1,24 @@
-import fs from 'fs';
-import path from 'path';
-import Parser = require('web-tree-sitter');
+const fs = require('fs');
+const path = require('path');
+const webTreeSitter = require('web-tree-sitter');
+const Parser = webTreeSitter.Parser || webTreeSitter;
+const Language = webTreeSitter.Language || Parser.Language;
 
 const args = process.argv.slice(2);
 const isCheck = args.includes('--check');
 let pkgDir = args.find(a => !a.startsWith('--')) || '.';
 
-async function main() {
+async function main(overridePkgDir) {
+  if (overridePkgDir) pkgDir = overridePkgDir;
   await Parser.init();
   const parser = new Parser();
-  const wasmPath = path.resolve(__dirname, '../node_modules/tree-sitter-moonbit/tree-sitter-moonbit.wasm');
-  const MoonBit = await Parser.Language.load(wasmPath);
+  let wasmPath;
+  try {
+    wasmPath = path.join(path.dirname(require.resolve('tree-sitter-moonbit/package.json')), 'tree-sitter-moonbit.wasm');
+  } catch (e) {
+    wasmPath = path.resolve(__dirname, '../../node_modules/tree-sitter-moonbit/tree-sitter-moonbit.wasm');
+  }
+  const MoonBit = await Language.load(wasmPath);
   parser.setLanguage(MoonBit);
 
   const files = fs.readdirSync(pkgDir).filter(f => f.endsWith('.mbt') && !f.endsWith('_test.mbt') && !f.endsWith('_wbtest.mbt') && f !== '_napi_bindings.mbt');
@@ -22,7 +30,7 @@ async function main() {
   let dispatcherCode = `pub fn moonbit_napi_dispatcher(func_id : Int, env : NapiEnv, info : NapiCallbackInfo) -> NapiValue {\n  match func_id {\n`;
   
   let funcId = 0;
-  const exportedFuncs: Array<{name: string, id: number}> = [];
+  const exportedFuncs = [];
 
   for (const file of files) {
     const filePath = path.join(pkgDir, file);
@@ -30,7 +38,7 @@ async function main() {
     const tree = parser.parse(code);
     const root = tree.rootNode;
     
-    if (root.hasError()) {
+    if (root.hasError) {
       console.error(`[ERROR] File ${file} has syntax errors.`);
       hasErrors = true;
       continue;
@@ -40,37 +48,32 @@ async function main() {
       const node = root.child(i);
       if (node.type === 'comment' && node.text.trim() === '/// @napi') {
         let nextIdx = i + 1;
-        while (nextIdx < root.childCount && root.child(nextIdx)?.type === 'comment') {
+        while (nextIdx < root.childCount && (root.child(nextIdx)?.type === 'comment' || root.child(nextIdx)?.type === 'semicolon')) {
             nextIdx++;
         }
         
-        const funcNode = root.child(nextIdx);
+        let structItem = root.child(nextIdx);
+        let funcNode = structItem;
+        if (structItem && structItem.type === 'structure_item') {
+          funcNode = structItem.child(0);
+        }
+        
         if (!funcNode || funcNode.type !== 'function_definition') {
           console.error(`[ERROR] ${file}:${node.startPosition.row + 1}: /// @napi is not followed by a function definition.`);
           hasErrors = true;
           continue;
         }
 
-        const isPub = funcNode.child(0)?.type === 'pub';
+        const isPub = funcNode.children.some(c => c.type === 'visibility' || c.text === 'pub');
         if (!isPub) {
           console.error(`[ERROR] ${file}:${funcNode.startPosition.row + 1}: /// @napi functions must be pub.`);
           hasErrors = true;
           continue;
         }
 
-        let nameNode = null;
-        let paramsNode = null;
-        let retNode = null;
-
-        for (const child of funcNode.children) {
-          if (child.type === 'identifier') {
-            nameNode = child;
-          } else if (child.type === 'parameters') {
-            paramsNode = child;
-          } else if (child.type === 'return_type') {
-            retNode = child;
-          }
-        }
+        const nameNode = funcNode.children.find(c => c.type === 'function_identifier' || c.type === 'identifier');
+        const paramsNode = funcNode.children.find(c => c.type === 'parameters');
+        const retNode = funcNode.children.find(c => c.type === 'return_type');
 
         if (!nameNode || !paramsNode) {
           console.error(`[ERROR] ${file}:${funcNode.startPosition.row + 1}: Invalid function signature.`);
@@ -80,13 +83,13 @@ async function main() {
 
         const funcName = nameNode.text;
         
-        const params: Array<{name: string, type: string}> = [];
-        for (const p of paramsNode.namedChildren) {
+        const params = [];
+        for (const p of paramsNode.children) {
           if (p.type === 'parameter') {
-            const pName = p.childForFieldName('name')?.text || p.children[0]?.text;
-            const pType = p.childForFieldName('type')?.text || p.children[2]?.text;
-            if (pName && pType) {
-              params.push({name: pName, type: pType});
+            const pText = p.text;
+            const parts = pText.split(':').map(s => s.trim());
+            if (parts.length >= 2) {
+              params.push({name: parts[0], type: parts[1]});
             }
           }
         }
@@ -99,10 +102,8 @@ async function main() {
 
         let retType = 'Unit';
         if (retNode) {
-          const typeNode = retNode.children.find(c => c.type !== '->');
-          if (typeNode) {
-             retType = typeNode.text.replace(/!.*$/, '').trim(); 
-          }
+          // returns something like `-> Int!Error`
+          retType = retNode.text.replace('->', '').trim().replace(/!.*$/, '').trim();
         }
         
         const throws = retNode ? retNode.text.includes('!') : false;
@@ -225,4 +226,4 @@ async function main() {
   }
 }
 
-main().catch(console.error);
+module.exports = main;
