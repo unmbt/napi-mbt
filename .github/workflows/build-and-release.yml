@@ -19,10 +19,16 @@ jobs:
         include:
           - os: ubuntu-latest
             artifact_name: napi-mbt-linux-x64
-          - os: macos-latest
+            src_dir: linux-x64
+          - os: macos-13
             artifact_name: napi-mbt-darwin-x64
+            src_dir: darwin-x64
+          - os: macos-latest
+            artifact_name: napi-mbt-darwin-arm64
+            src_dir: darwin-arm64
           - os: windows-latest
             artifact_name: napi-mbt-win32-x64
+            src_dir: win32-x64
 
     steps:
       - name: Checkout Repository
@@ -52,15 +58,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts_export
-          # The node module is created at artifacts/[platform]-[arch]/napi_mbt.node
-          # We need to copy it to the export directory
-          if [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            cp artifacts/linux-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
-          elif [ "${{ matrix.os }}" = "macos-latest" ]; then
-            cp artifacts/darwin-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
-          elif [ "${{ matrix.os }}" = "windows-latest" ]; then
-            cp artifacts/win32-x64/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
-          fi
+          cp artifacts/${{ matrix.src_dir }}/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
