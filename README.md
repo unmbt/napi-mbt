@@ -31,7 +31,7 @@ With the bundled `@unmbt/napi-mbt-cli`, developers can effortlessly auto-generat
 - 🪄 **`@napi` Macro Emulation**: Write standard MoonBit functions, add a `/// @napi` comment, and `napi-mbt`'s AST parser will automatically generate C-bindings and router dispatches.
 - 📝 **Automatic TypeScript Typing**: Generates `.d.ts` declaration files effortlessly alongside your MoonBit compilations for strong-typed JS/TS consumption.
 - 🚀 **Zero-Copy Buffer Mutation**: Safely manipulate Node.js Buffers directly in MoonBit memory using `NapiBufferView`.
-- 📦 **Integrated Cross-Platform CI/CD**: Matrix-build ready! Automatically publishes architecture-specific Native Modules via NPM's `optionalDependencies` pattern (Supports Windows, Linux, macOS - x64 & ARM64).
+- 📦 **Integrated Cross-Platform CI/CD**: Matrix-build ready! Automatically publishes architecture-specific Native Modules via NPM's `optionalDependencies` pattern (Currently supports Windows and macOS. Linux support is WIP due to ELF symbol collision issues).
 
 ## 🚀 Quick Start
 
@@ -88,6 +88,8 @@ You can now use your native addon in JavaScript:
 const addon = require('./artifacts/win32-x64/napi_mbt.node');
 console.log(addon.add(2, 3)); // Output: 5
 ```
+
+> **Note**: Linux is currently not supported because MoonBit's native backend emits ELF shared objects that experience symbol collisions and TLS initial-exec model issues when dynamically loaded into Node.js. We are tracking this issue and hope to resolve it in future MoonBit updates.
 
 ## 📚 Documentation
 

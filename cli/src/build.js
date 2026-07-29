@@ -70,6 +70,7 @@ async function main(pkgDir = '.') {
     ccLinkFlags = "-shared -undefined dynamic_lookup";
     ccFlags = "";
   } else {
+    // @todo: Linux support is currently broken (SIGSEGV)
     ccLinkFlags = "-shared";
     ccFlags = "-fPIC";
   }
@@ -109,6 +110,10 @@ options(
   console.log(`[构建] 正在执行 ${cmd}...`);
   
   const buildEnv = { ...process.env };
+  // @todo: Linux is currently not supported due to ELF flat symbol namespace collision 
+  // and TLS (Thread Local Storage) initial-exec model issues causing SIGSEGV when loaded 
+  // dynamically via dlopen in Node.js. Kept here for future reference.
+  // https://github.com/unmbt/napi-mbt/actions/runs/30452105920/job/90576383891
   if (platform !== 'win32' && platform !== 'darwin') {
     const ccWrapperPath = path.join(CACHE_DIR, 'cc_wrapper.sh');
     fs.writeFileSync(ccWrapperPath, '#!/bin/sh\nexec cc -fPIC "$@"\n');

@@ -32,7 +32,7 @@
 - 🪄 **伪宏 `@napi` 自动化生成**：只要在标准的 MoonBit 函数前加上 `/// @napi` 的注释，内置的 AST 语法树解析器就会自动为你编写一切 C 端交互胶水代码。
 - 📝 **自动 TypeScript 定义**：构建时自动分析 MoonBit 签名，同步输出严谨的 `.d.ts` 类型声明文件，实现 JS/TS 的全链路强类型约束。
 - 🚀 **Buffer 零拷贝修改**：提供专属的 `NapiBufferView` 视图，允许在 MoonBit 侧直接读写 Node.js Buffer 内存，极为适合图像处理和加密的高性能场景。
-- 📦 **集成跨平台 CI/CD**：内置针对 Optional Dependencies 的发布支持，配合标准化的 GitHub Actions 矩阵，实现 Windows、Linux、macOS 原生拓展库的一键编译发布。
+- 📦 **集成跨平台 CI/CD**：内置针对 Optional Dependencies 的发布支持，配合标准化的 GitHub Actions 矩阵，实现 Windows 和 macOS 原生拓展库的一键编译发布（Linux 支持因 ELF 符号冲突问题暂为 WIP 状态）。
 
 ## 🚀 快速开始
 
@@ -89,6 +89,8 @@ npx napi-mbt build
 const addon = require('./artifacts/win32-x64/napi_mbt.node');
 console.log(addon.add(2, 3)); // 输出: 5
 ```
+
+> **注意**：由于 MoonBit 的 Native 后端目前生成的 ELF 动态共享对象在 Node.js 中加载时会遇到全局符号冲突（Symbol Collision）以及 TLS (initial-exec) 模型引发的段错误 (SIGSEGV)，Linux 平台当前暂不支持。我们正在跟踪该问题，期望在 MoonBit 的后续更新中修复。
 
 ## 📚 文档
 
