@@ -60,6 +60,7 @@ async function main(pkgDir = '.') {
 
   const platform = os.platform();
   let ccLinkFlags = "";
+  let ccFlags = "";
 
   if (platform === 'win32') {
     // Use relative path for cc-link-flags to avoid absolute paths in moon.pkg
@@ -67,8 +68,10 @@ async function main(pkgDir = '.') {
     ccLinkFlags = `/LD "./${relativeLibPath}"`;
   } else if (platform === 'darwin') {
     ccLinkFlags = "-shared -undefined dynamic_lookup";
+    ccFlags = "";
   } else {
     ccLinkFlags = "-shared";
+    ccFlags = "-fPIC";
   }
 
   // Generate moon.pkg in KDL format natively
@@ -81,6 +84,7 @@ options(
   "native-stub": [ "stub.c" ],
   link: {
     "native": {
+      "cc-flags": "${ccFlags}",
       "stub-cc-flags": "-I./node_modules/node-api-headers/include",
       "cc-link-flags": "${ccLinkFlags.replace(/"/g, '\\"')}",
       "exports": [
@@ -103,8 +107,21 @@ options(
 
   let cmd = `moon build --target native${isRelease ? ' --release' : ''}`;
   console.log(`[构建] 正在执行 ${cmd}...`);
+  
+  const buildEnv = { ...process.env };
+  if (platform !== 'win32' && platform !== 'darwin') {
+    const ccWrapperPath = path.join(CACHE_DIR, 'cc_wrapper.sh');
+    fs.writeFileSync(ccWrapperPath, '#!/bin/sh\nexec cc -fPIC "$@"\n');
+    fs.chmodSync(ccWrapperPath, 0o755);
+    buildEnv.MOON_CC = ccWrapperPath;
+
+    const arWrapperPath = path.join(CACHE_DIR, 'ar');
+    fs.writeFileSync(arWrapperPath, '#!/bin/sh\nexec ar "$@"\n');
+    fs.chmodSync(arWrapperPath, 0o755);
+  }
+
   try {
-    execSync(cmd, { stdio: 'inherit', cwd: pkgDir });
+    execSync(cmd, { stdio: 'inherit', cwd: pkgDir, env: buildEnv });
   } catch (e) {
     console.error("构建失败");
     process.exit(1);
