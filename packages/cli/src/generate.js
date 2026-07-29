@@ -1,8 +1,12 @@
-const fs = require('fs');
-const path = require('path');
-const webTreeSitter = require('web-tree-sitter');
-const Parser = webTreeSitter.Parser || webTreeSitter;
-const Language = webTreeSitter.Language || Parser.Language;
+import fs from 'node:fs';
+import path from 'node:path';
+import { Parser, Language } from "web-tree-sitter";
+import { createRequire } from 'node:module';
+import { fileURLToPath } from 'node:url';
+
+const require = createRequire(import.meta.url);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const args = process.argv.slice(2);
 const isCheck = args.includes('--check');
@@ -34,7 +38,7 @@ async function main(overridePkgDir) {
 
   for (const file of files) {
     const filePath = path.join(pkgDir, file);
-    const code = fs.readFileSync(filePath, 'utf-8');
+    const code = fs.readFileSync(filePath, 'utf-8').replace(/\r\n/g, '\n');
     const tree = parser.parse(code);
     const root = tree.rootNode;
     
@@ -194,7 +198,8 @@ async function main(overridePkgDir) {
   }
 
   if (hasErrors) {
-    process.exit(1);
+    process.exitCode = 1;
+    return;
   }
 
   dispatcherCode += `    _ => { let _ = napi_throw_error(env, b"", b"Invalid function ID"); moonbit_dummy_napi_value() }\n  }\n}\n`;
@@ -226,4 +231,4 @@ async function main(overridePkgDir) {
   }
 }
 
-module.exports = main;
+export default main;

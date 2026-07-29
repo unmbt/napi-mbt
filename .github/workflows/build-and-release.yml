@@ -1,88 +1,87 @@
-name: Build and Release
+name: CI & Release
 
 on:
   push:
     branches:
       - master
-    tags:
-      - 'v*'
   pull_request:
     branches:
       - master
 
 jobs:
-  build:
-    name: Build on ${{ matrix.os }}
+  test:
+    name: Build & Test on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
         include:
-#           - os: ubuntu-latest
-#             artifact_name: napi-mbt-linux-x64
-#             src_dir: linux-x64
-          - os: macos-13
-            artifact_name: napi-mbt-darwin-x64
-            src_dir: darwin-x64
+          # Linux is temporarily disabled due to NAPI TLS/ELF namespace issues
+          # - os: ubuntu-latest
           - os: macos-latest
-            artifact_name: napi-mbt-darwin-arm64
-            src_dir: darwin-arm64
           - os: windows-latest
-            artifact_name: napi-mbt-win32-x64
-            src_dir: win32-x64
-
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
 
       - name: Install dependencies
-        run: npm install --ignore-scripts
+        run: pnpm install --no-frozen-lockfile
 
-      - name: Update Registry & Dependencies
-        run: moon update
+      - name: Build (CLI & Example)
+        run: pnpm run build
 
-      - name: Build Native Module
-        run: npm run build -- --release
-
-      - name: Test
-        run: npm run test
-
-      - name: Prepare Artifact
-        shell: bash
-        run: |
-          mkdir -p artifacts_export
-          cp artifacts/${{ matrix.src_dir }}/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: artifacts_export/${{ matrix.artifact_name }}.node
-          retention-days: 7
+      - name: Test (Example Native Bindings)
+        run: pnpm run test
 
   release:
-    name: Create GitHub Release
-    needs: build
-    if: startsWith(github.ref, 'refs/tags/')
+    name: Publish and Release
+    needs: test
+    # 只有推送到 master 分支才执行发包/PR 流程
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write       # changesets 需要写入 github release 和 commit
+      pull-requests: write  # changesets 需要创建和更新 version PR
+      id-token: write       # npm provenance (可信发布) 必备权限
     steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          path: artifacts
-          merge-multiple: true
+          fetch-depth: 0
 
-      - name: Release
-        uses: softprops/action-gh-release@v2
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          files: artifacts/*.node
-          generate_release_notes: true
+          node-version: 24
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build CLI
+        run: pnpm run build --filter=@unmbt/napi-mbt-cli
+
+      - name: Create Release PR or Publish
+        uses: changesets/action@v1
+        with:
+          publish: pnpm exec changeset publish
+          commit: "chore(release): version packages"
+          title: "chore(release): version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: true

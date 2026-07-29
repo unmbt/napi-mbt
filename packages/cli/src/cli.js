@@ -1,8 +1,13 @@
 #!/usr/bin/env node
 
-const path = require('path');
-const generate = require('../src/generate');
-const build = require('../src/build');
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import generate from './generate.js';
+import build from './index.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -16,7 +21,6 @@ async function main() {
     await build(cwd);
     console.log(`[napi-mbt] Build successful.`);
   } else if (command === 'prepublish') {
-    const fs = require('fs');
     const cwd = process.cwd();
     const pkgPath = path.join(cwd, 'package.json');
     if (!fs.existsSync(pkgPath)) {

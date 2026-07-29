@@ -1,0 +1,33 @@
+{
+  "name": "@unmbt/napi-mbt-cli",
+  "version": "0.1.0",
+  "description": "CLI tool for MoonBit N-API bindings",
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "bin": {
+    "napi": "dist/cli.mjs",
+    "napi-raw": "src/cli.js"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "scripts": {
+    "build": "tsdown"
+  },
+  "dependencies": {
+    "@unmbt/tree-sitter-moonbit": "latest",
+    "node-api-headers": "^1.9.0",
+    "web-tree-sitter": "^0.26.11"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.2",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2"
+  }
+}

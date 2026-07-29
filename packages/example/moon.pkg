@@ -8,7 +8,7 @@ options(
   link: {
     "native": {
       "cc-flags": "",
-      "stub-cc-flags": "-I./node_modules/node-api-headers/include",
+      "stub-cc-flags": "-I\"E:/project/moonbit/unmbt/napi-mbt/node_modules/.pnpm/node-api-headers@1.9.0/node_modules/node-api-headers/include\"",
       "cc-link-flags": "/LD \"./node_modules/.cache/napi-mbt/napi.lib\"",
       "exports": [
         "moonbit_napi_init",

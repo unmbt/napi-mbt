@@ -1,7 +1,10 @@
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-const { execSync } = require('child_process');
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 // 探测本机 MSVC 工具链中的 lib.exe
 function findLibExe() {
@@ -75,6 +78,15 @@ async function main(pkgDir = '.') {
     ccFlags = "-fPIC";
   }
 
+  let includePath;
+  try {
+    includePath = path.join(path.dirname(require.resolve('node-api-headers/package.json')), 'include');
+  } catch(e) {
+    includePath = path.join(pkgDir, 'node_modules', 'node-api-headers', 'include');
+  }
+  // Convert backslashes to forward slashes to avoid escape issues in moon.pkg
+  const normalizedInclude = includePath.replace(/\\/g, '/');
+
   // Generate moon.pkg in KDL format natively
   const pkgContent = `import {
   "moonbitlang/core/encoding/utf8",
@@ -86,7 +98,7 @@ options(
   link: {
     "native": {
       "cc-flags": "${ccFlags}",
-      "stub-cc-flags": "-I./node_modules/node-api-headers/include",
+      "stub-cc-flags": "-I\\"${normalizedInclude}\\"",
       "cc-link-flags": "${ccLinkFlags.replace(/"/g, '\\"')}",
       "exports": [
         "moonbit_napi_init",
@@ -164,4 +176,4 @@ options(
   }
 }
 
-module.exports = main;
+export default main;

@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+allowBuilds:
+  '@unmbt/tree-sitter-moonbit': false
+minimumReleaseAgeExclude:
+  - '@unmbt/tree-sitter-moonbit@0.1.0-git.00cc7c9'
