@@ -14,9 +14,9 @@ async function main(overridePkgDir) {
   const parser = new Parser();
   let wasmPath;
   try {
-    wasmPath = path.join(path.dirname(require.resolve('tree-sitter-moonbit/package.json')), 'tree-sitter-moonbit.wasm');
+    wasmPath = path.join(path.dirname(require.resolve('@unmbt/tree-sitter-moonbit/package.json')), 'tree-sitter-moonbit.wasm');
   } catch (e) {
-    wasmPath = path.resolve(__dirname, '../../node_modules/tree-sitter-moonbit/tree-sitter-moonbit.wasm');
+    wasmPath = path.resolve(__dirname, '../../node_modules/@unmbt/tree-sitter-moonbit/tree-sitter-moonbit.wasm');
   }
   const MoonBit = await Language.load(wasmPath);
   parser.setLanguage(MoonBit);

@@ -68,3 +68,10 @@ This generates the target JSON layouts within the `npm/` folder. Ensure your cha
 1. In `cli/src/generate.js`: Implement the TypeScript AST mapper to properly emit the `.d.ts` typing.
 2. In `cli/src/generate.js`: Enhance the `mbt` generation block to parse JS types to their corresponding internal definitions.
 3. In `lib.mbt`: Implement the extraction primitives utilizing underlying raw N-API signatures (`napi_get_named_property`, etc.).
+
+### Troubleshooting
+
+- **Installation Issues (node-gyp errors)**: When running `npm install` (e.g., when installing dependencies), you might encounter `node-gyp` compilation errors on some systems due to missing C++ build tools or Python. Since `napi-mbt` uses `moon build` and directly links via the native C compiler instead of relying on `node-gyp`, you can safely bypass these errors by running:
+  ```bash
+  npm install --ignore-scripts
+  ```

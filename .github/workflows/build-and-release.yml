@@ -37,7 +37,7 @@ jobs:
         uses: hustcer/setup-moonbit@v1
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --ignore-scripts
 
       - name: Update Registry & Dependencies
         run: moon update

@@ -67,3 +67,10 @@ node cli/bin/napi-mbt.js prepublish
 1. 在 `cli/src/generate.js` 中: 扩展 TypeScript AST 分析器，从而在 `index.d.ts` 中正确抛出新的类型签名。
 2. 在 `cli/src/generate.js` 中: 扩展 `mbt` 胶水代码生成模板，编写该类型的装箱和拆箱拦截逻辑。
 3. 在 `lib.mbt` 内: 调用底层的 Node-API（如 `napi_get_named_property` 等等），编写底层的内存提取和安全检验逻辑。
+
+### 常见问题排查 (Troubleshooting)
+
+- **安装依赖时遇到 node-gyp 报错**：在执行 `npm install` 时，部分缺少 C++ 构建工具或 Python 的系统可能会报出 `node-gyp` 编译错误。因为 `napi-mbt` 实际上是利用 `moon build` 和底层的 C 编译器直接完成链接的，完全不依赖 `node-gyp`，所以你可以安全地通过如下命令跳过该报错：
+  ```bash
+  npm install --ignore-scripts
+  ```
