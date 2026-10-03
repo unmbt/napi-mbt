@@ -1,50 +1,42 @@
-const test = require('node:test');
-const assert = require('node:assert');
-const path = require('node:path');
-const os = require('node:os');
+const assert = require('assert');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const childProcess = require('child_process');
+const addon = require('../index.cjs');
 
-const addon = require('../index.js');
+assert.strictEqual(addon.add(10, 20), 30);
+assert.strictEqual(addon.concat('Hello ', 'MoonBit'), 'Hello MoonBit');
+assert.strictEqual(addon.check_double(2.5), 5.0);
+assert.strictEqual(addon.check_bool(true), false);
+assert.strictEqual(addon.check_bool(false), true);
+const buffer = Buffer.from('Hello');
+assert.strictEqual(addon.roundtrip_bytes(buffer).toString(), 'Hello');
+const mutable = Buffer.from([10, 20, 30]);
+addon.mutate_buffer(mutable);
+assert.strictEqual(mutable[0], 11);
+assert.throws(() => addon.add(10), /Missing argument/);
+assert.throws(() => addon.add('10', 20), /Invalid argument, expected Int/);
 
-test('N-API Addon Tests', async (t) => {
-  await t.test('Number addition', () => {
-    assert.strictEqual(addon.add(10, 20), 30);
-  });
+const fixture = fs.mkdtempSync(path.join(os.tmpdir(), 'napi-mbt-'));
+fs.writeFileSync(path.join(fixture, 'napi-mbt.json'), JSON.stringify({ napiVersion: 1, features: ['bigint'] }));
+fs.writeFileSync(path.join(fixture, 'lib.mbt'), '#export_name("fixture")\npub fn fixture() -> Unit { () }\n');
+const gated = childProcess.spawnSync(process.execPath, [path.join(__dirname, '..', 'cli', 'bin', 'napi-mbt.js'), 'generate', fixture], { encoding: 'utf8' });
+assert.notStrictEqual(gated.status, 0);
+assert.ok(/lower than required feature level 6/.test(gated.stderr));
+function removeTree(dir) {
+  for (const entry of fs.readdirSync(dir)) {
+    const item = path.join(dir, entry);
+    if (fs.statSync(item).isDirectory()) removeTree(item);
+    else fs.unlinkSync(item);
+  }
+  fs.rmdirSync(dir);
+}
+removeTree(fixture);
 
-  await t.test('String concat', () => {
-    assert.strictEqual(addon.concat("Hello ", "MoonBit"), "Hello MoonBit");
-  });
-
-  await t.test('Double operations', () => {
-    assert.strictEqual(addon.check_double(2.5), 5.0);
-  });
-
-  await t.test('Boolean operations', () => {
-    assert.strictEqual(addon.check_bool(true), false);
-    assert.strictEqual(addon.check_bool(false), true);
-  });
-
-  await t.test('Buffer operations (Bytes roundtrip)', () => {
-    const buf = Buffer.from("Hello");
-    const res = addon.roundtrip_bytes(buf);
-    assert.strictEqual(Buffer.isBuffer(res), true);
-    assert.strictEqual(res.toString(), "Hello");
-  });
-
-  await t.test('Zero-copy Buffer mutation (NapiBufferView)', () => {
-    const buf = Buffer.from([10, 20, 30]);
-    addon.mutate_buffer(buf);
-    assert.strictEqual(buf[0], 11);
-  });
-
-  await t.test('Error handling (Missing parameters)', () => {
-    assert.throws(() => {
-      addon.add(10);
-    }, /Missing argument/);
-  });
-
-  await t.test('Error handling (Invalid type)', () => {
-    assert.throws(() => {
-      addon.add("10", 20);
-    }, /Invalid argument, expected Int/);
-  });
-});
+for (const target of ['win32-x64-msvc', 'darwin-x64', 'darwin-arm64', 'linux-x64-gnu', 'linux-arm64-gnu']) {
+  const manifest = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'npm', target, 'package.json'), 'utf8'));
+  assert.ok(manifest.main === 'napi_mbt.node');
+  assert.ok(manifest.os && manifest.cpu && manifest.files.indexOf('napi_mbt.node') >= 0);
+}
+console.log('napi-mbt tests passed');

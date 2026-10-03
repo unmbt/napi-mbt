@@ -18,8 +18,8 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact_name: napi-mbt-linux-x64
-            src_dir: linux-x64
+            artifact_name: napi-mbt-linux-x64-gnu
+            src_dir: linux-x64-gnu
           - os: macos-13
             artifact_name: napi-mbt-darwin-x64
             src_dir: darwin-x64
@@ -27,8 +27,8 @@ jobs:
             artifact_name: napi-mbt-darwin-arm64
             src_dir: darwin-arm64
           - os: windows-latest
-            artifact_name: napi-mbt-win32-x64
-            src_dir: win32-x64
+            artifact_name: napi-mbt-win32-x64-msvc
+            src_dir: win32-x64-msvc
 
     steps:
       - name: Checkout Repository

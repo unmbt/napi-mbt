@@ -1,9 +1,17 @@
 {
   "name": "napi-mbt",
   "version": "0.1.0",
-  "private": true,
-  "main": "index.js",
+  "main": "index.cjs",
+  "module": "index.mjs",
   "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "require": "./index.cjs",
+      "import": "./index.mjs",
+      "default": "./index.cjs"
+    }
+  },
   "devDependencies": {
     "@types/node": "^26.1.2",
     "@unmbt/tree-sitter-moonbit": "latest",
@@ -16,15 +24,15 @@
     "node-api-headers": "^1.9.0"
   },
   "scripts": {
-    "build": "node cli/bin/napi-mbt.js build",
+    "build": "node cli/bin/napi-mbt.js build --release",
     "generate": "node cli/src/generate.js",
     "test": "node --test scripts/test.js"
   },
   "optionalDependencies": {
-    "napi-mbt-darwin-arm64": "0.1.0",
+    "napi-mbt-win32-x64-msvc": "0.1.0",
     "napi-mbt-darwin-x64": "0.1.0",
-    "napi-mbt-linux-arm64": "0.1.0",
-    "napi-mbt-linux-x64": "0.1.0",
-    "napi-mbt-win32-x64": "0.1.0"
+    "napi-mbt-darwin-arm64": "0.1.0",
+    "napi-mbt-linux-x64-gnu": "0.1.0",
+    "napi-mbt-linux-arm64-gnu": "0.1.0"
   }
 }

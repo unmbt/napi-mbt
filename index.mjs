@@ -1,0 +1,10 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const addon = require('./index.cjs');
+export default addon;
+export const add = addon.add;
+export const check_bool = addon.check_bool;
+export const check_double = addon.check_double;
+export const concat = addon.concat;
+export const mutate_buffer = addon.mutate_buffer;
+export const roundtrip_bytes = addon.roundtrip_bytes;

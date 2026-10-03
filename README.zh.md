@@ -6,7 +6,7 @@
   </p>
 
   <p>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D18-brightgreen?logo=node.js&logoColor=white" alt="Node.js version" /></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D8.6-brightgreen?logo=node.js&logoColor=white" alt="Node.js version" /></a>
     <a href="https://www.moonbitlang.com/"><img src="https://img.shields.io/badge/MoonBit-Native-blueviolet?logo=moon&logoColor=white" alt="MoonBit Native" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Status" />
@@ -29,7 +29,7 @@
 ## ✨ 核心特性
 
 - ⚡ **零开销原生 ABI**：跳过 WASM 虚拟机中间层，以 Native 目标编译直接通过 Node-API 进行内存互操作，保证极限性能。
-- 🪄 **伪宏 `@napi` 自动化生成**：只要在标准的 MoonBit 函数前加上 `/// @napi` 的注释，内置的 AST 语法树解析器就会自动为你编写一切 C 端交互胶水代码。
+- 🪄 **`#export_name` 自动化生成**：注解中的名称同时成为 C ABI、JavaScript 和 TypeScript 导出名；
 - 📝 **自动 TypeScript 定义**：构建时自动分析 MoonBit 签名，同步输出严谨的 `.d.ts` 类型声明文件，实现 JS/TS 的全链路强类型约束。
 - 🚀 **Buffer 零拷贝修改**：提供专属的 `NapiBufferView` 视图，允许在 MoonBit 侧直接读写 Node.js Buffer 内存，极为适合图像处理和加密的高性能场景。
 - 📦 **集成跨平台 CI/CD**：内置针对 Optional Dependencies 的发布支持，配合标准化的 GitHub Actions 矩阵，实现 Windows、Linux、macOS 原生拓展库的一键编译发布。
@@ -38,7 +38,7 @@
 
 ### 1. 环境准备
 
-- 🟢 [Node.js](https://nodejs.org/en/) >= 18
+- 🟢 [Node.js](https://nodejs.org/en/) >= 8.6
 - 🌙 [MoonBit](https://www.moonbitlang.com/) 核心工具链
 - 🔨 C/C++ 编译器（Unix 上需要 GCC/Clang，Windows 上需要 Visual Studio）
 
@@ -60,10 +60,10 @@ moon new lib
 
 ### 3. 编写 MoonBit 逻辑代码
 
-在 `lib.mbt` 文件中，写一个函数并附带 `/// @napi` 标记：
+在 `lib.mbt` 文件中，写一个函数并附带 `#export_name("mbt_add")` 标记：
 
 ```moonbit
-/// @napi
+#export_name("mbt_add")
 pub fn add(a : Int, b : Int) -> Int {
   a + b
 }
@@ -78,17 +78,19 @@ npx napi-mbt build
 ```
 
 上述命令会自动执行：
-1. 🔍 扫描 AST 并识别 `/// @napi` 标记。
-2. 🛠️ 生成包含路由分发的 `_napi_bindings.mbt` 和 `index.d.ts`。
+1. 🔍 扫描 AST 并识别 `#export_name("mbt_add")` 标记。
+2. 🛠️ 生成逐导出的 `napi_exports.mbt`、`napi_glue.c` 和 `index.d.ts`。
 3. 🏗️ 执行底层的原生编译 (`moon build --target native`) 并链接 C 代码。
 4. 📦 将产生的 `.node` 输出到对应环境的构件目录 `artifacts/[platform]-[arch]/` 中。
 
 最后，你可以在 JavaScript 中直接调用了：
 
 ```javascript
-const addon = require('./artifacts/win32-x64/napi_mbt.node');
-console.log(addon.add(2, 3)); // 输出: 5
+const addon = require('./artifacts/win32-x64-msvc/napi_mbt.node');
+console.log(addon.mbt_add(2, 3)); // 输出: 5
 ```
+
+在 `napi-mbt.json` 中设置单一 N-API 版本。默认 v1 覆盖 Node 8.6–26；Threadsafe Function 需要 v4，BigInt 需要 v6。核心 Promise API 按当前 Node-API 头文件属于 v1。
 
 ## 📚 文档
 

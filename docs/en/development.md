@@ -8,38 +8,25 @@ This document dives deep into the internal architecture of `napi-mbt`. It is int
 
 The architecture is broadly split into three distinct layers:
 1. **The Toolchain (`@unmbt/napi-mbt-cli`)**: A Node.js CLI tool that controls AST extraction and orchestrates compilation.
-2. **The MoonBit N-API Core**: Contains memory primitives and the ID-based function dispatcher mechanism.
-3. **The C Trampoline (`stub.c`)**: A minimal C component bridging Node.js C ABI and the MoonBit runtime interface.
+2. **The MoonBit N-API Core**: Contains memory primitives and type-conversion helpers.
+3. **The C glue (`napi_glue.c`)**: Creates one Node-API callback for each export.
 
-### The Problem with C <-> MoonBit Interaction
 
 Node-API is a C interface. When Node.js wants to call a Native Addon, it expects a C-style function pointer matching the signature:
 `napi_value cb(napi_env env, napi_callback_info info)`.
 
 MoonBit does not (yet) allow arbitrary closures to be exported directly as C function pointers.
-To solve this, we implemented the **ID-Based Dispatcher (Trampoline)** architecture.
+To solve this, the generator emits one adapter and C wrapper for each exported function.
 
-## 2. The Trampoline Architecture
+## 2. Per-export C wrapper architecture
 
-Instead of exporting many dynamic function pointers, we utilize a statically mapped router.
+The CLI generates one MoonBit adapter and one N-API callback for every `#export_name("...")` function. Calls enter the matching adapter directly without a global dispatcher or function IDs.
 
-1. **AST Code Generation**: The CLI parses `/// @napi` functions using `web-tree-sitter`. It generates a massive `match` statement inside `_napi_bindings.mbt` called the `moonbit_napi_dispatcher`. Each exported function is assigned a unique integer `id`.
 2. **Initialization**: When Node.js loads the addon, `napi_register_module_v1` is invoked inside `stub.c`. It runs MoonBit's core init block `moonbit_napi_init()`.
-3. **Registration**: MoonBit registers functions via `moonbit_napi_create_func(env, name, id)`. Inside this method, it registers the JS string property to point to the generic C function `c_generic_trampoline`.
-4. **Invocation (The Trampoline)**: When JavaScript calls the native function, `c_generic_trampoline` is invoked. It retrieves the registered `id` from the V8 external data, and routes the call to the central `moonbit_napi_dispatcher(id, env, info)` back inside MoonBit.
+3. **Registration**: Generated C glue creates one N-API callback per export and attaches the exact export name to the module exports object.
 
 ```mermaid
 sequenceDiagram
-    participant JS as JavaScript
-    participant C as stub.c (c_generic_trampoline)
-    participant Dispatcher as MoonBit Dispatcher
-    participant Target as Target MoonBit Function
-    JS->>C: call nativeMethod()
-    C->>Dispatcher: moonbit_napi_dispatcher(id, env, info)
-    Dispatcher->>Target: Call actual logic
-    Target-->>Dispatcher: Returns raw NapiValue
-    Dispatcher-->>C: Return NapiValue
-    C-->>JS: Yields result to JS
 ```
 
 ## 3. The Dual-GC Problem and Safety
@@ -71,7 +58,4 @@ This generates the target JSON layouts within the `npm/` folder. Ensure your cha
 
 ### Troubleshooting
 
-- **Installation Issues (node-gyp errors)**: When running `npm install` (e.g., when installing dependencies), you might encounter `node-gyp` compilation errors on some systems due to missing C++ build tools or Python. Since `napi-mbt` uses `moon build` and directly links via the native C compiler instead of relying on `node-gyp`, you can safely bypass these errors by running:
-  ```bash
-  npm install --ignore-scripts
-  ```
+The build uses MoonBit, CMake, and the platform C compiler. Check `napi-mbt.json` and install the selected CMake, clang/GCC, or MSVC toolchain.

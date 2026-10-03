@@ -1,0 +1,108 @@
+{
+  "napiVersion": 1,
+  "requiredNapiVersion": 1,
+  "features": [],
+  "targets": [
+    "win32-x64-msvc",
+    "darwin-x64",
+    "darwin-arm64",
+    "linux-x64-gnu",
+    "linux-arm64-gnu"
+  ],
+  "generator": "auto",
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "add",
+      "exportName": "add",
+      "params": [
+        {
+          "name": "a",
+          "type": "Int"
+        },
+        {
+          "name": "b",
+          "type": "Int"
+        }
+      ],
+      "ret": "Int",
+      "throws": false,
+      "line": 192,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "check_bool",
+      "exportName": "check_bool",
+      "params": [
+        {
+          "name": "b",
+          "type": "Bool"
+        }
+      ],
+      "ret": "Bool",
+      "throws": false,
+      "line": 219,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "check_double",
+      "exportName": "check_double",
+      "params": [
+        {
+          "name": "d",
+          "type": "Double"
+        }
+      ],
+      "ret": "Double",
+      "throws": false,
+      "line": 225,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "concat",
+      "exportName": "concat",
+      "params": [
+        {
+          "name": "a",
+          "type": "String"
+        },
+        {
+          "name": "b",
+          "type": "String"
+        }
+      ],
+      "ret": "String",
+      "throws": false,
+      "line": 198,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "mutate_buffer",
+      "exportName": "mutate_buffer",
+      "params": [
+        {
+          "name": "view",
+          "type": "NapiBufferView"
+        }
+      ],
+      "ret": "Unit",
+      "throws": false,
+      "line": 204,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "roundtrip_bytes",
+      "exportName": "roundtrip_bytes",
+      "params": [
+        {
+          "name": "b",
+          "type": "Bytes"
+        }
+      ],
+      "ret": "Bytes",
+      "throws": false,
+      "line": 213,
+      "filename": "lib.mbt"
+    }
+  ]
+}

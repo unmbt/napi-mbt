@@ -8,5 +8,19 @@
     "arm64"
   ],
   "main": "napi_mbt.node",
-  "description": "darwin arm64 binary for napi-mbt"
+  "files": [
+    "napi_mbt.node",
+    "index.mjs"
+  ],
+  "exports": {
+    ".": {
+      "require": "./napi_mbt.node",
+      "import": "./index.mjs",
+      "default": "./napi_mbt.node"
+    }
+  },
+  "engines": {
+    "node": ">=8.6"
+  },
+  "napiVersion": 1
 }

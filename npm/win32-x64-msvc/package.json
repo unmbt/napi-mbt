@@ -1,8 +1,8 @@
 {
-  "name": "napi-mbt-darwin-x64",
+  "name": "napi-mbt-win32-x64-msvc",
   "version": "0.1.0",
   "os": [
-    "darwin"
+    "win32"
   ],
   "cpu": [
     "x64"

@@ -18,8 +18,8 @@
 
 ### `napi-mbt build [--release]`
 一键全自动打包流程。它内部依次执行以下事务：
-1. 调用 AST 语法分析器扫描当前项目中的所有 `.mbt` 文件，抓取被 `/// @napi` 标记修饰的导出函数。
-2. 自动生成处理参数解析、内存安全校验与数据结构映射转换的胶水代码 (`_napi_bindings.mbt`)。
+1. 调用 AST 语法分析器扫描当前项目中的所有 `.mbt` 文件，抓取被 `#export_name("mbt_add")` 标记修饰的导出函数。
+2. 自动生成处理参数解析、内存安全校验与数据结构映射转换的胶水代码 (`napi_exports.mbt`)。
 3. 自动生成 100% 精确匹配原函数的 TypeScript 声明文件 (`index.d.ts`)。
 4. 调用 `moon build --target native` 进行静态编译。
 5. 通过 C 编译器桥接 V8 与 MoonBit 的 Native 构件。
@@ -29,12 +29,12 @@
 
 ### `napi-mbt prepublish`
 处理跨平台 Npm 发布的包结构构建。
-它会读取项目的 `package.json`，并根据配置生成利用 `optionalDependencies` 模式分发的子包体系（放置于 `npm/` 目录下，如 `npm/win32-x64/package.json`）。
+它会读取项目的 `package.json`，并根据配置生成利用 `optionalDependencies` 模式分发的子包体系（放置于 `npm/` 目录下，如 `npm/win32-x64-msvc/package.json`）。
 同时在根目录下自动创建智能加载入口 `index.js`，保证使用者在 `require` 时，能够自动根据宿主的真实操作系统，实时加载正确架构的 `.node` 二进制产物。
 
-## 3. 伪宏 `/// @napi` 与类型支持
+## 3. 伪宏 `#export_name("mbt_add")` 与类型支持
 
-为了将某个普通的 MoonBit 业务函数暴露给 JS 使用，你只需要给它添加一个 `/// @napi` 的注释段即可。目前，为了避免跨语言 GC 灾难，转换器执行非常严格的类型限制，只有安全的数据类型才会被接纳。
+为了将某个普通的 MoonBit 业务函数暴露给 JS 使用，你只需要给它添加一个 `#export_name("mbt_add")` 的注释段即可。目前，为了避免跨语言 GC 灾难，转换器执行非常严格的类型限制，只有安全的数据类型才会被接纳。
 
 ### 当前稳定支持的类型映射表：
 
@@ -49,7 +49,7 @@
 | `Unit`           | `void`                 | 无返回值场景。 |
 
 ### 复杂类型说明 (Roadmap)
-当前的 Phase 4 暂不支持对象（Object）、数组（Array）以及 Promise。这是因为我们还在设计安全的、抵御 V8 GC 移动 (Moving GC) 的统一句柄转换算法，该能力将在后续迭代 (Phase 5) 提供原生支持。
+Promise 和 BigInt 已通过 feature registry 提供封装；对象（Object）和数组（Array）仍不属于当前生成器支持的自动转换类型。
 
 ## 4. 健壮的错误阻断机制
 
@@ -65,7 +65,7 @@
 
 使用范例:
 ```moonbit
-/// @napi
+#export_name("mbt_add")
 pub fn mutate_image_colors(view : NapiBufferView) -> Unit {
   let length = view.length()
   for i = 0; i < length; i = i + 1 {

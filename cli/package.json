@@ -2,6 +2,9 @@
   "name": "@unmbt/napi-mbt-cli",
   "version": "0.1.0",
   "description": "CLI tool for MoonBit N-API bindings",
+  "engines": {
+    "node": ">=8.6"
+  },
   "bin": {
     "napi-mbt": "bin/napi-mbt.js"
   },

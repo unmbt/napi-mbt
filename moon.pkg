@@ -2,18 +2,23 @@ import {
   "moonbitlang/core/encoding/utf8",
 }
 
+pkgtype(kind: "foreign_library")
+
 options(
-  "is-main": false,
-  "native-stub": [ "stub.c" ],
+  "native-stub": [ "stub.c", "napi_glue.c" ],
   link: {
     "native": {
       "cc-flags": "",
-      "stub-cc-flags": "-I./node_modules/node-api-headers/include",
+      "stub-cc-flags": "-I./node_modules/node-api-headers/include -DNAPI_VERSION=1",
       "cc-link-flags": "/LD \"./node_modules/.cache/napi-mbt/napi.lib\"",
       "exports": [
-        "moonbit_napi_init",
-        "moonbit_napi_dispatcher",
-        "moonbit_release_handle",
+        "moonbit_init",
+        "napi_mbt_adapter_add",
+        "napi_mbt_adapter_check_bool",
+        "napi_mbt_adapter_check_double",
+        "napi_mbt_adapter_concat",
+        "napi_mbt_adapter_mutate_buffer",
+        "napi_mbt_adapter_roundtrip_bytes",
       ],
     },
   },

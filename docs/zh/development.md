@@ -8,37 +8,24 @@
 
 我们的架构由三个边界清晰的层次组成：
 1. **工具链核心 (`@unmbt/napi-mbt-cli`)**: 基于 Node.js 的 CLI 脚本，统筹所有的 AST 语法分析、依赖挂载、及目标编译。
-2. **MoonBit N-API 运行时引擎**: 包含与 N-API 对接的基础内存通信结构、以及核心的 `函数路由分发器 (Dispatcher)`。
+2. **MoonBit N-API 运行时引擎**: 包含与 N-API 对接的基础内存通信结构和类型转换 helper。
 3. **C 蹦床 (`stub.c`)**: 极简的 C 层实现，提供标准 Node-API 注册入口，充当 C ABI 和 MoonBit 运行时之间的缓冲垫。
 
-### 为什么需要 C <-> MoonBit 的特殊交互？
 
 Node-API 是纯 C 的接口协议。当 Node.js 试图调用一个原生扩展时，它要求目标必须是签名类似于 `napi_value cb(napi_env env, napi_callback_info info)` 的标准 C 函数指针。
 
 然而，当前的 MoonBit 尚不能直接将其内部的动态闭包作为原生 C 函数指针导出给宿主。
-为了解决这一语言层面的阻隔，我们设计了 **基于 ID 路由的统一蹦床模型 (Trampoline)**。
+为了解决这一语言层面的阻隔，生成器为每个导出函数生成独立的 adapter 和 C wrapper。
 
-## 2. 蹦床架构 (The Trampoline Architecture)
+## 2. 逐导出 C wrapper 架构
 
-与其将每个业务函数动态导出为指针，我们采用了在编译期静态生成全局路由表的方案。
+CLI 为每个 `#export_name("...")` 函数生成一个 MoonBit adapter 和独立的 N-API callback。调用时直接进入对应 adapter，不使用全局 dispatcher 或函数 ID。
 
-1. **AST 代码生成**: 当你运行 build 时，CLI 会启动 `web-tree-sitter` 读取所有的 `/// @napi` 函数。接着它会在 `_napi_bindings.mbt` 中写出一个巨型的 `match` 匹配语句（即 `moonbit_napi_dispatcher`）。每个被导出的函数都会被分配一个独一无二的整型 `id`。
 2. **加载初始化**: 当 Node.js 加载编译好的 `.node` 扩展时，底层的 `stub.c` 会触发 `napi_register_module_v1`。该函数会调用 MoonBit 的初始化区块 `moonbit_napi_init()`。
-3. **函数挂载**: 在初始化时，MoonBit 调用内部的 `moonbit_napi_create_func(env, name, id)` 将你的函数挂载给 V8 引擎。在这里，我们给 JavaScript 绑定的底层实际 C 指针永远是同一个通用的 `c_generic_trampoline`。
-4. **调用反弹 (Trampoline Bounce)**: 当 JavaScript 试图调用该原生方法时，`c_generic_trampoline` 被触发。它会从 V8 的 External 上下文数据中抽出绑定的 `id`，然后立刻将所有调用数据回传给 MoonBit 核心的 `moonbit_napi_dispatcher(id, env, info)`，由分发器精确地唤醒你编写的实际业务函数。
+3. **函数挂载**: 模块初始化时，生成的 C glue 为每个导出创建独立的 N-API callback，并把同名属性挂载到 exports。
 
 ```mermaid
 sequenceDiagram
-    participant JS as JavaScript
-    participant C as stub.c (c_generic_trampoline)
-    participant Dispatcher as MoonBit Dispatcher
-    participant Target as 目标 MoonBit 函数
-    JS->>C: 调用 nativeMethod()
-    C->>Dispatcher: 传递 moonbit_napi_dispatcher(id, env, info)
-    Dispatcher->>Target: 映射路由至业务逻辑
-    Target-->>Dispatcher: 返回原始 NapiValue
-    Dispatcher-->>C: 返回 NapiValue
-    C-->>JS: 返回结果给 JS 引擎
 ```
 
 ## 3. 双重 GC 灾难与内存安全
@@ -70,7 +57,4 @@ node cli/bin/napi-mbt.js prepublish
 
 ### 常见问题排查 (Troubleshooting)
 
-- **安装依赖时遇到 node-gyp 报错**：在执行 `npm install` 时，部分缺少 C++ 构建工具或 Python 的系统可能会报出 `node-gyp` 编译错误。因为 `napi-mbt` 实际上是利用 `moon build` 和底层的 C 编译器直接完成链接的，完全不依赖 `node-gyp`，所以你可以安全地通过如下命令跳过该报错：
-  ```bash
-  npm install --ignore-scripts
-  ```
+构建由 MoonBit、CMake 和平台 C 编译器完成。检查 `napi-mbt.json` 的 builder/target 配置，并确认对应的 CMake、clang/GCC 或 MSVC 工具链已安装。

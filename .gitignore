@@ -9,3 +9,5 @@ node.lib
 dist/
 artifacts/
 artifacts
+
+.napi-mbt/

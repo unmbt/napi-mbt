@@ -18,8 +18,8 @@ The `@unmbt/napi-mbt-cli` exposes the `napi-mbt` bin command.
 
 ### `napi-mbt build [--release]`
 Executes the full pipeline to build your native module:
-1. Triggers the internal AST parser to scan all `.mbt` files in the current folder for functions tagged with `/// @napi`.
-2. Generates the `_napi_bindings.mbt` file containing routing tables and memory conversion implementations.
+1. Triggers the internal AST parser to scan all `.mbt` files in the current folder for functions tagged with `#export_name("mbt_add")`.
+2. Generates per-export adapters in `napi_exports.mbt` plus matching C callbacks and memory conversions.
 3. Generates the `index.d.ts` file containing exactly matching TypeScript definitions.
 4. Executes `moon build --target native` internally.
 5. C links the Node-API and MoonBit artifacts to produce the `.node` binary.
@@ -29,12 +29,12 @@ Executes the full pipeline to build your native module:
 
 ### `napi-mbt prepublish`
 Automates the structural setup for cross-platform Node distribution.
-It reads your root `package.json`, generates `optionalDependencies` logic, and outputs target packages in the `npm/` directory (e.g., `npm/win32-x64/package.json`).
+It reads your root `package.json`, generates `optionalDependencies` logic, and outputs target packages in the `npm/` directory (e.g., `npm/win32-x64-msvc/package.json`).
 It also creates an intelligent `index.js` loader in the root directory that dynamically loads the correct `.node` package depending on the host's operating system in runtime.
 
-## 3. The `/// @napi` Macro & Supported Types
+## 3. The `#export_name("mbt_add")` Macro & Supported Types
 
-To expose a MoonBit function to JS, simply document it with the `/// @napi` tag. The parser strictly supports specific Types that guarantee memory safety and bidirectional conversions.
+To expose a MoonBit function to JS, simply document it with the `#export_name("mbt_add")` tag. The parser strictly supports specific Types that guarantee memory safety and bidirectional conversions.
 
 ### Current Supported MoonBit Types:
 
@@ -49,7 +49,7 @@ To expose a MoonBit function to JS, simply document it with the `/// @napi` tag.
 | `Unit`           | `void`                 | Used when there is no return value. |
 
 ### Note on Complex Types
-Objects, Arrays, and Promises are **not natively supported yet** in Phase 4 due to ongoing stabilization of MoonBit's dual garbage collector interoperability. These will be natively supported in future releases (Phase 5).
+Promise and BigInt helpers are available through the feature registry. Object and Array conversion is still outside the supported generated type set.
 
 ## 4. Error Handling
 
@@ -65,7 +65,7 @@ Because memory is managed entirely by Node.js GC, **never** store a `NapiBufferV
 
 Example usage:
 ```moonbit
-/// @napi
+#export_name("mbt_add")
 pub fn mutate_image_colors(view : NapiBufferView) -> Unit {
   let length = view.length()
   for i = 0; i < length; i = i + 1 {
