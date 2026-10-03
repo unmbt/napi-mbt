@@ -1,0 +1,29 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/napi-mbt/generator"
+
+// Values
+pub fn render_c_glue(Array[ExportSpec], Int) -> String
+
+pub fn render_moonbit_adapters(Array[ExportSpec]) -> String
+
+pub fn scan_source(String) -> Array[ExportSpec]
+
+// Errors
+
+// Types and methods
+pub(all) struct ExportSpec {
+  source_name : String
+  export_name : String
+  parameters : Array[String]
+  return_type : String
+}
+
+pub(all) struct GeneratorConfig {
+  napi_version : Int
+  builder : String
+  generator : String
+}
+
+// Type aliases
+
+// Traits

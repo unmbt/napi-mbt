@@ -13,9 +13,9 @@ name = "unmbt/napi-mbt"
 
 version = "0.1.0"
 
-readme = "README.mbt.md"
+readme = "README.md"
 
-repository = ""
+repository = "https://github.com/unmbt/napi-mbt"
 
 license = "MIT"
 
@@ -23,4 +23,10 @@ keywords = [ ]
 
 supported_targets = "native"
 
-description = ""
+description = "Generate and build Node-API bindings for MoonBit."
+
+preferred_target = "native"
+
+import {
+  "moonbitlang/async@0.20.2",
+}

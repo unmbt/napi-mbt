@@ -1,0 +1,60 @@
+'use strict';
+
+// Publish the CLI, platform packages, and root facade in dependency order.
+// This script only runs npm publish when explicitly invoked by a release job.
+var fs = require('fs');
+var path = require('path');
+var childProcess = require('child_process');
+
+var root = path.resolve(__dirname, '..');
+var platformRoot = path.join(root, 'npm');
+// npm is a .cmd shim on Windows. `execFileSync('npm.cmd', ...)` is rejected
+// by some Node/Windows combinations, so let the platform shell resolve it.
+var npmCommand = 'npm';
+var dryRun = process.argv.indexOf('--dry-run') >= 0;
+var platformsOnly = process.argv.indexOf('--platforms-only') >= 0;
+var tagIndex = process.argv.indexOf('--tag');
+var tag = tagIndex >= 0 ? process.argv[tagIndex + 1] : null;
+
+function runPublish(directory) {
+  if (!dryRun && directory.indexOf(platformRoot + path.sep) === 0 && !fs.existsSync(path.join(directory, 'napi_mbt.node'))) {
+    throw new Error('Missing napi_mbt.node for ' + path.basename(directory) + '; build that target before publishing.');
+  }
+  // `npm publish --dry-run` still performs registry version checks on some
+  // npm releases. `npm pack --dry-run` is the deterministic inspection mode
+  // we want for CI and local verification.
+  var args = [dryRun ? 'pack' : 'publish', directory];
+  if (dryRun) args.push('--dry-run');
+  else args.push('--access', 'public');
+  if (tag) args.push('--tag', tag);
+  if (process.platform === 'win32') {
+    var quote = function (value) {
+      var text = String(value);
+      return /\s/.test(text) ? '"' + text.replace(/"/g, '\\"') + '"' : text;
+    };
+    var commandLine = npmCommand + ' ' + args.map(quote).join(' ');
+    childProcess.execFileSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', commandLine], { cwd: root, stdio: 'inherit' });
+  } else {
+    childProcess.execFileSync(npmCommand, args, { cwd: root, stdio: 'inherit' });
+  }
+}
+
+function packageDirectories() {
+  if (!fs.existsSync(platformRoot)) return [];
+  return fs.readdirSync(platformRoot).map(function (name) {
+    return path.join(platformRoot, name);
+  }).filter(function (directory) {
+    return fs.existsSync(path.join(directory, 'package.json'));
+  }).sort();
+}
+
+function main() {
+  childProcess.execFileSync(process.execPath, [path.join(root, 'cli/bin/napi-mbt.js'), 'prepublish'], { cwd: root, stdio: 'inherit' });
+  packageDirectories().forEach(runPublish);
+  if (!platformsOnly) {
+    runPublish(path.join(root, 'cli'));
+    runPublish(root);
+  }
+}
+
+main();

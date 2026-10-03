@@ -24,7 +24,7 @@
 `napi-mbt` 是一款深受 `napi-rs` 启发的框架，它赋予了开发者利用极速、轻量的多范式语言 **MoonBit** 编写原生 Node.js C++ 扩展（Addon）的能力。
 `napi-mbt` 基于无开销的 Node-API (N-API) C ABI，完美连接 MoonBit 与 Node.js，彻底避免了基于 WASM 序列化的内存损耗，让你的代码获得比肩 C++ 的裸机执行性能。
 
-通过自带的工程化命令行工具 `@unmbt/napi-mbt-cli`，开发者可以全自动生成 TypeScript 定义文件、C ABI 分发跳板，并一键完成跨多平台的 NPM 分发配置。
+仓库会把原生 MoonBit CLI 发布到 Mooncakes 和 GitHub Releases。Node CLI 继续作为 tree-sitter 生成器的 fallback，因此全局安装 CLI 不再强制依赖 npm。
 
 ## ✨ 核心特性
 
@@ -42,15 +42,41 @@
 - 🌙 [MoonBit](https://www.moonbitlang.com/) 核心工具链
 - 🔨 C/C++ 编译器（Unix 上需要 GCC/Clang，Windows 上需要 Visual Studio）
 
+### 安装 CLI
+
+可以直接用 MoonBit 从源码构建：
+
+```bash
+moon build --target native --release cmd/main
+```
+
+也可以把预编译 CLI 安装到 `~/.unmbt`（Windows 为
+`%USERPROFILE%\.unmbt`）：
+
+Unix 系统可使用仓库安装脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.sh | bash
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
+```
+
+原生启动器会调用随 release 一起下载的 Node fallback runtime 来执行
+tree-sitter 生成。只有直接安装 fallback 包或发布 N-API 平台包时才需要 npm。
+
 ### 2. 项目初始化
 
-创建一个新的 Node.js 项目并安装构建工具：
+创建一个新的 Node.js 项目，并安装 N-API 头文件：
 
 ```bash
 mkdir my-napi-addon
 cd my-napi-addon
 npm init -y
-npm install @unmbt/napi-mbt-cli --save-dev
+npm install node-api-headers
 ```
 
 初始化 MoonBit 包并配置你的 `moon.pkg`：
@@ -91,6 +117,17 @@ console.log(addon.mbt_add(2, 3)); // 输出: 5
 ```
 
 在 `napi-mbt.json` 中设置单一 N-API 版本。默认 v1 覆盖 Node 8.6–26；Threadsafe Function 需要 v4，BigInt 需要 v6。核心 Promise API 按当前 Node-API 头文件属于 v1。
+
+### 发包
+
+版本发布使用仓库中的 `bump.config.json`，会在版本提交前执行 native 构建和测试。完成各目标平台构建后，按平台包、CLI、根包的顺序准备并发布：
+
+```bash
+npm run publish:prepare
+npm run publish:all
+```
+
+使用 `npm run publish:dry-run` 可以只检查 npm 包内容而不实际发布。
 
 ## 📚 文档
 

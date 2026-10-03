@@ -1,0 +1,123 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/napi-mbt"
+
+// Values
+pub fn add(Int, Int) -> Int
+
+pub fn check_bool(Bool) -> Bool
+
+pub fn check_double(Double) -> Double
+
+pub fn concat(String, String) -> String
+
+pub fn get_Bool(NapiEnv, NapiValue) -> Bool
+
+pub fn get_Bytes(NapiEnv, NapiValue) -> Bytes
+
+pub fn get_Double(NapiEnv, NapiValue) -> Double
+
+pub fn get_Int(NapiEnv, NapiValue) -> Int
+
+pub fn get_NapiBufferView(NapiEnv, NapiValue) -> NapiBufferView
+
+pub fn get_String(NapiEnv, NapiValue) -> String
+
+pub fn moonbit_release_handle(Int) -> Unit
+
+pub fn mutate_buffer(NapiBufferView) -> Unit
+
+pub fn napi_bigint_from_int64(NapiEnv, Int64) -> NapiValue
+
+pub fn napi_bigint_from_uint64(NapiEnv, UInt64) -> NapiValue
+
+pub fn napi_bigint_to_int64(NapiEnv, NapiValue) -> (Int64, Bool)
+
+pub fn napi_bigint_to_uint64(NapiEnv, NapiValue) -> (UInt64, Bool)
+
+pub fn napi_mbt_adapter_add(NapiEnv, NapiValue, NapiValue) -> NapiValue
+
+pub fn napi_mbt_adapter_check_bool(NapiEnv, NapiValue) -> NapiValue
+
+pub fn napi_mbt_adapter_check_double(NapiEnv, NapiValue) -> NapiValue
+
+pub fn napi_mbt_adapter_concat(NapiEnv, NapiValue, NapiValue) -> NapiValue
+
+pub fn napi_mbt_adapter_mutate_buffer(NapiEnv, NapiValue) -> NapiValue
+
+pub fn napi_mbt_adapter_roundtrip_bytes(NapiEnv, NapiValue) -> NapiValue
+
+pub fn napi_promise_is(NapiEnv, NapiValue) -> Bool
+
+pub fn napi_promise_new(NapiEnv) -> NapiPromise
+
+pub fn napi_promise_reject(NapiEnv, NapiPromise, NapiValue) -> Unit
+
+pub fn napi_promise_resolve(NapiEnv, NapiPromise, NapiValue) -> Unit
+
+pub fn napi_threadsafe_function_acquire(NapiThreadsafeFunction) -> Unit
+
+pub fn napi_threadsafe_function_call(NapiThreadsafeFunction, UnmanagedBuffer, Int) -> Unit
+
+pub fn napi_threadsafe_function_create(NapiEnv, NapiValue, NapiValue, NapiValue, Int, Int, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer) -> NapiThreadsafeFunction
+
+pub fn napi_threadsafe_function_release(NapiThreadsafeFunction, Int) -> Unit
+
+pub fn registry_get(Int) -> String?
+
+pub fn registry_release(Int) -> Unit
+
+pub fn registry_retain(String) -> Int
+
+pub fn roundtrip_bytes(Bytes) -> Bytes
+
+pub fn set_Bool(NapiEnv, Bool) -> NapiValue
+
+pub fn set_Bytes(NapiEnv, Bytes) -> NapiValue
+
+pub fn set_Double(NapiEnv, Double) -> NapiValue
+
+pub fn set_Int(NapiEnv, Int) -> NapiValue
+
+pub fn set_String(NapiEnv, String) -> NapiValue
+
+pub fn set_Unit(NapiEnv, Unit) -> NapiValue
+
+// Errors
+
+// Types and methods
+pub struct NapiBufferView {
+  buf : UnmanagedBuffer
+  len : Int
+  mut is_alive : Bool
+}
+pub fn NapiBufferView::invalidate(Self) -> Unit
+pub fn NapiBufferView::length(Self) -> Int
+pub fn NapiBufferView::load8(Self, Int) -> Int
+pub fn NapiBufferView::store8(Self, Int, Int) -> Unit
+
+#external
+pub type NapiCallbackInfo
+
+#external
+pub type NapiDeferred
+
+#external
+pub type NapiEnv
+
+pub struct NapiPromise {
+  promise : NapiValue
+  deferred : NapiDeferred
+}
+
+#external
+pub type NapiThreadsafeFunction
+
+#external
+pub type NapiValue
+
+#external
+pub type UnmanagedBuffer
+
+// Type aliases
+
+// Traits

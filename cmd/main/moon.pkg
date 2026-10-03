@@ -1,5 +1,9 @@
-// import {
-//   "Wyatex/moon-mbt" @lib,
-// }
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+  "moonbitlang/core/env",
+}
 
 pkgtype(kind: "executable")
+
+supported_targets = "native"

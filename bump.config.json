@@ -1,0 +1,4 @@
+{
+  "execute": "npm run build && npm test",
+  "all": true
+}

@@ -24,7 +24,7 @@ function remove(dir) {
 }
 try {
   ok(['init', fixture, '--name', 'fixture-addon']);
-  ['moon.mod', 'napi_exports.mbt', 'napi_glue.c', 'index.d.ts', 'index.cjs', 'index.mjs', 'test/smoke.mjs'].forEach(function (name) {
+  ['moon.mod', 'bump.config.json', 'napi_exports.mbt', 'napi_glue.c', 'index.d.ts', 'index.cjs', 'index.mjs', 'test/smoke.mjs'].forEach(function (name) {
     assert.ok(fs.existsSync(path.join(fixture, name)), name);
   });
   assert.ok(/name\s*=\s*"fixture-addon"/.test(fs.readFileSync(path.join(fixture, 'moon.mod'), 'utf8')));
@@ -44,7 +44,7 @@ try {
   assert.strictEqual(child.exports['.'].import, './index.mjs');
   assert.ok(child.files.indexOf('index.mjs') >= 0);
   // Comments must neither create exports nor infer an advanced N-API version.
-  fs.appendFileSync(path.join(fixture, 'lib.mbt'), '\nnapi_bigint_from_int64 anything\n');
+  fs.appendFileSync(path.join(fixture, 'lib.mbt'), '\n/// @napi napi_bigint_from_int64 anything\n');
   ok(['generate', fixture]);
   console.log('CLI integration contracts passed');
 } finally {

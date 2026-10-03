@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const generate = require('../src/generate');
 const build = require('../src/build');
+const VERSION = require('../package.json').version;
 const SUPPORTED_TARGETS = ['win32-x64-msvc', 'darwin-x64', 'darwin-arm64', 'linux-x64-gnu', 'linux-arm64-gnu'];
 
 function mkdirp(dir) {
@@ -39,11 +40,11 @@ async function init(dir, args) {
     types: 'index.d.ts',
     exports: { '.': { types: './index.d.ts', require: './index.cjs', import: './index.mjs', default: './index.cjs' } },
     scripts: { generate: 'napi-mbt generate', build: 'napi-mbt build --release', test: 'node test/smoke.cjs' },
-    devDependencies: { '@unmbt/napi-mbt-cli': '^0.1.0' },
     dependencies: { 'node-api-headers': '^1.9.0' }
   };
   writeFile(path.join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', force);
   writeFile(path.join(dir, 'napi-mbt.json'), JSON.stringify({ napiVersion: 1, generator: 'auto', builder: 'auto', targets: ['win32-x64-msvc', 'darwin-x64', 'darwin-arm64', 'linux-x64-gnu', 'linux-arm64-gnu'], features: [], cjs: true, esm: true }, null, 2) + '\n', force);
+  writeFile(path.join(dir, 'bump.config.json'), JSON.stringify({ execute: 'npm run build && npm test', all: true }, null, 2) + '\n', force);
   writeFile(path.join(dir, 'moon.mod'), `name = "${name.replace(/^@/, '')}"
 version = "0.1.0"
 supported_targets = "native"
@@ -136,7 +137,8 @@ async function main() {
   const args = process.argv.slice(2);
   const command = args[0];
   const cwd = process.cwd();
-  if (command === 'init') await init(args[1] || '.', args.slice(2));
+  if (command === '--version' || command === '-V') console.log(VERSION);
+  else if (command === 'init') await init(args[1] || '.', args.slice(2));
   else if (command === 'generate') {
     const generatedDir = positionalDirectory(args.slice(1)) || cwd;
     const generatorIndex = args.indexOf('--generator');

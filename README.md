@@ -23,7 +23,7 @@
 
 `napi-mbt` is a framework inspired by `napi-rs` that empowers developers to build native Node.js addons using **MoonBit**, a fast and lightweight multi-paradigm language. `napi-mbt` bridges MoonBit and Node.js with a zero-overhead Node-API (N-API) C ABI, avoiding the memory cost of WASM-based marshaling while maintaining optimal execution performance.
 
-With the bundled `@unmbt/napi-mbt-cli`, developers can effortlessly auto-generate TypeScript definitions, C ABI per-export C wrappers, and NPM multi-architecture distribution configurations.
+The repository publishes a native MoonBit CLI to Mooncakes and GitHub Releases. The Node CLI remains a fallback transport for tree-sitter generation, while the native launcher makes global npm installation optional.
 
 ## ✨ Key Features
 
@@ -41,15 +41,42 @@ With the bundled `@unmbt/napi-mbt-cli`, developers can effortlessly auto-generat
 - 🌙 [MoonBit](https://www.moonbitlang.com/) Toolchain
 - 🔨 A C Compiler (GCC/Clang on Unix, MSVC on Windows)
 
+### Installing the CLI
+
+Build it from source with MoonBit:
+
+```bash
+moon build --target native --release cmd/main
+```
+
+Or install the precompiled native CLI into `~/.unmbt` (Windows uses
+`%USERPROFILE%\.unmbt`):
+
+On Unix-like systems the repository installer performs the same version check:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.sh | bash
+```
+
+On Windows PowerShell:
+
+```powershell
+irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
+```
+
+The native launcher delegates to the bundled Node fallback runtime for
+tree-sitter generation. npm is only needed when you choose to install the
+fallback package directly or publish the N-API platform packages.
+
 ### 2. Project Setup
 
-Create a new Node.js project:
+Create a new Node.js project (the native CLI is already on your PATH):
 
 ```bash
 mkdir my-napi-addon
 cd my-napi-addon
 npm init -y
-npm install @unmbt/napi-mbt-cli --save-dev
+npm install node-api-headers
 ```
 
 Initialize your MoonBit package and configure `moon.pkg`:
@@ -90,6 +117,17 @@ console.log(addon.mbt_add(2, 3)); // Output: 5
 ```
 
 Set one package-wide N-API version in `napi-mbt.json`. The default v1 covers Node 8.6–26; Threadsafe Function requires v4 and BigInt requires v6. Core Promise APIs are v1 according to the Node-API headers.
+
+### Release and publish
+
+Version releases use the repository's `bump.config.json`; it runs the native build and tests before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:
+
+```bash
+npm run publish:prepare
+npm run publish:all
+```
+
+Use `npm run publish:dry-run` to inspect package contents without publishing.
 
 ## 📚 Documentation
 

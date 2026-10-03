@@ -69,7 +69,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: build
+    needs: [build, cli]
     if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     permissions:
@@ -84,5 +84,74 @@ jobs:
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/*.node
+          files: |
+            artifacts/*.node
+            artifacts/*.tar.gz
           generate_release_notes: true
+
+  cli:
+    name: Build MoonBit CLI on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            asset_name: napi-mbt-linux-amd64
+          - os: macos-13
+            asset_name: napi-mbt-macos-x64
+          - os: macos-latest
+            asset_name: napi-mbt-macos-arm64
+          - os: windows-latest
+            asset_name: napi-mbt-windows-amd64
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      - name: Setup MoonBit
+        uses: hustcer/setup-moonbit@v1
+      - name: Build native CLI
+        run: moon build --release --target native cmd/main
+      - name: Package native CLI and Node fallback
+        shell: bash
+        run: |
+          set -eux
+          mkdir -p cli-release/runtime
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            cp _build/native/release/build/cmd/main/main.exe cli-release/napi-mbt.exe
+          else
+            cp _build/native/release/build/cmd/main/main cli-release/napi-mbt
+            chmod +x cli-release/napi-mbt
+          fi
+          cp -R cli cli-release/runtime/cli
+          npm install --prefix cli-release/runtime/cli --production --ignore-scripts
+          tar -czf "${{ matrix.asset_name }}.tar.gz" -C cli-release .
+      - name: Upload CLI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset_name }}
+          path: ${{ matrix.asset_name }}.tar.gz
+
+  publish-mooncakes:
+    name: Publish MoonBit module
+    needs: [build, cli]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+      - run: moon update
+      - name: Verify module version
+        shell: bash
+        run: |
+          module_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' moon.mod | head -n 1)"
+          test "v${module_version}" = "${GITHUB_REF_NAME}"
+      - name: Configure Mooncakes credentials
+        env:
+          MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_CREDENTIALS }}
+        run: |
+          test -n "$MOONCAKES_CREDENTIALS"
+          install -d -m 700 "$HOME/.moon"
+          printf '%s' "$MOONCAKES_CREDENTIALS" > "$HOME/.moon/credentials.json"
+          chmod 600 "$HOME/.moon/credentials.json"
+      - run: moon publish

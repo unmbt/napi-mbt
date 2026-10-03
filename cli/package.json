@@ -2,6 +2,14 @@
   "name": "@unmbt/napi-mbt-cli",
   "version": "0.1.0",
   "description": "CLI tool for MoonBit N-API bindings",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/unmbt/napi-mbt.git",
+    "directory": "cli"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=8.6"
   },
