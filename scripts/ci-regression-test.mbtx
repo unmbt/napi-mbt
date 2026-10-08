@@ -1,0 +1,74 @@
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn checked(args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("node", args)
+  if code != 0 {
+    fail("node failed: \{err.text()}\{out.text()}")
+  }
+  out.text()
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let cli = root + "/cli/bin/napi-mbt.js"
+  let temp = @fs.tmpdir(prefix="napi-mbt-ci-")
+  defer @fs.rmdir(temp, recursive=true)
+  ignore(checked([cli, "init", temp, "--name", "ci-fixture"]))
+  // The Windows checkout failed on lib.mbt despite accepting identical LF
+  // source on Linux. Exercise that file with both line endings.
+  let source = @fs.read_file(root + "/lib.mbt")
+    .text()
+    .replace_all(old="\r\n", new="\n")
+  let exported = "\n#export_name(\"line_endings\")\npub fn line_endings() -> Int { 42 }\n"
+  @fs.write_file(temp + "/lib.mbt", source + exported)
+  ignore(checked([cli, "generate", temp]))
+  let expected = @fs.read_file(temp + "/index.d.ts").text()
+  @fs.write_file(
+    temp + "/lib.mbt",
+    (source + exported).replace_all(old="\n", new="\r\n"),
+  )
+  ignore(checked([cli, "generate", temp, "--check"]))
+  assert_eq(@fs.read_file(temp + "/index.d.ts").text(), expected)
+  // Normalizing CRLF must not hide real syntax errors.
+  @fs.write_file(temp + "/lib.mbt", "pub fn broken(\r\n")
+  let (code, _, _) = @process.collect_output("node", [cli, "generate", temp])
+  assert_true(code != 0)
+  // Evaluate the actual prebuild hook for both platform configurations.
+  for
+    (os, flags, link) in [
+      (
+        "Windows_NT", "/utf-8", "/LD \"./node_modules/.cache/napi-mbt/napi.lib\"",
+      ),
+      ("Linux", "-fPIC", "-c"),
+    ] {
+    let (code, out, err) = @process.collect_output(
+      "moon",
+      ["run", root + "/build.mbtx"],
+      extra_env={ "OS": os },
+    )
+    assert_eq(code, 0, msg=err.text())
+    let config = @json.parse(out.text())
+    guard config
+      is {
+        "vars": {
+          "NAPI_C_FLAGS": String(actual_flags),
+          "NAPI_LINK_FLAGS": String(actual_link),
+          ..
+        },
+        ..
+      } else {
+      fail("Invalid prebuild output")
+    }
+    assert_eq(actual_flags, flags)
+    assert_eq(actual_link, link)
+  }
+  println("CI regression tests passed")
+}

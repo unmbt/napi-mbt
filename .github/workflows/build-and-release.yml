@@ -20,7 +20,7 @@ jobs:
           - os: ubuntu-latest
             artifact_name: napi-mbt-linux-x64-gnu
             src_dir: linux-x64-gnu
-          - os: macos-13
+          - os: macos-15-intel
             artifact_name: napi-mbt-darwin-x64
             src_dir: darwin-x64
           - os: macos-latest
@@ -56,6 +56,9 @@ jobs:
 
       - name: Test
         run: npm run test
+
+      - name: CI regression tests
+        run: moon run scripts/ci-regression-test.mbtx
 
       - name: Prepare Artifact
         shell: bash
@@ -100,7 +103,7 @@ jobs:
         include:
           - os: ubuntu-latest
             asset_name: napi-mbt-linux-amd64
-          - os: macos-13
+          - os: macos-15-intel
             asset_name: napi-mbt-macos-x64
           - os: macos-latest
             asset_name: napi-mbt-macos-arm64
@@ -111,6 +114,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Update Registry & Dependencies
+        run: moon update
       - name: Build native CLI
         run: moon build --release --target native cmd/napi-mbt-cli
       - name: Package native CLI and Node fallback

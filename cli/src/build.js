@@ -1,5 +1,4 @@
 const fs = require('fs');
-const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const generate = require('./generate');
@@ -58,9 +57,20 @@ function locateMoonArtifacts(pkgDir, mode) {
   const dir = path.join(pkgDir, '_build', 'native', mode, 'build');
   if (!fs.existsSync(dir)) throw new Error(`MoonBit build directory not found: ${dir}`);
   const pick = names => names.map(name => path.join(dir, name)).find(fs.existsSync);
-  const object = pick(process.platform === 'win32' ? ['napi-mbt.obj'] : ['napi-mbt.o']);
-  const stub = pick(process.platform === 'win32' ? ['stub.obj'] : ['stub.o']);
-  const runtime = pick(process.platform === 'win32' ? ['libruntime.lib'] : ['libruntime.a', 'runtime.o']);
+  if (process.platform !== 'win32') {
+    const source = pick(['napi-mbt.c']);
+    const moonc = execFileSync('which', ['moonc'], { encoding: 'utf8' }).trim();
+    const moonHome = process.env.MOON_HOME || path.dirname(path.dirname(fs.realpathSync(moonc)));
+    const runtimeDir = path.join(moonHome, 'lib', 'runtime');
+    const runtimeSources = fs.existsSync(runtimeDir)
+      ? fs.readdirSync(runtimeDir).filter(name => name.endsWith('.c')).sort().map(name => path.join(runtimeDir, name))
+      : [path.join(moonHome, 'lib', 'runtime.c')].filter(fs.existsSync);
+    if (!source || !runtimeSources.length) throw new Error('MoonBit generated C or runtime sources are missing');
+    return { dir, source, runtimeSources, moonInclude: path.join(moonHome, 'include') };
+  }
+  const object = pick(['napi-mbt.obj']);
+  const stub = pick(['stub.obj']);
+  const runtime = pick(['libruntime.lib']);
   if (!object || !stub || !runtime) throw new Error('MoonBit native artifacts are incomplete');
   return { dir, object, stub, runtime };
 }
@@ -73,12 +83,21 @@ function cmakeFile(pkgDir, artifacts, config, mode, napiLib) {
     'add_library(napi_mbt MODULE "' + quoteCMake(path.join(pkgDir, 'napi_glue.c')) + '")',
     'target_include_directories(napi_mbt PRIVATE "' + quoteCMake(include) + '")',
     'target_compile_definitions(napi_mbt PRIVATE NAPI_VERSION=' + String(config.napiVersion) + ')',
-    'target_link_libraries(napi_mbt PRIVATE "' + quoteCMake(artifacts.object) + '" "' + quoteCMake(artifacts.stub) + '" "' + quoteCMake(artifacts.runtime) + '"' + (napiLib ? ' "' + quoteCMake(napiLib) + '"' : '') + ')',
     'set_target_properties(napi_mbt PROPERTIES PREFIX "" SUFFIX ".node")'
   ];
   if (process.platform !== 'win32') {
+    // Package cc-flags do not reach Moon's runtime compilation. Recompile its
+    // sources here so every object in the Node addon is position independent.
+    const sources = [artifacts.source, path.join(pkgDir, 'stub.c')].concat(artifacts.runtimeSources);
+    lines.push('target_sources(napi_mbt PRIVATE ' + sources.map(file => '"' + quoteCMake(file) + '"').join(' ') + ')');
+    lines.push('target_include_directories(napi_mbt PRIVATE "' + quoteCMake(artifacts.moonInclude) + '")');
+    lines.push('target_compile_definitions(napi_mbt PRIVATE MOONBIT_ALLOCATOR=MOONBIT_ALLOCATOR_SYSTEM)');
+    lines.push('target_compile_options(napi_mbt PRIVATE -fwrapv -fno-strict-aliasing)');
+    lines.push('target_link_libraries(napi_mbt PRIVATE m)');
     lines.push('set_target_properties(napi_mbt PROPERTIES POSITION_INDEPENDENT_CODE ON)');
     if (process.platform === 'darwin') lines.push('target_link_options(napi_mbt PRIVATE "-undefined" "dynamic_lookup")');
+  } else {
+    lines.push('target_link_libraries(napi_mbt PRIVATE "' + quoteCMake(artifacts.object) + '" "' + quoteCMake(artifacts.stub) + '" "' + quoteCMake(artifacts.runtime) + '" "' + quoteCMake(napiLib) + '")');
   }
   return lines.join('\n') + '\n';
 }
@@ -89,14 +108,16 @@ function ensureMoonPackage(pkgDir, manifest, config, napiLib) {
   let text = fs.readFileSync(filename, 'utf8');
   if (text.indexOf('pkgtype(kind: "foreign_library")') < 0) text = 'pkgtype(kind: "foreign_library")\n' + text;
   if (text.indexOf('napi_glue.c') < 0) text = text.replace(/"native-stub"\s*:\s*\[([^\]]*)\]/, '"native-stub": ["stub.c", "napi_glue.c"]');
-  const napiFlags = `-I./node_modules/node-api-headers/include -DNAPI_VERSION=${Number(config.napiVersion || 1)}`;
+  const dynamicFlags = text.includes('${build.NAPI_C_FLAGS}');
+  const cFlags = dynamicFlags ? '${build.NAPI_C_FLAGS}' : process.platform === 'win32' ? '/utf-8' : '-fPIC';
+  const napiFlags = `${cFlags} -I./node_modules/node-api-headers/include -DNAPI_VERSION=${Number(config.napiVersion || 1)}`;
   if (text.indexOf('"stub-cc-flags"') >= 0) text = text.replace(/"stub-cc-flags"\s*:\s*"[^"]*"/, `"stub-cc-flags": "${napiFlags}"`);
   else text = text.replace(/(link\s*:\s*\{\s*"native"\s*:\s*\{)/, `$1\n      "stub-cc-flags": "${napiFlags}",`);
-  // MoonBit's foreign-library step still needs a shared-library link action.
-  // CMake performs the final .node link afterward.
-  const moonLinkFlags = process.platform === 'win32'
+  // On Unix, stop at compilation: Moon's runtime archive is not PIC. CMake
+  // rebuilds the generated C and runtime sources for the final .node link.
+  const moonLinkFlags = dynamicFlags ? '${build.NAPI_LINK_FLAGS}' : process.platform === 'win32'
     ? `/LD "./node_modules/.cache/napi-mbt/napi.lib"`
-    : process.platform === 'darwin' ? '-shared -undefined dynamic_lookup' : '-shared';
+    : '-c';
   const encodedMoonLinkFlags = moonLinkFlags.replace(/"/g, '\\"');
   if (text.indexOf('"cc-link-flags"') >= 0) {
     text = text.replace(/"cc-link-flags"\s*:\s*"(?:\\.|[^"\\])*"/, `"cc-link-flags": "${encodedMoonLinkFlags}"`);
@@ -124,7 +145,9 @@ async function main(pkgDir = '.', options = {}) {
   if (configuredTargets.length && configuredTargets.indexOf(outputTarget) < 0) throw new Error(`Target ${outputTarget} is not listed in napi-mbt.json`);
   if (outputTarget !== targetName()) throw new Error(`Cross-compiling ${outputTarget} requires a matching MoonBit target and toolchain; current host is ${targetName()}`);
   if (dryRun) { console.log(`[napi-mbt] dry-run: moon build --target native --${mode}`); return; }
-  execFileSync('moon', ['build', '--target', 'native', mode === 'release' ? '--release' : '--debug'], { cwd: pkgDir, stdio: 'inherit' });
+  // Use generated C on every host and the same allocator in both build stages.
+  const moonEnv = Object.assign({}, process.env, { MOONBIT_NEW_NATIVE: '0', MOONBIT_ALLOCATOR: 'system' });
+  execFileSync('moon', ['build', '--target', 'native', mode === 'release' ? '--release' : '--debug', '.'], { cwd: pkgDir, stdio: 'inherit', env: moonEnv });
   const artifacts = locateMoonArtifacts(pkgDir, mode);
   const buildRoot = path.join(pkgDir, '.napi-mbt', 'cmake', mode);
   mkdirp(buildRoot);
@@ -135,7 +158,7 @@ async function main(pkgDir = '.', options = {}) {
   if (builder === 'clang') generatorArgs.push('-DCMAKE_C_COMPILER=clang');
   if (builder === 'gcc') generatorArgs.push('-DCMAKE_C_COMPILER=gcc');
   if (builder === 'msvc' && commandExists('clang-cl')) generatorArgs.push('-DCMAKE_C_COMPILER=clang-cl');
-  execFileSync('cmake', ['-S', path.join(pkgDir, '.napi-mbt'), '-B', buildRoot].concat(generatorArgs), { cwd: pkgDir, stdio: 'inherit' });
+  execFileSync('cmake', ['-S', path.join(pkgDir, '.napi-mbt'), '-B', buildRoot, `-DCMAKE_BUILD_TYPE=${mode === 'release' ? 'Release' : 'Debug'}`].concat(generatorArgs), { cwd: pkgDir, stdio: 'inherit' });
   execFileSync('cmake', ['--build', buildRoot, '--config', mode], { cwd: pkgDir, stdio: 'inherit' });
   const built = path.join(buildRoot, 'napi_mbt.node');
   if (!fs.existsSync(built)) throw new Error(`CMake did not produce ${built}`);

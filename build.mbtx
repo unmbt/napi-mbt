@@ -1,0 +1,25 @@
+///|
+import {
+  "moonbitlang/core/env",
+}
+
+///|
+fn main {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let output : Json = {
+    "vars": {
+      "NAPI_C_FLAGS": if windows {
+        "/utf-8"
+      } else {
+        "-fPIC"
+      },
+      // CMake performs the Unix shared-library link with a PIC runtime.
+      "NAPI_LINK_FLAGS": if windows {
+        "/LD \"./node_modules/.cache/napi-mbt/napi.lib\""
+      } else {
+        "-c"
+      },
+    },
+  }
+  println(output.stringify())
+}

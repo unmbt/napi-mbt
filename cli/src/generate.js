@@ -148,7 +148,8 @@ async function main(overridePkgDir, options) {
   const functions = [];
   const userSources = [];
   for (const file of files) {
-    const source = fs.readFileSync(path.join(pkgDir, file), 'utf8');
+    // The grammar expects LF even when Git checks out sources as CRLF on Windows.
+    const source = fs.readFileSync(path.join(pkgDir, file), 'utf8').replace(/\r\n/g, '\n');
     userSources.push(source);
     const tree = parser.parse(source);
     if (tree.rootNode.hasError) fail(`${file} contains MoonBit syntax errors`);

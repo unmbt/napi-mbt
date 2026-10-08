@@ -30,3 +30,7 @@ preferred_target = "native"
 import {
   "moonbitlang/async@0.20.2",
 }
+
+options(
+  "--moonbit-unstable-prebuild": "build.mbtx",
+)

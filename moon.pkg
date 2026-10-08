@@ -8,9 +8,9 @@ options(
   "native-stub": [ "stub.c", "napi_glue.c" ],
   link: {
     "native": {
-      "cc-flags": "",
-      "stub-cc-flags": "-I./node_modules/node-api-headers/include -DNAPI_VERSION=1",
-      "cc-link-flags": "/LD \"./node_modules/.cache/napi-mbt/napi.lib\"",
+      "cc-flags": "${build.NAPI_C_FLAGS}",
+      "stub-cc-flags": "${build.NAPI_C_FLAGS} -I./node_modules/node-api-headers/include -DNAPI_VERSION=1",
+      "cc-link-flags": "${build.NAPI_LINK_FLAGS}",
       "exports": [
         "moonbit_init",
         "napi_mbt_adapter_add",
