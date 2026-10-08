@@ -20,7 +20,10 @@ ARCH="$(uname -m)"
 case "$OS:$ARCH" in
   Linux:x86_64|Linux:amd64) ASSET="napi-mbt-linux-amd64" ;;
   Linux:aarch64|Linux:arm64) ASSET="napi-mbt-linux-arm64" ;;
-  Darwin:x86_64|Darwin:amd64) ASSET="napi-mbt-macos-x64" ;;
+  Darwin:x86_64|Darwin:amd64)
+    echo "Intel macOS prebuilt releases are paused: the current MoonBit toolchain installer supports macOS ARM64 only." >&2
+    exit 1
+    ;;
   Darwin:arm64) ASSET="napi-mbt-macos-arm64" ;;
   *) echo "Unsupported platform: $OS/$ARCH" >&2; exit 1 ;;
 esac

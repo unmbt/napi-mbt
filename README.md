@@ -31,7 +31,11 @@ The repository publishes a native MoonBit CLI to Mooncakes and GitHub Releases. 
 - 🪄 **`#export_name` generation**: The annotation name becomes the C ABI, JavaScript, and TypeScript export name;
 - 📝 **Automatic TypeScript Typing**: Generates `.d.ts` declaration files effortlessly alongside your MoonBit compilations for strong-typed JS/TS consumption.
 - 🚀 **Zero-Copy Buffer Mutation**: Safely manipulate Node.js Buffers directly in MoonBit memory using `NapiBufferView`.
-- 📦 **Integrated Cross-Platform CI/CD**: Matrix-build ready! Automatically publishes architecture-specific Native Modules via NPM's `optionalDependencies` pattern (Supports Windows, Linux, macOS - x64 & ARM64).
+- 📦 **Integrated Cross-Platform CI/CD**: Builds native modules and CLI binaries for Windows x64, Linux x64, and macOS ARM64. Platform packages use NPM's `optionalDependencies` pattern.
+
+Intel macOS prebuilt releases are paused because the current MoonBit toolchain
+installer does not support macOS x64. macOS CI and GitHub Releases target Apple
+Silicon (ARM64). Existing Intel package metadata is retained for compatibility.
 
 ## 🚀 Quick Start
 

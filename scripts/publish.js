@@ -41,10 +41,16 @@ function runPublish(directory) {
 
 function packageDirectories() {
   if (!fs.existsSync(platformRoot)) return [];
+  // prepublish refreshes this list from napi-mbt.json. Retained metadata for
+  // paused targets must not cause those packages to be published again.
+  var optionalDependencies = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8')).optionalDependencies || {};
   return fs.readdirSync(platformRoot).map(function (name) {
     return path.join(platformRoot, name);
   }).filter(function (directory) {
-    return fs.existsSync(path.join(directory, 'package.json'));
+    var manifest = path.join(directory, 'package.json');
+    return fs.existsSync(manifest) && Object.prototype.hasOwnProperty.call(
+      optionalDependencies, JSON.parse(fs.readFileSync(manifest, 'utf8')).name
+    );
   }).sort();
 }
 

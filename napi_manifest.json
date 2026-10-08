@@ -4,7 +4,6 @@
   "features": [],
   "targets": [
     "win32-x64-msvc",
-    "darwin-x64",
     "darwin-arm64",
     "linux-x64-gnu",
     "linux-arm64-gnu"

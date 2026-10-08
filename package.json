@@ -43,7 +43,6 @@
   },
   "optionalDependencies": {
     "napi-mbt-win32-x64-msvc": "0.1.0",
-    "napi-mbt-darwin-x64": "0.1.0",
     "napi-mbt-darwin-arm64": "0.1.0",
     "napi-mbt-linux-x64-gnu": "0.1.0",
     "napi-mbt-linux-arm64-gnu": "0.1.0"

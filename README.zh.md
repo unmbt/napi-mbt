@@ -34,6 +34,10 @@
 - 🚀 **Buffer 零拷贝修改**：提供专属的 `NapiBufferView` 视图，允许在 MoonBit 侧直接读写 Node.js Buffer 内存，极为适合图像处理和加密的高性能场景。
 - 📦 **集成跨平台 CI/CD**：内置针对 Optional Dependencies 的发布支持，配合标准化的 GitHub Actions 矩阵，实现 Windows、Linux、macOS 原生拓展库的一键编译发布。
 
+当前 CI 构建 Windows x64、Linux x64 和 macOS ARM64 的原生模块及 CLI。
+由于当前 MoonBit 工具链安装器不支持 macOS x64，Intel macOS 的预编译发布暂时暂停；
+macOS CI 和 GitHub Releases 仅面向 Apple Silicon（ARM64）。已有 Intel 包元数据保留以兼容旧版本。
+
 ## 🚀 快速开始
 
 ### 1. 环境准备
