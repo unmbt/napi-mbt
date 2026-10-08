@@ -1,0 +1,27 @@
+// Generated using `moon info`, DON'T EDIT IT
+package "unmbt/napi-mbt/internal/syntax"
+
+// Values
+pub fn parse(String) -> Node raise
+
+// Errors
+
+// Types and methods
+pub struct Node {
+  tree : Tree
+  raw : Bytes
+  source : Bytes
+}
+pub fn Node::children(Self) -> Array[Self]
+pub fn Node::has_error(Self) -> Bool
+pub fn Node::is_error(Self) -> Bool
+pub fn Node::kind(Self) -> String
+pub fn Node::line(Self) -> Int
+pub fn Node::text(Self) -> String
+pub fn Node::tokens(Self) -> Array[String]
+
+type Tree
+
+// Type aliases
+
+// Traits

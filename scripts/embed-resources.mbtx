@@ -1,0 +1,23 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn main {
+  guard @env.args() is [_, input, output] else { fail("Expected input and output") }
+  let json = @fs.read_file(input).text()
+  ignore(@json.parse(json))
+  let chunks = []
+  let mut start = 0
+  while start < json.length() {
+    let mut end = if start + 2000 < json.length() { start + 2000 } else { json.length() }
+    // Never split a UTF-16 surrogate pair between generated literals.
+    if end < json.length() && json[end - 1].to_int() >= 0xD800 && json[end - 1].to_int() <= 0xDBFF { end -= 1 }
+    chunks.push(json[start:end].to_owned().to_json().stringify())
+    start = end
+  }
+  @fs.write_file(output, "// Generated from data/resources.json. Do not edit.\n///|\nlet bundled : String = [\n  " + chunks.join(",\n  ") + ",\n].join(\"\")\n")
+}

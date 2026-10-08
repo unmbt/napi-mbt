@@ -1,0 +1,19 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+async fn main {
+  guard @env.args() is [_, asset] else { fail("Expected asset name") }
+  let temp = @fs.tmpdir(prefix="napi-mbt-release-")
+  defer @fs.rmdir(temp, recursive=true)
+  let name = if @env.get_env_var("OS") == Some("Windows_NT") { "napi-mbt-cli.exe" } else { "napi-mbt-cli" }
+  @fs.write_file(temp + "/" + name, @fs.read_file("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  if @env.get_env_var("OS") != Some("Windows_NT") { @fs.chmod(temp + "/" + name, 0o755) }
+  @fs.mkdir(temp + "/licenses")
+  for name in ["TREE-SITTER-LICENSE", "GRAMMAR-LICENSE"] {
+    @fs.write_file(temp + "/licenses/" + name, @fs.read_file("internal/syntax/vendor/" + name))
+  }
+  @fs.write_file(temp + "/licenses/NAPI-MBT-LICENSE", @fs.read_file("LICENSE"))
+  @fs.write_file(temp + "/licenses/UNICODE-LICENSE", @fs.read_file("internal/syntax/vendor/runtime/unicode/LICENSE"))
+  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is { "NODE-API-LICENSE": String(license), .. } else { fail("Missing bundled license") }
+  @fs.write_file(temp + "/licenses/NODE-API-LICENSE", license)
+  let status = @process.run("tar", ["-czf", asset + ".tar.gz", "-C", temp, "."])
+  if status != 0 { fail("Packaging failed") }
+}

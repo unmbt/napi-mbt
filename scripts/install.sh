@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -eu
 
-# Install the native MoonBit CLI. npm is intentionally not used here; the
-# Node implementation is downloaded as a runtime payload for commands that
-# still use the tree-sitter transport.
+# Install the standalone native MoonBit CLI.
 REPO="${NAPI_MBT_REPO:-unmbt/napi-mbt}"
 ROOT="${NAPI_MBT_HOME:-$HOME/.unmbt}"
 VERSION="${NAPI_MBT_VERSION:-}"
@@ -19,7 +17,6 @@ OS="$(uname -s)"
 ARCH="$(uname -m)"
 case "$OS:$ARCH" in
   Linux:x86_64|Linux:amd64) ASSET="napi-mbt-linux-amd64" ;;
-  Linux:aarch64|Linux:arm64) ASSET="napi-mbt-linux-arm64" ;;
   Darwin:x86_64|Darwin:amd64)
     echo "Intel macOS prebuilt releases are paused: the current MoonBit toolchain installer supports macOS ARM64 only." >&2
     exit 1
@@ -38,21 +35,13 @@ trap 'rm -rf "$TMP"' EXIT
 URL="https://github.com/$REPO/releases/download/$VERSION/$ASSET.tar.gz"
 curl -fL "$URL" -o "$TMP/cli.tar.gz"
 rm -rf "$ROOT"
-mkdir -p "$ROOT/runtime"
+mkdir -p "$ROOT"
 tar -xzf "$TMP/cli.tar.gz" -C "$ROOT"
 
 if [ ! -x "$ROOT/napi-mbt-cli" ]; then
   echo "Release $VERSION did not contain napi-mbt-cli" >&2
   exit 1
 fi
-mv "$ROOT/napi-mbt-cli" "$ROOT/napi-mbt-cli-bin"
-cat > "$ROOT/napi-mbt-cli" <<EOF
-#!/usr/bin/env bash
-set -e
-export NAPI_MBT_NODE_RUNTIME="$ROOT/runtime/cli/bin/napi-mbt.js"
-exec "$ROOT/napi-mbt-cli-bin" "\$@"
-EOF
-chmod +x "$ROOT/napi-mbt-cli"
 
 case ":${PATH}:" in
   *:"$ROOT":*) ;;

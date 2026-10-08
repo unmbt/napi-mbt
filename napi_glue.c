@@ -17,6 +17,10 @@ static napi_value napi_mbt_callback_add(napi_env env, napi_callback_info info) {
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 2) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  napi_valuetype type_0;
+  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Int"); return NULL; }
+  napi_valuetype type_1;
+  if (napi_typeof(env, argv[1], &type_1) != napi_ok || type_1 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Int"); return NULL; }
   return napi_mbt_adapter_add(env, argv[0], argv[1]);
 }
 
@@ -26,6 +30,8 @@ static napi_value napi_mbt_callback_check_bool(napi_env env, napi_callback_info 
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  napi_valuetype type_0;
+  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_boolean) { napi_throw_type_error(env, NULL, "Invalid argument, expected Bool"); return NULL; }
   return napi_mbt_adapter_check_bool(env, argv[0]);
 }
 
@@ -35,6 +41,8 @@ static napi_value napi_mbt_callback_check_double(napi_env env, napi_callback_inf
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  napi_valuetype type_0;
+  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Double"); return NULL; }
   return napi_mbt_adapter_check_double(env, argv[0]);
 }
 
@@ -44,6 +52,10 @@ static napi_value napi_mbt_callback_concat(napi_env env, napi_callback_info info
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 2) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  napi_valuetype type_0;
+  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_string) { napi_throw_type_error(env, NULL, "Invalid argument, expected String"); return NULL; }
+  napi_valuetype type_1;
+  if (napi_typeof(env, argv[1], &type_1) != napi_ok || type_1 != napi_string) { napi_throw_type_error(env, NULL, "Invalid argument, expected String"); return NULL; }
   return napi_mbt_adapter_concat(env, argv[0], argv[1]);
 }
 
@@ -53,6 +65,8 @@ static napi_value napi_mbt_callback_mutate_buffer(napi_env env, napi_callback_in
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  bool buffer_0 = false;
+  if (napi_is_buffer(env, argv[0], &buffer_0) != napi_ok || !buffer_0) { napi_throw_type_error(env, NULL, "Invalid argument, expected Buffer"); return NULL; }
   return napi_mbt_adapter_mutate_buffer(env, argv[0]);
 }
 
@@ -62,6 +76,8 @@ static napi_value napi_mbt_callback_roundtrip_bytes(napi_env env, napi_callback_
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return NULL;
   if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
+  bool buffer_0 = false;
+  if (napi_is_buffer(env, argv[0], &buffer_0) != napi_ok || !buffer_0) { napi_throw_type_error(env, NULL, "Invalid argument, expected Buffer"); return NULL; }
   return napi_mbt_adapter_roundtrip_bytes(env, argv[0]);
 }
 

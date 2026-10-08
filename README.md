@@ -23,7 +23,7 @@
 
 `napi-mbt` is a framework inspired by `napi-rs` that empowers developers to build native Node.js addons using **MoonBit**, a fast and lightweight multi-paradigm language. `napi-mbt` bridges MoonBit and Node.js with a zero-overhead Node-API (N-API) C ABI, avoiding the memory cost of WASM-based marshaling while maintaining optimal execution performance.
 
-The repository publishes a native MoonBit CLI to Mooncakes and GitHub Releases. The Node CLI remains a fallback transport for tree-sitter generation, while the native launcher makes global npm installation optional.
+The CLI is a standalone MoonBit native executable distributed through Mooncakes and GitHub Releases. `init`, `generate`, `build`, and `prepublish` do not invoke Node.js or npm. The Tree-sitter parser, project templates, and Node-API headers are bundled into the executable.
 
 ## ✨ Key Features
 
@@ -41,9 +41,9 @@ Silicon (ARM64). Existing Intel package metadata is retained for compatibility.
 
 ### 1. Requirements
 
-- 🟢 [Node.js](https://nodejs.org/en/) >= 8.6
-- 🌙 [MoonBit](https://www.moonbitlang.com/) Toolchain
-- 🔨 A C Compiler (GCC/Clang on Unix, MSVC on Windows)
+- `init`, `generate`, `prepublish`: the native CLI only.
+- `build`: [MoonBit](https://www.moonbitlang.com/), CMake, and GCC/Clang on Unix or Visual Studio C++ build tools on Windows. CMake must support the installed Visual Studio version.
+- [Node.js](https://nodejs.org/en/) is needed to load/test the generated addon; npm is needed to publish packages. Neither is a CLI build dependency.
 
 ### Installing the CLI
 
@@ -73,8 +73,7 @@ The native CLI uses `moonbitlang/core/argparse` for subcommands and help.
 Its version comes from `moon.mod`: the `gen_version` rule and `dev_build` in
 `cmd/napi-mbt-cli/moon.pkg` run `scripts/gen_version.mbtx` to regenerate
 `generated_version.mbt`. Keep that generated file in releases for downstream
-builds. Run `moon run scripts/cli-native-test.mbtx` to check argument handling
-and version regeneration.
+builds. After building the CLI, run `moon run scripts/cli-native-test.mbtx` to test both the release executable and `moon install` without Node/npm on PATH.
 
 Or install the precompiled native CLI into `~/.unmbt` (Windows uses
 `%USERPROFILE%\.unmbt`):
@@ -91,30 +90,19 @@ On Windows PowerShell:
 irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
 ```
 
-`moon install` installs the native executable only. `init`, `generate`, `build`
-and `prepublish` currently require Node.js and the Node fallback. Install
-`@unmbt/napi-mbt-cli` as a project dev dependency (searched in the current directory
-and its parents), or set `NAPI_MBT_NODE_RUNTIME` to an absolute path to
-`cli/bin/napi-mbt.js` in a checkout with its npm dependencies installed.
-The GitHub Release installer bundles the fallback and its dependencies.
-Help, version queries and `targets` run entirely in MoonBit.
+`moon install` and the Release installer provide the same standalone CLI. The old npm CLI package and Node fallback are retired. Use `--generator=auto` or `--generator=moonbit`; the old `node` value produces a migration error. No `node_modules` directory is required. Build resources are extracted into the ignored `.napi-mbt/` directory.
 
 ### 2. Project Setup
 
-Create a new Node.js project (the native CLI is already on your PATH):
+Create a project with the native CLI on PATH:
 
 ```bash
-mkdir my-napi-addon
+napi-mbt-cli init my-napi-addon
 cd my-napi-addon
-npm init -y
-npm install --save-dev @unmbt/napi-mbt-cli
-npm install node-api-headers
+napi-mbt-cli generate --check
 ```
 
-Initialize your MoonBit package and configure `moon.pkg`:
-```bash
-moon new lib
-```
+The command creates the MoonBit package, addon configuration, loaders, type declarations, and Node smoke tests. It refuses to overwrite existing files unless `--force` is given.
 
 ### 3. Writing MoonBit Code
 
@@ -155,11 +143,25 @@ Set one package-wide N-API version in `napi-mbt.json`. The default v1 covers Nod
 Version releases use the repository's `bump.config.json`; it runs `moon check` before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:
 
 ```bash
-npm run publish:prepare
+napi-mbt-cli prepublish
 npm run publish:all
 ```
 
 Use `npm run publish:dry-run` to inspect package contents without publishing.
+
+### Development checks
+
+```bash
+moon build --target native --release cmd/napi-mbt-cli
+moon run --target native --release cmd/napi-mbt-cli -- build --release
+moon run scripts/cli-native-test.mbtx
+moon check --target native --warn-list +73 --deny-warn
+moon test --target native
+moon run scripts/parser-asan-test.mbtx
+node --test scripts/test.js
+```
+
+The native test stages run before Node load tests. Vendored parser versions and licenses are recorded in `internal/syntax/VENDOR.md`. Editable templates and header resources live in `internal/assets/data/resources.json`; the MoonBit resource build rule regenerates the embedded copy when that input changes.
 
 ## 📚 Documentation
 

@@ -7,7 +7,7 @@ This document dives deep into the internal architecture of `napi-mbt`. It is int
 `napi-mbt` is designed to be a highly performant and automated bridge between V8 JavaScript engine and MoonBit, facilitated through Node-API (N-API).
 
 The architecture is broadly split into three distinct layers:
-1. **The Toolchain (`@unmbt/napi-mbt-cli`)**: A Node.js CLI tool that controls AST extraction and orchestrates compilation.
+1. **The Toolchain (`napi-mbt-cli`)**: A standalone MoonBit executable with a statically linked Tree-sitter parser. It handles generation and native compilation without Node/npm.
 2. **The MoonBit N-API Core**: Contains memory primitives and type-conversion helpers.
 3. **The C glue (`napi_glue.c`)**: Creates one Node-API callback for each export.
 
@@ -22,12 +22,8 @@ To solve this, the generator emits one adapter and C wrapper for each exported f
 
 The CLI generates one MoonBit adapter and one N-API callback for every `#export_name("...")` function. Calls enter the matching adapter directly without a global dispatcher or function IDs.
 
-2. **Initialization**: When Node.js loads the addon, `napi_register_module_v1` is invoked inside `stub.c`. It runs MoonBit's core init block `moonbit_napi_init()`.
-3. **Registration**: Generated C glue creates one N-API callback per export and attaches the exact export name to the module exports object.
-
-```mermaid
-sequenceDiagram
-```
+1. **Initialization**: Node.js invokes `napi_register_module_v1` in `napi_glue.c`, which calls `moonbit_init()`.
+2. **Registration**: Generated C glue creates one N-API callback per export and attaches the exact export name to the module exports object.
 
 ## 3. The Dual-GC Problem and Safety
 
@@ -42,18 +38,18 @@ MoonBit and V8 both have independent Garbage Collectors. Passing memory between 
 
 ### Testing Locally
 The testing framework operates without needing to publish packages.
-Simply run `npm test`. The test runner triggers `node --test scripts/test.js`, testing bidirectional integration across the AST generator, the C linkage, and the MoonBit runtime logic.
+Build the CLI with `moon build --target native --release cmd/napi-mbt-cli`, then build the root addon with `moon run --target native --release cmd/napi-mbt-cli -- build --release`. Run `moon run scripts/ci-regression-test.mbtx` for native command tests in an environment without Node/npm and `moon test --target native` for unit tests. Finally, `node --test scripts/test.js` loads the already-built root and fixture addons.
 
 ### Building Optional Dependencies
 To debug the `napi-mbt prepublish` generation logic:
 ```bash
-node cli/bin/napi-mbt.js prepublish
+napi-mbt-cli prepublish
 ```
-This generates the target JSON layouts within the `npm/` folder. Ensure your changes to `index.js` correctly resolve the generated layouts.
+This generates the target JSON layouts within the `npm/` folder. The generated `index.cjs` and `index.mjs` resolve these platform packages.
 
 ### Adding New Types (e.g., Object, Array)
-1. In `cli/src/generate.js`: Implement the TypeScript AST mapper to properly emit the `.d.ts` typing.
-2. In `cli/src/generate.js`: Enhance the `mbt` generation block to parse JS types to their corresponding internal definitions.
+1. In `generator/strict.mbt`: Extend the exported-signature validation and type model.
+2. In `generator/outputs.mbt`: Extend adapters and TypeScript declarations; update the embedded templates in `internal/assets/data/resources.json` when runtime support changes.
 3. In `lib.mbt`: Implement the extraction primitives utilizing underlying raw N-API signatures (`napi_get_named_property`, etc.).
 
 ### Troubleshooting

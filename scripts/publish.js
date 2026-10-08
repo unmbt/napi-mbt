@@ -1,6 +1,6 @@
 'use strict';
 
-// Publish the CLI, platform packages, and root facade in dependency order.
+// Publish addon platform packages and the root facade in dependency order.
 // This script only runs npm publish when explicitly invoked by a release job.
 var fs = require('fs');
 var path = require('path');
@@ -55,10 +55,11 @@ function packageDirectories() {
 }
 
 function main() {
-  childProcess.execFileSync(process.execPath, [path.join(root, 'cli/bin/napi-mbt.js'), 'prepublish'], { cwd: root, stdio: 'inherit' });
+  const local = path.join(root, '_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe');
+  const cli = process.env.NAPI_MBT_CLI || (fs.existsSync(local) ? local : 'napi-mbt-cli');
+  childProcess.execFileSync(cli, ['prepublish'], { cwd: root, stdio: 'inherit' });
   packageDirectories().forEach(runPublish);
   if (!platformsOnly) {
-    runPublish(path.join(root, 'cli'));
     runPublish(root);
   }
 }

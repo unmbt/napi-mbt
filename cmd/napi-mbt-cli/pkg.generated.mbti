@@ -6,6 +6,9 @@ package "unmbt/napi-mbt/cmd/napi-mbt-cli"
 // Errors
 
 // Types and methods
+type Config
+
+type Generated
 
 // Type aliases
 

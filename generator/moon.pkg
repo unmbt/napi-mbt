@@ -1,3 +1,8 @@
+import {
+  "unmbt/napi-mbt/internal/syntax",
+  "moonbitlang/core/json",
+}
+
 options(
   "is-main": false,
 )

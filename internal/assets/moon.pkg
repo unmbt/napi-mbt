@@ -1,0 +1,14 @@
+import {
+  "moonbitlang/core/json",
+}
+
+rule(
+  name: "embed-resources",
+  command: "moon run scripts/embed-resources.mbtx $input $output",
+)
+
+dev_build(
+  rule: "embed-resources",
+  input: "data/resources.json",
+  output: "generated_resources.mbt",
+)

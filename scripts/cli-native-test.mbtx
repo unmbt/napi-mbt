@@ -1,129 +1,181 @@
-///|
 import {
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/process",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
 }
 
 ///|
-async fn checked(
-  command : String,
-  args : Array[String],
-  cwd : String,
-) -> String {
-  let (code, out, err) = @process.collect_output(command, args, cwd~)
-  if code != 0 {
-    fail("\{command} failed: \{err.text()}\{out.text()}")
-  }
+async fn checked(program : String, args : Array[String], cwd : String, env : Map[String, String]) -> String {
+  let (code, out, err) = @process.collect_output(program, args, cwd~, extra_env=env)
+  if code != 0 { fail("\{program} \{args.join(" ")} failed: \{out.text()}\{err.text()}") }
   out.text()
 }
-
+///|
+async fn rejected(binary : String, args : Array[String], cwd : String, env : Map[String, String]) -> Unit {
+  let (code, _, _) = @process.collect_output(binary, args, cwd~, extra_env=env)
+  assert_true(code != 0, msg="Expected failure: " + args.join(" "))
+}
+///|
+async fn no_node_environment(temp : String) -> Map[String, String] {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let separator = if windows { ";" } else { ":" }
+  let paths = @env.get_env_var("PATH").unwrap_or("").split(separator).map(p => p.to_owned()).to_array()
+  let safe = []
+  if windows {
+    for dir in paths {
+      if dir.is_empty() { continue }
+      let mut contains_node = false
+      for name in ["node.exe", "npm", "npm.cmd", "npm.exe"] { if @fs.exists(dir + "/" + name) { contains_node = true } }
+      if !contains_node { safe.push(dir) }
+    }
+  } else {
+    let bin = temp + "/toolchain"
+    @fs.mkdir(bin)
+    // Unix often installs node beside cc in /usr/bin. Expose only the native
+    // toolchain rather than inheriting that whole directory.
+    for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
+      for dir in paths {
+        let path = dir + "/" + name
+        if @fs.exists(path) && @fs.can_execute(path) {
+          @fs.symlink(target=@fs.realpath(path), bin + "/" + name)
+          break
+        }
+      }
+    }
+    safe.push(bin)
+  }
+  { "PATH": safe.join(separator) }
+}
 ///|
 async fn main {
   let root = @fs.realpath(".")
-  let binary = root +
-    "/_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"
-  ignore(
-    checked(
-      "moon",
-      ["build", "--target", "native", "--release", "cmd/napi-mbt-cli"],
-      root,
-    ),
-  )
-  let version = checked(binary, ["--version"], root)
-  assert_eq(checked(binary, ["-V"], root), version)
-  assert_true(checked(binary, ["--help"], root).contains("prepublish"))
-  assert_true(checked(binary, ["build", "--help"], root).contains("--dry-run"))
-  assert_true(checked(binary, ["help", "generate"], root).contains("--check"))
-  let (invalid, _, _) = @process.collect_output(
-    binary,
-    ["build", "--unknown"],
-    cwd=root,
-  )
-  assert_true(invalid != 0)
-
-  // Isolate version changes from the working tree. Build twice with the same
-  // rule to prove moon.mod changes invalidate the generated constant.
-  let temp = @fs.tmpdir(prefix="napi-mbt-cli-")
+  let temp = @fs.tmpdir(prefix="napi-mbt-no-node-")
   defer @fs.rmdir(temp, recursive=true)
-  let bin_dir = temp + "/bin"
-  ignore(
-    checked("moon", ["install", "./cmd/napi-mbt-cli", "--bin", bin_dir], root),
-  )
-  let installed = bin_dir +
-    "/napi-mbt-cli" +
-    (if @fs.exists(bin_dir + "/napi-mbt-cli.exe") { ".exe" } else { "" })
-  assert_eq(checked(installed, ["--version"], temp), version)
-  assert_true(checked(installed, ["--help"], temp).contains("napi-mbt-cli"))
-  assert_true(checked(installed, ["targets"], temp).contains("win32-x64-msvc"))
-  // Simulate a project-local fallback without network/npm installation.
-  let local_bin = temp + "/node_modules/@unmbt/napi-mbt-cli/bin"
-  @fs.mkdir(local_bin, recursive=true)
-  @fs.write_file(
-    local_bin + "/napi-mbt.js",
-    "console.log('fallback:' + JSON.stringify(process.argv.slice(2)))\n",
-  )
-  @fs.mkdir(temp + "/nested")
-  assert_true(
-    checked(installed, ["generate", "--check"], temp + "/nested").contains(
-      "fallback:[\"generate\",\".\",\"--check\"]",
-    ),
-  )
-  ignore(
-    checked(binary, ["init", "--name=fixture-addon", temp + "/addon"], root),
-  )
-  ignore(
-    checked(
-      binary,
-      ["generate", "--generator=node", "--check", temp + "/addon"],
-      root,
-    ),
-  )
-  @fs.mkdir(temp + "/cmd/napi-mbt-cli", recursive=true)
-  @fs.mkdir(temp + "/scripts")
-  @fs.write_file(
-    temp + "/scripts/gen_version.mbtx",
-    @fs.read_file(root + "/scripts/gen_version.mbtx"),
-  )
-  @fs.write_file(
-    temp + "/cmd/napi-mbt-cli/moon.pkg",
-    @fs.read_file(root + "/cmd/napi-mbt-cli/moon.pkg"),
-  )
-  @fs.write_file(
-    temp + "/cmd/napi-mbt-cli/main.mbt",
-    "fn main { println(VERSION) }\n",
-  )
-  for expected in ["1.2.3", "2.0.0-rc.1+build.7"] {
-    @fs.write_file(
-      temp + "/moon.mod",
-      "name = \"test/version\"\nversion = \"\{expected}\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.20.2\", }\n",
-    )
-    ignore(
-      checked(
-        "moon",
-        ["build", "--target", "native", "--release", "cmd/napi-mbt-cli"],
-        temp,
-      ),
-    )
-    let actual = checked(
-      temp + "/_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe",
-      [],
-      temp,
-    )
-    assert_eq(actual.trim().to_owned(), expected)
+  let archive = temp + "/release"
+  ignore(checked("moon", ["run", "scripts/package-cli.mbtx", archive], root, Map([])))
+  let unpacked = temp + "/unpacked"
+  @fs.mkdir(unpacked)
+  ignore(checked("tar", ["-xzf", archive + ".tar.gz", "-C", unpacked], root, Map([])))
+  let binary = unpacked + (if @env.get_env_var("OS") == Some("Windows_NT") { "/napi-mbt-cli.exe" } else { "/napi-mbt-cli" })
+  let env = no_node_environment(temp)
+  // Also change the parent environment: Windows executable lookup can happen
+  // before CreateProcess applies a child's explicit environment block.
+  let old_path = @env.get_env_var("PATH").unwrap_or("")
+  @env.set_env_var("PATH", env["PATH"])
+  defer @env.set_env_var("PATH", old_path)
+  for name in ["node", "npm"] {
+    try @process.collect_output(name, ["--version"], cwd=temp, extra_env=env) catch { _ => () } noraise { _ => fail("\{name} remained executable") }
   }
-  @fs.write_file(temp + "/invalid.mod", "name = \"test/missing-version\"\n")
-  let (invalid_version, _, _) = @process.collect_output(
-    "moon",
-    [
-      "run",
-      root + "/scripts/gen_version.mbtx",
-      temp + "/invalid.mod",
-      temp + "/invalid.mbt",
-    ],
-    cwd=root,
-  )
-  assert_true(invalid_version != 0)
-  assert_true(!@fs.exists(temp + "/invalid.mbt"))
-  println("Native CLI and version build-rule contracts passed")
+  println("Verified node/npm are unavailable")
+  let install_dir = temp + "/installed"
+  ignore(checked("moon", ["install", "./cmd/napi-mbt-cli", "--bin", install_dir], root, env))
+  let installed = install_dir + (if @env.get_env_var("OS") == Some("Windows_NT") { "/napi-mbt-cli.exe" } else { "/napi-mbt-cli" })
+  for (label, executable) in [("release", binary), ("installed", installed)] {
+    let dir = temp + "/" + label + " project 空格"
+    println("Testing \{label} CLI outside the repository")
+    assert_true(checked(executable, ["--help"], temp, env).contains("prepublish"))
+    assert_true(checked(executable, ["targets"], temp, env).contains("win32-x64-msvc"))
+    let conflict = dir + " conflict"
+    @fs.mkdir(conflict)
+    @fs.write_file(conflict + "/test", "existing file")
+    rejected(executable, ["init", conflict], temp, env)
+    assert_true(!@fs.exists(conflict + "/package.json"))
+    ignore(checked(executable, ["init", dir, "--name", "native-fixture"], temp, { "PATH": "" }))
+    let source = @fs.read_file(dir + "/lib.mbt").text()
+    rejected(executable, ["init", dir], temp, env)
+    assert_eq(@fs.read_file(dir + "/lib.mbt").text(), source)
+    ignore(checked(executable, ["init", dir, "--name", "native-fixture", "--force"], temp, env))
+    ignore(checked(executable, ["generate", dir, "--check"], temp, { "PATH": "" }))
+    let missing = checked(executable, ["prepublish", dir], temp, { "PATH": "" })
+    assert_true(missing.contains("no artifact"))
+    assert_true(@fs.exists(dir + "/npm/win32-x64-msvc/package.json"))
+    let expected = @fs.read_file(dir + "/index.d.ts").text()
+    @fs.write_file(dir + "/lib.mbt", source.replace_all(old="\n", new="\r\n"))
+    ignore(checked(executable, ["generate", dir, "--check"], temp, env))
+    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), expected)
+    @fs.write_file(dir + "/index.d.ts", "dirty")
+    rejected(executable, ["generate", dir, "--check"], temp, env)
+    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
+    @fs.write_file(dir + "/lib.mbt", "pub fn broken(\r\n")
+    rejected(executable, ["generate", dir], temp, env)
+    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
+    @fs.write_file(dir + "/lib.mbt", source)
+    @fs.write_file(dir + "/duplicate.mbt", source)
+    rejected(executable, ["generate", dir], temp, env)
+    @fs.remove(dir + "/duplicate.mbt")
+    rejected(executable, ["generate", dir, "--generator=node"], temp, env)
+    let config = @fs.read_file(dir + "/napi-mbt.json").text()
+    @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":1,\"features\":[\"bigint\"]}")
+    rejected(executable, ["generate", dir], temp, env)
+    @fs.write_file(dir + "/napi-mbt.json", config)
+    rejected(executable, ["build", dir], temp, { "PATH": "" })
+    let extra =
+      #|
+      #|///|
+      #|#export_name("failure")
+      #|pub fn failure() -> Unit raise { fail("native fixture failure") }
+      #|///|
+      #|#export_name("touch")
+      #|pub fn touch(buf : NapiBufferView) -> Unit { buf.store8(0, buf.load8(0) + 1) }
+      #|///|
+      #|let saved : Ref[NapiBufferView?] = Ref(None)
+      #|///|
+      #|#export_name("save_buffer")
+      #|pub fn save_buffer(buf : NapiBufferView) -> Unit { saved.val = Some(buf) }
+      #|///|
+      #|#export_name("saved_alive")
+      #|pub fn saved_alive() -> Bool { match saved.val { Some(buf) => buf.is_alive; None => false } }
+      #|///|
+      #|#export_name("save_failure")
+      #|pub fn save_failure(buf : NapiBufferView) -> Unit raise { saved.val = Some(buf); fail("saved failure") }
+      #|
+    @fs.write_file(dir + "/lib.mbt", source + extra)
+    ignore(checked(executable, ["generate", dir], temp, env))
+    let before = @fs.read_file(dir + "/moon.pkg").text()
+    ignore(checked(executable, ["build", dir, "--dry-run"], temp, env))
+    assert_eq(@fs.read_file(dir + "/moon.pkg").text(), before)
+    rejected(executable, ["build", dir, "--target=not-a-target"], temp, env)
+    if @env.get_env_var("OS") == Some("Windows_NT") {
+      @fs.write_file(dir + "/napi-mbt.json", "{\"builder\":\"gcc\"}")
+      rejected(executable, ["build", dir], temp, env)
+      @fs.write_file(dir + "/napi-mbt.json", config)
+    }
+    let stub = @fs.read_file(dir + "/stub.c").text()
+    @fs.write_file(dir + "/stub.c", "#error expected child compiler failure\n")
+    rejected(executable, ["build", dir, "--release"], temp, env)
+    @fs.write_file(dir + "/stub.c", stub)
+    ignore(checked(executable, ["build", dir, "--release"], temp, env))
+    if @env.get_env_var("OS") == Some("Windows_NT") {
+      let cache = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/CMakeCache.txt").text()
+      assert_true(cache.contains("CMAKE_GENERATOR:INTERNAL=Visual Studio "))
+      assert_true(cache.contains("CMAKE_GENERATOR_PLATFORM:INTERNAL=x64"))
+      let project = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/napi_mbt.vcxproj").text()
+      assert_true(project.contains("<RuntimeLibrary>MultiThreaded</RuntimeLibrary>"))
+    }
+    if label == "release" { ignore(checked(executable, ["build", dir], temp, env)) }
+    let pkg_path = dir + "/package.json"
+    guard @json.parse(@fs.read_file(pkg_path).text()) is Object(pkg) else { fail("Invalid fixture package") }
+    pkg["custom"] = { "preserve": true }
+    pkg["optionalDependencies"] = { "unrelated": "1.0.0", "native-fixture-old": "0.0.1" }
+    @fs.write_file(pkg_path, pkg.to_json().stringify(indent=2))
+    rejected(executable, ["prepublish", dir, "--target=invalid"], temp, env)
+    ignore(checked(executable, ["prepublish", dir], temp, env))
+    let published = @json.parse(@fs.read_file(pkg_path).text())
+    assert_true(published is { "custom": { "preserve": True, .. }, "optionalDependencies": { "unrelated": String("1.0.0"), "native-fixture-old"? : None, .. }, .. })
+    let prepared = @fs.read_file(pkg_path).text()
+    ignore(checked(executable, ["prepublish", dir], temp, env))
+    assert_eq(@fs.read_file(pkg_path).text(), prepared)
+    assert_true(!@fs.exists(dir + "/node_modules"))
+    // Preserve just the load-test payload for the subsequent, separate Node job.
+    let smoke = root + "/.napi-mbt/native-smoke/" + label
+    if !@fs.exists(smoke) { @fs.mkdir(smoke, recursive=true) }
+    for name in ["index.cjs", "index.mjs"] { @fs.write_file(smoke + "/" + name, @fs.read_file(dir + "/" + name)) }
+    for target in @fs.readdir(dir + "/artifacts") {
+      if !@fs.exists(smoke + "/artifacts/" + target) { @fs.mkdir(smoke + "/artifacts/" + target, recursive=true) }
+      @fs.write_file(smoke + "/artifacts/" + target + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+    }
+  }
+  println("Native CLI contracts passed without Node/npm")
 }

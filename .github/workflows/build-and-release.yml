@@ -33,31 +33,41 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
-
-      - name: Install dependencies
-        run: npm install --ignore-scripts
 
       - name: Update Registry & Dependencies
         run: moon update
 
+      - name: Build native CLI
+        run: moon build --target native --release cmd/napi-mbt-cli
+
       - name: Build Native Module
-        run: npm run build -- --release
+        run: moon run --target native --release cmd/napi-mbt-cli -- build --release
 
       - name: Strict MoonBit check
         run: moon check --target native --warn-list +73 --deny-warn
 
-      - name: Test
-        run: npm run test
-
       - name: CI regression tests
         run: moon run scripts/ci-regression-test.mbtx
+
+      - name: MoonBit tests
+        run: moon test --target native
+
+      - name: Parser FFI AddressSanitizer tests
+        # The hosted Windows image's MSVC ASan runtime currently cannot start
+        # MoonBit's generated test executables (0xc0000139). Native parser
+        # coverage is still exercised by the MoonBit test step above.
+        if: runner.os != 'Windows'
+        run: moon run scripts/parser-asan-test.mbtx
+
+      - name: Setup Node for addon load tests
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Load addons in Node
+        run: node --test scripts/test.js
 
       - name: Prepare Artifact
         shell: bash
@@ -113,28 +123,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
       - name: Update Registry & Dependencies
         run: moon update
       - name: Build native CLI
         run: moon build --release --target native cmd/napi-mbt-cli
-      - name: Package native CLI and Node fallback
-        shell: bash
-        run: |
-          set -eux
-          mkdir -p cli-release/runtime
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe cli-release/napi-mbt-cli.exe
-          else
-            cp _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe cli-release/napi-mbt-cli
-            chmod +x cli-release/napi-mbt-cli
-          fi
-          cp -R cli cli-release/runtime/cli
-          npm install --prefix cli-release/runtime/cli --production --ignore-scripts
-          tar -czf "${{ matrix.asset_name }}.tar.gz" -C cli-release .
+      - name: Package standalone native CLI
+        run: moon run scripts/package-cli.mbtx ${{ matrix.asset_name }}
       - name: Upload CLI artifact
         uses: actions/upload-artifact@v4
         with:

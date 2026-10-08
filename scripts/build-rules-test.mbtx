@@ -1,0 +1,40 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process" }
+///|
+async fn checked(args : Array[String], cwd : String) -> String {
+  let (code, out, err) = @process.collect_output("moon", args, cwd~)
+  if code != 0 { fail(err.text() + out.text()) }
+  out.text()
+}
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-build-rules-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.mkdir(temp + "/scripts")
+  @fs.mkdir(temp + "/cmd")
+  for name in ["gen_version.mbtx", "embed-resources.mbtx"] {
+    @fs.write_file(temp + "/scripts/" + name, @fs.read_file(root + "/scripts/" + name))
+  }
+  let package_text =
+    #|pkgtype(kind: "executable")
+    #|rule(name: "version", command: "moon run scripts/gen_version.mbtx $input $output")
+    #|dev_build(rule: "version", input: "../moon.mod", output: "version.mbt")
+    #|rule(name: "assets", command: "moon run scripts/embed-resources.mbtx $input $output")
+    #|dev_build(rule: "assets", input: "resources.json", output: "resources.mbt")
+  @fs.write_file(temp + "/cmd/moon.pkg", package_text)
+  @fs.write_file(temp + "/cmd/main.mbt", "fn main { println(VERSION); println(bundled) }\n")
+  for version in ["1.2.3", "2.0.0-rc.1+test"] {
+    @fs.write_file(temp + "/moon.mod", "name = \"test/build-rules\"\nversion = \"\{version}\"\npreferred_target = \"native\"\n")
+    let padding = Array::make(1988, "a").join("")
+    let resource = "{\"value\":\"" + padding + "🌙\{version}\"}"
+    @fs.write_file(temp + "/cmd/resources.json", resource)
+    let output = checked(["run", "--target", "native", "cmd"], temp).replace_all(old="\r\n", new="\n")
+    assert_true(output.contains(version + "\n"))
+    assert_true(output.contains(resource))
+  }
+  @fs.write_file(temp + "/invalid.mod", "name = \"test/no-version\"\n")
+  let (code, _, _) = @process.collect_output("moon", ["run", root + "/scripts/gen_version.mbtx", temp + "/invalid.mod", temp + "/invalid.mbt"], cwd=root)
+  assert_true(code != 0)
+  assert_true(!@fs.exists(temp + "/invalid.mbt"))
+  println("Version and embedded-resource build rules passed")
+}

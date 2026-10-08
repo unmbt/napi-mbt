@@ -9,7 +9,7 @@ options(
   link: {
     "native": {
       "cc-flags": "${build.NAPI_C_FLAGS}",
-      "stub-cc-flags": "${build.NAPI_C_FLAGS} -I./node_modules/node-api-headers/include -DNAPI_VERSION=1",
+      "stub-cc-flags": "${build.NAPI_C_FLAGS} -I./.napi-mbt/include -DNAPI_VERSION=1",
       "cc-link-flags": "${build.NAPI_LINK_FLAGS}",
       "exports": [
         "moonbit_init",

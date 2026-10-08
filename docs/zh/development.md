@@ -7,9 +7,9 @@
 `napi-mbt` 被设计为 V8 JavaScript 引擎与 MoonBit 语言之间的高性能、自动化桥梁。其底层直接依赖于标准的 Node-API (N-API)。
 
 我们的架构由三个边界清晰的层次组成：
-1. **工具链核心 (`@unmbt/napi-mbt-cli`)**: 基于 Node.js 的 CLI 脚本，统筹所有的 AST 语法分析、依赖挂载、及目标编译。
+1. **工具链核心 (`napi-mbt-cli`)**：独立 MoonBit 原生程序，静态链接 Tree-sitter，完成 AST 分析、生成与原生构建，无需 Node/npm。
 2. **MoonBit N-API 运行时引擎**: 包含与 N-API 对接的基础内存通信结构和类型转换 helper。
-3. **C 蹦床 (`stub.c`)**: 极简的 C 层实现，提供标准 Node-API 注册入口，充当 C ABI 和 MoonBit 运行时之间的缓冲垫。
+3. **C glue (`napi_glue.c`)**：提供 Node-API 注册入口和逐导出的回调。
 
 
 Node-API 是纯 C 的接口协议。当 Node.js 试图调用一个原生扩展时，它要求目标必须是签名类似于 `napi_value cb(napi_env env, napi_callback_info info)` 的标准 C 函数指针。
@@ -21,12 +21,8 @@ Node-API 是纯 C 的接口协议。当 Node.js 试图调用一个原生扩展�
 
 CLI 为每个 `#export_name("...")` 函数生成一个 MoonBit adapter 和独立的 N-API callback。调用时直接进入对应 adapter，不使用全局 dispatcher 或函数 ID。
 
-2. **加载初始化**: 当 Node.js 加载编译好的 `.node` 扩展时，底层的 `stub.c` 会触发 `napi_register_module_v1`。该函数会调用 MoonBit 的初始化区块 `moonbit_napi_init()`。
-3. **函数挂载**: 模块初始化时，生成的 C glue 为每个导出创建独立的 N-API callback，并把同名属性挂载到 exports。
-
-```mermaid
-sequenceDiagram
-```
+1. **加载初始化**：Node.js 调用 `napi_glue.c` 的 `napi_register_module_v1`，该函数调用 `moonbit_init()`。
+2. **函数挂载**：生成的 C glue 为每个导出创建独立的 N-API callback，并把同名属性挂载到 exports。
 
 ## 3. 双重 GC 灾难与内存安全
 
@@ -41,18 +37,18 @@ MoonBit 和 V8 分别拥有完全独立的垃圾收集器 (Garbage Collectors)�
 
 ### 在本地进行测试
 我们的测试用例无需执行任何外围发布。
-你只需运行 `npm test`，内部的 `node --test scripts/test.js` 脚本便会接管一切，在本地快速验证 AST 抓取、编译、C 绑定与逻辑映射的全链路状态。
+先执行 `moon build --target native --release cmd/napi-mbt-cli` 构建 CLI，再用 `moon run --target native --release cmd/napi-mbt-cli -- build --release` 构建根项目扩展。`moon run scripts/ci-regression-test.mbtx` 在隔离 Node/npm 的环境测试原生命令，`moon test --target native` 执行单元测试。最后用 `node --test scripts/test.js` 加载已生成的根项目及测试项目扩展。
 
 ### 验证 Npm 分发逻辑
 为了调试 `napi-mbt prepublish` 所输出的多平台分发架构，请运行：
 ```bash
-node cli/bin/napi-mbt.js prepublish
+napi-mbt-cli prepublish
 ```
-该指令会在工作区根目录的 `npm/` 文件夹中输出对应架构的 `.json` 布局文件。确保你在根目录自动生成的 `index.js` 智能分发器能够正确适配。
+该指令会在 `npm/` 文件夹中输出各平台包的元数据。生成的 `index.cjs` 和 `index.mjs` 负责加载这些平台包。
 
 ### 如何添加对新数据类型 (如 Object/Array) 的支持
-1. 在 `cli/src/generate.js` 中: 扩展 TypeScript AST 分析器，从而在 `index.d.ts` 中正确抛出新的类型签名。
-2. 在 `cli/src/generate.js` 中: 扩展 `mbt` 胶水代码生成模板，编写该类型的装箱和拆箱拦截逻辑。
+1. 在 `generator/strict.mbt` 中扩展导出签名校验与类型模型。
+2. 在 `generator/outputs.mbt` 中扩展适配代码和 TypeScript 声明；运行时模板变化时同步更新 `internal/assets/data/resources.json`。
 3. 在 `lib.mbt` 内: 调用底层的 Node-API（如 `napi_get_named_property` 等等），编写底层的内存提取和安全检验逻辑。
 
 ### 常见问题排查 (Troubleshooting)

@@ -1,0 +1,46 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    let src = source + "/" + name
+    let dst = destination + "/" + name
+    if @fs.kind(src) == Directory { copy_tree(src, dst) }
+    else { @fs.write_file(dst, @fs.read_file(src)) }
+  }
+}
+
+///|
+async fn main {
+  // Isolate compiler flags and caches; do not patch the developer's toolchain.
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-parser-asan-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.write_file(temp + "/moon.mod", "name = \"unmbt/napi-mbt\"\npreferred_target = \"native\"\n")
+  copy_tree(root + "/internal/syntax", temp + "/internal/syntax")
+  copy_tree(root + "/generator", temp + "/generator")
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let flags = if windows { "/utf-8 /Z7 /fsanitize=address" } else { "-g -fsanitize=address -fno-omit-frame-pointer" }
+  for pkg in ["internal/syntax", "generator"] {
+    let path = temp + "/" + pkg + "/moon.pkg"
+    let config = @fs.read_file(path).text()
+    @fs.write_file(path, config.replace_all(old="options(", new="options(link: { \"native\": { \"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\" } }, "))
+  }
+  let env = {
+    "MOONBIT_NEW_NATIVE": "0", "MOONBIT_ALLOCATOR": "system",
+    "ASAN_OPTIONS": "detect_leaks=0:fast_unwind_on_malloc=0",
+  }
+  if windows {
+    let pf = @env.get_env_var("ProgramFiles(x86)").unwrap_or("C:/Program Files (x86)")
+    let (_, out, _) = @process.collect_output(pf + "/Microsoft Visual Studio/Installer/vswhere.exe", ["-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath", "-utf8"])
+    let tools = out.text().trim().to_owned() + "/VC/Tools/MSVC"
+    let dirs = []
+    for version in @fs.readdir(tools) { dirs.push(tools + "/" + version + "/bin/Hostx64/x64") }
+    env["PATH"] = dirs.join(";") + ";" + @env.get_env_var("PATH").unwrap_or("")
+  }
+  let (code, out, err) = @process.collect_output("moon", ["test", "--target", "native", "--release", "internal/syntax", "generator"], cwd=temp, extra_env=env)
+  println(out.text())
+  println(err.text())
+  if code != 0 { fail("Parser AddressSanitizer validation failed") }
+}

@@ -2,6 +2,16 @@
 package "unmbt/napi-mbt/generator"
 
 // Values
+pub fn adapters(Array[ParsedExport]) -> String
+
+pub fn c_glue(Array[ParsedExport]) -> String
+
+pub fn declarations(Array[ParsedExport]) -> String
+
+pub fn loaders(Array[ParsedExport], String, Int) -> (String, String)
+
+pub fn parse_source(String, String) -> ParsedSource raise
+
 pub fn render_c_glue(Array[ExportSpec], Int) -> String
 
 pub fn render_moonbit_adapters(Array[ExportSpec]) -> String
@@ -22,6 +32,27 @@ pub(all) struct GeneratorConfig {
   napi_version : Int
   builder : String
   generator : String
+}
+
+pub(all) struct Parameter {
+  name : String
+  type_name : String
+}
+
+pub(all) struct ParsedExport {
+  source_name : String
+  export_name : String
+  parameters : Array[Parameter]
+  return_type : String
+  throws : Bool
+  filename : String
+  line : Int
+}
+pub fn ParsedExport::manifest(Self) -> Json
+
+pub(all) struct ParsedSource {
+  exports : Array[ParsedExport]
+  features : Array[String]
 }
 
 // Type aliases

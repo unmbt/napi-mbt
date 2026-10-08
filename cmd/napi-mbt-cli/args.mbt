@@ -9,7 +9,7 @@ fn cli_command() -> @argparse.Command {
   let generator = @argparse.OptionArg(
     "generator",
     long="generator",
-    about="Generator: auto, moonbit, node",
+    about="Generator: auto or moonbit (native)",
   )
   let target = @argparse.OptionArg(
     "target",
@@ -77,11 +77,8 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
   normalized.push(values.values.get("directory").unwrap()[0])
   for option in ["name", "generator", "target"] {
     if values.values.get(option) is Some([value, ..]) {
-      if option == "generator" &&
-        value != "auto" &&
-        value != "moonbit" &&
-        value != "node" {
-        fail("Unknown generator: \{value}; expected auto, moonbit or node")
+      if option == "generator" {
+        validate_generator(value)
       }
       normalized.push("--" + option)
       normalized.push(value)

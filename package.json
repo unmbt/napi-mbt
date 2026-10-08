@@ -12,6 +12,7 @@
   "main": "index.cjs",
   "module": "index.mjs",
   "types": "index.d.ts",
+  "files": ["index.cjs", "index.mjs", "index.d.ts", "README.md", "README.zh.md", "LICENSE"],
   "exports": {
     ".": {
       "types": "./index.d.ts",
@@ -22,29 +23,17 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.2",
-    "@unmbt/tree-sitter-moonbit": "latest",
-    "node-api-headers": "^1.9.0",
     "ts-node": "^10.9.2",
-    "typescript": "^7.0.2",
-    "web-tree-sitter": "^0.26.11"
-  },
-  "dependencies": {
-    "node-api-headers": "^1.9.0"
+    "typescript": "^7.0.2"
   },
   "scripts": {
-    "build": "node cli/bin/napi-mbt.js build --release",
-    "generate": "node cli/src/generate.js",
-    "cli:build": "moon build --target native --release cmd/napi-mbt-cli",
-    "cli:run": "moon run cmd/napi-mbt-cli --",
     "test": "node --test scripts/test.js",
-    "publish:prepare": "node cli/bin/napi-mbt.js prepublish",
     "publish:dry-run": "node scripts/publish.js --dry-run",
     "publish:all": "node scripts/publish.js"
   },
   "optionalDependencies": {
     "napi-mbt-win32-x64-msvc": "0.1.0",
     "napi-mbt-darwin-arm64": "0.1.0",
-    "napi-mbt-linux-x64-gnu": "0.1.0",
-    "napi-mbt-linux-arm64-gnu": "0.1.0"
+    "napi-mbt-linux-x64-gnu": "0.1.0"
   }
 }

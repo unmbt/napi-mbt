@@ -1,0 +1,41 @@
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  if !@fs.exists(destination) { @fs.mkdir(destination, recursive=true) }
+  for name in @fs.readdir(source) {
+    let src = source + "/" + name
+    let dst = destination + "/" + name
+    if @fs.kind(src) == Directory {
+      copy_tree(src, dst)
+    } else {
+      @fs.write_file(dst, @fs.read_file(src))
+    }
+  }
+}
+
+///|
+async fn main {
+  guard @env.args() is [_, runtime, grammar, headers] else {
+    fail("Usage: vendor-native.mbtx <tree-sitter-0.26.8> <grammar-190881d> <node-api-headers-1.9.0>")
+  }
+  let dest = "internal/syntax/vendor"
+  copy_tree(runtime + "/lib/src", dest + "/runtime")
+  copy_tree(runtime + "/lib/include/tree_sitter", dest + "/runtime/tree_sitter")
+  copy_tree(grammar + "/src", dest + "/grammar")
+  @fs.write_file(dest + "/TREE-SITTER-LICENSE", @fs.read_file(runtime + "/LICENSE"))
+  @fs.write_file(dest + "/GRAMMAR-LICENSE", @fs.read_file(grammar + "/LICENSE"))
+  if !@fs.exists("internal/assets/data") { @fs.mkdir("internal/assets/data", recursive=true) }
+  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is Object(resources) else { fail("Invalid resources.json") }
+  for name in ["node_api.h", "node_api_types.h", "js_native_api.h", "js_native_api_types.h"] {
+    resources["include/" + name] = @fs.read_file(headers + "/include/" + name).text().to_json()
+  }
+  resources["node_api.def"] = @fs.read_file(headers + "/def/node_api.def").text().to_json()
+  resources["NODE-API-LICENSE"] = @fs.read_file(headers + "/LICENSE").text().to_json()
+  @fs.write_file("internal/assets/data/resources.json", resources.to_json().stringify(indent=2) + "\n")
+}

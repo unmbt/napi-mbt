@@ -1,7 +1,5 @@
-///| Difficult cases are covered by the Node integration suite as they exercise
-
 ///|
-/// filesystem, tree-sitter and native compilation boundaries.
+/// Filesystem and native compilation are also exercised by cli-native-test.mbtx.
 test "export names are not inferred from source names" {
   let item : @generator.ExportSpec = {
     source_name: "internal_add",
