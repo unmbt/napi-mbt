@@ -4,7 +4,7 @@ fn cli_command() -> @argparse.Command {
     "directory",
     about="Project directory",
     default_values=["."],
-    num_args=@argparse.ValueRange(lower=0, upper=1),
+    num_args=ValueRange(lower=0, upper=1),
   )
   let generator = @argparse.OptionArg(
     "generator",
@@ -16,60 +16,50 @@ fn cli_command() -> @argparse.Command {
     long="target",
     about="Build target",
   )
-  @argparse.Command(
-    "napi-mbt",
+  Command(
+    "napi-mbt-cli",
     version=VERSION,
     about="Generate and build MoonBit Node-API addons",
     arg_required_else_help=true,
     subcommand_required=true,
     subcommands=[
-      @argparse.Command(
+      Command(
         "init",
         about="Create the official addon template",
         positionals=[directory],
-        options=[@argparse.OptionArg("name", long="name", about="Package name")],
-        flags=[
-          @argparse.FlagArg(
-            "force",
-            long="force",
-            about="Overwrite existing files",
-          ),
-        ],
+        options=[OptionArg("name", long="name", about="Package name")],
+        flags=[FlagArg("force", long="force", about="Overwrite existing files")],
       ),
-      @argparse.Command(
+      Command(
         "generate",
         about="Generate bindings and loaders",
         positionals=[directory],
         options=[generator],
         flags=[
-          @argparse.FlagArg(
+          FlagArg(
             "check",
             long="check",
             about="Check generated files without writing",
           ),
         ],
       ),
-      @argparse.Command(
+      Command(
         "build",
         about="Build the native addon",
         positionals=[directory],
         options=[generator, target],
         flags=[
-          @argparse.FlagArg("release", long="release", about="Release build"),
-          @argparse.FlagArg(
-            "dry-run",
-            long="dry-run",
-            about="Show build commands",
-          ),
+          FlagArg("release", long="release", about="Release build"),
+          FlagArg("dry-run", long="dry-run", about="Show build commands"),
         ],
       ),
-      @argparse.Command(
+      Command(
         "prepublish",
         about="Prepare platform npm packages",
         positionals=[directory],
         options=[target],
       ),
-      @argparse.Command("targets", about="List supported targets"),
+      Command("targets", about="List supported targets"),
     ],
   )
 }

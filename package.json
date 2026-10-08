@@ -34,8 +34,8 @@
   "scripts": {
     "build": "node cli/bin/napi-mbt.js build --release",
     "generate": "node cli/src/generate.js",
-    "cli:build": "moon build --target native --release cmd/main",
-    "cli:run": "moon run cmd/main --",
+    "cli:build": "moon build --target native --release cmd/napi-mbt-cli",
+    "cli:run": "moon run cmd/napi-mbt-cli --",
     "test": "node --test scripts/test.js",
     "publish:prepare": "node cli/bin/napi-mbt.js prepublish",
     "publish:dry-run": "node scripts/publish.js --dry-run",

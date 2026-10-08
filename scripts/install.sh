@@ -38,18 +38,18 @@ rm -rf "$ROOT"
 mkdir -p "$ROOT/runtime"
 tar -xzf "$TMP/cli.tar.gz" -C "$ROOT"
 
-if [ ! -x "$ROOT/napi-mbt" ]; then
-  echo "Release $VERSION did not contain napi-mbt" >&2
+if [ ! -x "$ROOT/napi-mbt-cli" ]; then
+  echo "Release $VERSION did not contain napi-mbt-cli" >&2
   exit 1
 fi
-mv "$ROOT/napi-mbt" "$ROOT/napi-mbt-bin"
-cat > "$ROOT/napi-mbt" <<EOF
+mv "$ROOT/napi-mbt-cli" "$ROOT/napi-mbt-cli-bin"
+cat > "$ROOT/napi-mbt-cli" <<EOF
 #!/usr/bin/env bash
 set -e
 export NAPI_MBT_NODE_RUNTIME="$ROOT/runtime/cli/bin/napi-mbt.js"
-exec "$ROOT/napi-mbt-bin" "\$@"
+exec "$ROOT/napi-mbt-cli-bin" "\$@"
 EOF
-chmod +x "$ROOT/napi-mbt"
+chmod +x "$ROOT/napi-mbt-cli"
 
 case ":${PATH}:" in
   *:"$ROOT":*) ;;

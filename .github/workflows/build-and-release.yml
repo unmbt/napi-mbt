@@ -51,6 +51,9 @@ jobs:
       - name: Build Native Module
         run: npm run build -- --release
 
+      - name: Strict MoonBit check
+        run: moon check --target native --warn-list +73 --deny-warn
+
       - name: Test
         run: npm run test
 
@@ -109,17 +112,17 @@ jobs:
       - name: Setup MoonBit
         uses: hustcer/setup-moonbit@v1
       - name: Build native CLI
-        run: moon build --release --target native cmd/main
+        run: moon build --release --target native cmd/napi-mbt-cli
       - name: Package native CLI and Node fallback
         shell: bash
         run: |
           set -eux
           mkdir -p cli-release/runtime
           if [[ "$RUNNER_OS" == "Windows" ]]; then
-            cp _build/native/release/build/cmd/main/main.exe cli-release/napi-mbt.exe
+            cp _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe cli-release/napi-mbt-cli.exe
           else
-            cp _build/native/release/build/cmd/main/main cli-release/napi-mbt
-            chmod +x cli-release/napi-mbt
+            cp _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe cli-release/napi-mbt-cli
+            chmod +x cli-release/napi-mbt-cli
           fi
           cp -R cli cli-release/runtime/cli
           npm install --prefix cli-release/runtime/cli --production --ignore-scripts

@@ -26,14 +26,14 @@ try {
     if (Test-Path $InstallRoot) { Remove-Item $InstallRoot -Recurse -Force }
     New-Item -ItemType Directory -Path $InstallRoot | Out-Null
     tar -xzf $archive -C $InstallRoot
-    $binary = Join-Path $InstallRoot "napi-mbt.exe"
-    if (-not (Test-Path $binary)) { throw "Release $Version did not contain napi-mbt.exe" }
-    Rename-Item $binary "napi-mbt-bin.exe"
+    $binary = Join-Path $InstallRoot "napi-mbt-cli.exe"
+    if (-not (Test-Path $binary)) { throw "Release $Version did not contain napi-mbt-cli.exe" }
+    Rename-Item $binary "napi-mbt-cli-bin.exe"
     @"
 @echo off
 set "NAPI_MBT_NODE_RUNTIME=$InstallRoot\runtime\cli\bin\napi-mbt.js"
-"$InstallRoot\napi-mbt-bin.exe" %*
-"@ | Set-Content (Join-Path $InstallRoot "napi-mbt.cmd") -Encoding ASCII
+"$InstallRoot\napi-mbt-cli-bin.exe" %*
+"@ | Set-Content (Join-Path $InstallRoot "napi-mbt-cli.cmd") -Encoding ASCII
 
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($userPath -split ';') -notcontains $InstallRoot) {

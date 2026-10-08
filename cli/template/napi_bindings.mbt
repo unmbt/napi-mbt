@@ -53,15 +53,6 @@ extern "c" fn napi_get_boolean(
 extern "c" fn napi_get_undefined(env : NapiEnv, result : Ref[NapiValue]) -> Int = "napi_get_undefined"
 
 ///|
-#borrow(utf8name)
-extern "c" fn napi_set_named_property(
-  env : NapiEnv,
-  object : NapiValue,
-  utf8name : Bytes,
-  value : NapiValue,
-) -> Int = "napi_set_named_property"
-
-///|
 #borrow(buf, result)
 extern "c" fn napi_get_value_string_utf8(
   env : NapiEnv,
@@ -89,32 +80,6 @@ extern "c" fn napi_create_string_utf8(
   length : Int,
   result : Ref[NapiValue],
 ) -> Int = "napi_create_string_utf8"
-
-///|
-#borrow(result)
-extern "c" fn napi_get_value_external(
-  env : NapiEnv,
-  value : NapiValue,
-  result : Ref[Int],
-) -> Int = "napi_get_value_external"
-
-///|
-#borrow(result)
-extern "c" fn moonbit_napi_create_external_id(
-  env : NapiEnv,
-  id : Int,
-  result : Ref[NapiValue],
-) -> Int = "moonbit_napi_create_external_id"
-
-///|
-#borrow(result)
-extern "c" fn moonbit_napi_create_external_buffer(
-  env : NapiEnv,
-  length : Int,
-  data : UnmanagedBuffer,
-  id : Int,
-  result : Ref[NapiValue],
-) -> Int = "moonbit_napi_create_external_buffer"
 
 ///|
 #borrow(data, length)

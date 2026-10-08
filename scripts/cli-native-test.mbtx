@@ -21,11 +21,12 @@ async fn checked(
 ///|
 async fn main {
   let root = @fs.realpath(".")
-  let binary = root + "/_build/native/release/build/cmd/main/main.exe"
+  let binary = root +
+    "/_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"
   ignore(
     checked(
       "moon",
-      ["build", "--target", "native", "--release", "cmd/main"],
+      ["build", "--target", "native", "--release", "cmd/napi-mbt-cli"],
       root,
     ),
   )
@@ -45,6 +46,29 @@ async fn main {
   // rule to prove moon.mod changes invalidate the generated constant.
   let temp = @fs.tmpdir(prefix="napi-mbt-cli-")
   defer @fs.rmdir(temp, recursive=true)
+  let bin_dir = temp + "/bin"
+  ignore(
+    checked("moon", ["install", "./cmd/napi-mbt-cli", "--bin", bin_dir], root),
+  )
+  let installed = bin_dir +
+    "/napi-mbt-cli" +
+    (if @fs.exists(bin_dir + "/napi-mbt-cli.exe") { ".exe" } else { "" })
+  assert_eq(checked(installed, ["--version"], temp), version)
+  assert_true(checked(installed, ["--help"], temp).contains("napi-mbt-cli"))
+  assert_true(checked(installed, ["targets"], temp).contains("win32-x64-msvc"))
+  // Simulate a project-local fallback without network/npm installation.
+  let local_bin = temp + "/node_modules/@unmbt/napi-mbt-cli/bin"
+  @fs.mkdir(local_bin, recursive=true)
+  @fs.write_file(
+    local_bin + "/napi-mbt.js",
+    "console.log('fallback:' + JSON.stringify(process.argv.slice(2)))\n",
+  )
+  @fs.mkdir(temp + "/nested")
+  assert_true(
+    checked(installed, ["generate", "--check"], temp + "/nested").contains(
+      "fallback:[\"generate\",\".\",\"--check\"]",
+    ),
+  )
   ignore(
     checked(binary, ["init", "--name=fixture-addon", temp + "/addon"], root),
   )
@@ -55,17 +79,20 @@ async fn main {
       root,
     ),
   )
-  @fs.mkdir(temp + "/cmd/main", recursive=true)
+  @fs.mkdir(temp + "/cmd/napi-mbt-cli", recursive=true)
   @fs.mkdir(temp + "/scripts")
   @fs.write_file(
     temp + "/scripts/gen_version.mbtx",
     @fs.read_file(root + "/scripts/gen_version.mbtx"),
   )
   @fs.write_file(
-    temp + "/cmd/main/moon.pkg",
-    @fs.read_file(root + "/cmd/main/moon.pkg"),
+    temp + "/cmd/napi-mbt-cli/moon.pkg",
+    @fs.read_file(root + "/cmd/napi-mbt-cli/moon.pkg"),
   )
-  @fs.write_file(temp + "/cmd/main/main.mbt", "fn main { println(VERSION) }\n")
+  @fs.write_file(
+    temp + "/cmd/napi-mbt-cli/main.mbt",
+    "fn main { println(VERSION) }\n",
+  )
   for expected in ["1.2.3", "2.0.0-rc.1+build.7"] {
     @fs.write_file(
       temp + "/moon.mod",
@@ -74,12 +101,12 @@ async fn main {
     ignore(
       checked(
         "moon",
-        ["build", "--target", "native", "--release", "cmd/main"],
+        ["build", "--target", "native", "--release", "cmd/napi-mbt-cli"],
         temp,
       ),
     )
     let actual = checked(
-      temp + "/_build/native/release/build/cmd/main/main.exe",
+      temp + "/_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe",
       [],
       temp,
     )

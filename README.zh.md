@@ -44,14 +44,30 @@
 
 ### 安装 CLI
 
-可以直接用 MoonBit 从源码构建：
+首选使用 `moon install`（需要 Mooncakes 上已发布包含此入口的版本）：
 
 ```bash
-moon build --target native --release cmd/main
+moon install unmbt/napi-mbt/cmd/napi-mbt-cli
+napi-mbt-cli --help
+```
+
+默认安装到 `~/.moon/bin`，命令名为 `napi-mbt-cli`，Windows 下为
+`napi-mbt-cli.exe`。请将安装目录加入 PATH。新版本发布前，可从当前仓库
+安装；也可以通过 `--bin` 指定安装到 `~/.unmbt`：
+
+```bash
+moon install ./cmd/napi-mbt-cli
+moon install ./cmd/napi-mbt-cli --bin ~/.unmbt
+```
+
+也可以只编译，不安装：
+
+```bash
+moon build --target native --release cmd/napi-mbt-cli
 ```
 
 原生 CLI 使用 `moonbitlang/core/argparse` 解析子命令并提供帮助。
-版本以 `moon.mod` 为唯一来源：`cmd/main/moon.pkg` 中的 `gen_version`
+版本以 `moon.mod` 为唯一来源：`cmd/napi-mbt-cli/moon.pkg` 中的 `gen_version`
 rule 和 `dev_build` 调用 `scripts/gen_version.mbtx` 生成
 `generated_version.mbt`。发布时保留生成文件，供下游构建使用。
 运行 `moon run scripts/cli-native-test.mbtx` 可验证参数解析和版本自动更新。
@@ -71,8 +87,12 @@ Windows PowerShell：
 irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
 ```
 
-原生启动器会调用随 release 一起下载的 Node fallback runtime 来执行
-tree-sitter 生成。只有直接安装 fallback 包或发布 N-API 平台包时才需要 npm。
+`moon install` 只安装原生可执行文件。当前 `init`、`generate`、`build`
+和 `prepublish` 仍需要 Node.js 和 Node fallback。可在项目中安装
+`@unmbt/napi-mbt-cli` 开发依赖（启动器会从当前目录向父目录查找），或将
+`NAPI_MBT_NODE_RUNTIME` 设置为已安装 npm 依赖的源码仓库中
+`cli/bin/napi-mbt.js` 的绝对路径。GitHub Release 安装脚本会附带 fallback
+及其依赖。帮助、版本查询和 `targets` 完全由 MoonBit 执行。
 
 ### 2. 项目初始化
 
@@ -82,6 +102,7 @@ tree-sitter 生成。只有直接安装 fallback 包或发布 N-API 平台包时
 mkdir my-napi-addon
 cd my-napi-addon
 npm init -y
+npm install --save-dev @unmbt/napi-mbt-cli
 npm install node-api-headers
 ```
 
@@ -106,7 +127,7 @@ pub fn add(a : Int, b : Int) -> Int {
 通过 CLI 工具自动生成所有绑定并编译出 `.node` 二进制插件：
 
 ```bash
-npx napi-mbt build
+napi-mbt-cli build
 ```
 
 上述命令会自动执行：
@@ -126,7 +147,7 @@ console.log(addon.mbt_add(2, 3)); // 输出: 5
 
 ### 发包
 
-版本发布使用仓库中的 `bump.config.json`，会在版本提交前执行 native 构建和测试。完成各目标平台构建后，按平台包、CLI、根包的顺序准备并发布：
+版本发布使用仓库中的 `bump.config.json`，会在版本提交前执行 `moon check`。完成各目标平台构建后，按平台包、CLI、根包的顺序准备并发布：
 
 ```bash
 npm run publish:prepare

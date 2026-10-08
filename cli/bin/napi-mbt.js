@@ -39,7 +39,7 @@ async function init(dir, args) {
     module: 'index.mjs',
     types: 'index.d.ts',
     exports: { '.': { types: './index.d.ts', require: './index.cjs', import: './index.mjs', default: './index.cjs' } },
-    scripts: { generate: 'napi-mbt generate', build: 'napi-mbt build --release', test: 'node test/smoke.cjs' },
+    scripts: { generate: 'napi-mbt-cli generate', build: 'napi-mbt-cli build --release', test: 'node test/smoke.cjs' },
     dependencies: { 'node-api-headers': '^1.9.0' }
   };
   writeFile(path.join(dir, 'package.json'), JSON.stringify(pkg, null, 2) + '\n', force);

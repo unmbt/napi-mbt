@@ -43,15 +43,31 @@ The repository publishes a native MoonBit CLI to Mooncakes and GitHub Releases. 
 
 ### Installing the CLI
 
-Build it from source with MoonBit:
+Use `moon install` (recommended, once a release containing this entry point is on Mooncakes):
 
 ```bash
-moon build --target native --release cmd/main
+moon install unmbt/napi-mbt/cmd/napi-mbt-cli
+napi-mbt-cli --help
+```
+
+This installs `napi-mbt-cli` (`napi-mbt-cli.exe` on Windows) into `~/.moon/bin`.
+Ensure that directory is on PATH. To install the current checkout before a new
+Mooncakes release, or choose `~/.unmbt` as the destination:
+
+```bash
+moon install ./cmd/napi-mbt-cli
+moon install ./cmd/napi-mbt-cli --bin ~/.unmbt
+```
+
+You can also build from source:
+
+```bash
+moon build --target native --release cmd/napi-mbt-cli
 ```
 
 The native CLI uses `moonbitlang/core/argparse` for subcommands and help.
 Its version comes from `moon.mod`: the `gen_version` rule and `dev_build` in
-`cmd/main/moon.pkg` run `scripts/gen_version.mbtx` to regenerate
+`cmd/napi-mbt-cli/moon.pkg` run `scripts/gen_version.mbtx` to regenerate
 `generated_version.mbt`. Keep that generated file in releases for downstream
 builds. Run `moon run scripts/cli-native-test.mbtx` to check argument handling
 and version regeneration.
@@ -71,9 +87,13 @@ On Windows PowerShell:
 irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
 ```
 
-The native launcher delegates to the bundled Node fallback runtime for
-tree-sitter generation. npm is only needed when you choose to install the
-fallback package directly or publish the N-API platform packages.
+`moon install` installs the native executable only. `init`, `generate`, `build`
+and `prepublish` currently require Node.js and the Node fallback. Install
+`@unmbt/napi-mbt-cli` as a project dev dependency (searched in the current directory
+and its parents), or set `NAPI_MBT_NODE_RUNTIME` to an absolute path to
+`cli/bin/napi-mbt.js` in a checkout with its npm dependencies installed.
+The GitHub Release installer bundles the fallback and its dependencies.
+Help, version queries and `targets` run entirely in MoonBit.
 
 ### 2. Project Setup
 
@@ -83,6 +103,7 @@ Create a new Node.js project (the native CLI is already on your PATH):
 mkdir my-napi-addon
 cd my-napi-addon
 npm init -y
+npm install --save-dev @unmbt/napi-mbt-cli
 npm install node-api-headers
 ```
 
@@ -107,7 +128,7 @@ pub fn add(a : Int, b : Int) -> Int {
 Run the CLI tool to auto-generate bindings and build the `.node` binary:
 
 ```bash
-npx napi-mbt build
+napi-mbt-cli build
 ```
 
 This command will:
@@ -127,7 +148,7 @@ Set one package-wide N-API version in `napi-mbt.json`. The default v1 covers Nod
 
 ### Release and publish
 
-Version releases use the repository's `bump.config.json`; it runs the native build and tests before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:
+Version releases use the repository's `bump.config.json`; it runs `moon check` before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:
 
 ```bash
 npm run publish:prepare
