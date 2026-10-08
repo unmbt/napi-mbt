@@ -1,4 +1,4 @@
 {
-  "execute": "npm run build && npm test",
+  "execute": "moon check",
   "all": true
 }

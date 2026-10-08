@@ -2,8 +2,20 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/core/env",
+  "moonbitlang/core/argparse",
 }
 
 pkgtype(kind: "executable")
 
 supported_targets = "native"
+
+rule(
+  name: "gen_version",
+  command: "moon run scripts/gen_version.mbtx $input $output",
+)
+
+dev_build(
+  rule: "gen_version",
+  input: "../../moon.mod",
+  output: "generated_version.mbt",
+)

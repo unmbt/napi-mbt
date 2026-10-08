@@ -1,15 +1,4 @@
 ///|
-/// Native entry point for napi-mbt.
-///
-/// The scanner/build implementation is still shared with the Node transport
-/// while the native executable is being rolled out.  Keeping this bridge in
-/// MoonBit means the installed command is a native program and does not need
-/// npm to be installed globally.  Release installers set
-/// `NAPI_MBT_NODE_RUNTIME` to the bundled fallback script; during development
-/// the repository's `cli/bin/napi-mbt.js` is used.
-const VERSION : String = "0.1.0"
-
-///|
 fn print_targets() -> Unit {
   println("win32-x64-msvc")
   println("darwin-x64")
@@ -21,11 +10,8 @@ fn print_targets() -> Unit {
 ///|
 async fn main {
   let argv = @env.args()
-  if argv.length() > 1 && (argv[1] == "--version" || argv[1] == "-V") {
-    println(VERSION)
-    return
-  }
-  if argv.length() > 1 && argv[1] == "targets" {
+  let parsed = parse_cli(argv[1:].to_owned())
+  if parsed[0] == "targets" {
     print_targets()
     return
   }
@@ -39,8 +25,8 @@ async fn main {
   }
   let args : Array[String] = []
   args.push(runtime)
-  for i = 1; i < argv.length(); i = i + 1 {
-    args.push(argv[i])
+  for arg in parsed {
+    args.push(arg)
   }
   let status = @process.run(node, args) catch {
     error => {

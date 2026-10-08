@@ -50,6 +50,12 @@
 moon build --target native --release cmd/main
 ```
 
+原生 CLI 使用 `moonbitlang/core/argparse` 解析子命令并提供帮助。
+版本以 `moon.mod` 为唯一来源：`cmd/main/moon.pkg` 中的 `gen_version`
+rule 和 `dev_build` 调用 `scripts/gen_version.mbtx` 生成
+`generated_version.mbt`。发布时保留生成文件，供下游构建使用。
+运行 `moon run scripts/cli-native-test.mbtx` 可验证参数解析和版本自动更新。
+
 也可以把预编译 CLI 安装到 `~/.unmbt`（Windows 为
 `%USERPROFILE%\.unmbt`）：
 

@@ -1,0 +1,102 @@
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+}
+
+///|
+async fn checked(
+  command : String,
+  args : Array[String],
+  cwd : String,
+) -> String {
+  let (code, out, err) = @process.collect_output(command, args, cwd~)
+  if code != 0 {
+    fail("\{command} failed: \{err.text()}\{out.text()}")
+  }
+  out.text()
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = root + "/_build/native/release/build/cmd/main/main.exe"
+  ignore(
+    checked(
+      "moon",
+      ["build", "--target", "native", "--release", "cmd/main"],
+      root,
+    ),
+  )
+  let version = checked(binary, ["--version"], root)
+  assert_eq(checked(binary, ["-V"], root), version)
+  assert_true(checked(binary, ["--help"], root).contains("prepublish"))
+  assert_true(checked(binary, ["build", "--help"], root).contains("--dry-run"))
+  assert_true(checked(binary, ["help", "generate"], root).contains("--check"))
+  let (invalid, _, _) = @process.collect_output(
+    binary,
+    ["build", "--unknown"],
+    cwd=root,
+  )
+  assert_true(invalid != 0)
+
+  // Isolate version changes from the working tree. Build twice with the same
+  // rule to prove moon.mod changes invalidate the generated constant.
+  let temp = @fs.tmpdir(prefix="napi-mbt-cli-")
+  defer @fs.rmdir(temp, recursive=true)
+  ignore(
+    checked(binary, ["init", "--name=fixture-addon", temp + "/addon"], root),
+  )
+  ignore(
+    checked(
+      binary,
+      ["generate", "--generator=node", "--check", temp + "/addon"],
+      root,
+    ),
+  )
+  @fs.mkdir(temp + "/cmd/main", recursive=true)
+  @fs.mkdir(temp + "/scripts")
+  @fs.write_file(
+    temp + "/scripts/gen_version.mbtx",
+    @fs.read_file(root + "/scripts/gen_version.mbtx"),
+  )
+  @fs.write_file(
+    temp + "/cmd/main/moon.pkg",
+    @fs.read_file(root + "/cmd/main/moon.pkg"),
+  )
+  @fs.write_file(temp + "/cmd/main/main.mbt", "fn main { println(VERSION) }\n")
+  for expected in ["1.2.3", "2.0.0-rc.1+build.7"] {
+    @fs.write_file(
+      temp + "/moon.mod",
+      "name = \"test/version\"\nversion = \"\{expected}\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.20.2\", }\n",
+    )
+    ignore(
+      checked(
+        "moon",
+        ["build", "--target", "native", "--release", "cmd/main"],
+        temp,
+      ),
+    )
+    let actual = checked(
+      temp + "/_build/native/release/build/cmd/main/main.exe",
+      [],
+      temp,
+    )
+    assert_eq(actual.trim().to_owned(), expected)
+  }
+  @fs.write_file(temp + "/invalid.mod", "name = \"test/missing-version\"\n")
+  let (invalid_version, _, _) = @process.collect_output(
+    "moon",
+    [
+      "run",
+      root + "/scripts/gen_version.mbtx",
+      temp + "/invalid.mod",
+      temp + "/invalid.mbt",
+    ],
+    cwd=root,
+  )
+  assert_true(invalid_version != 0)
+  assert_true(!@fs.exists(temp + "/invalid.mbt"))
+  println("Native CLI and version build-rule contracts passed")
+}

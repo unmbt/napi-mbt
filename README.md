@@ -49,6 +49,13 @@ Build it from source with MoonBit:
 moon build --target native --release cmd/main
 ```
 
+The native CLI uses `moonbitlang/core/argparse` for subcommands and help.
+Its version comes from `moon.mod`: the `gen_version` rule and `dev_build` in
+`cmd/main/moon.pkg` run `scripts/gen_version.mbtx` to regenerate
+`generated_version.mbt`. Keep that generated file in releases for downstream
+builds. Run `moon run scripts/cli-native-test.mbtx` to check argument handling
+and version regeneration.
+
 Or install the precompiled native CLI into `~/.unmbt` (Windows uses
 `%USERPROFILE%\.unmbt`):
 
