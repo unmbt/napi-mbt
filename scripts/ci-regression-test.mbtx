@@ -3,6 +3,7 @@ import {
   "moonbitlang/async",
   "moonbitlang/async/fs",
   "moonbitlang/async/process",
+  "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
 
@@ -41,6 +42,23 @@ async fn main {
   @fs.write_file(temp + "/lib.mbt", "pub fn broken(\r\n")
   let (code, _, _) = @process.collect_output("node", [cli, "generate", temp])
   assert_true(code != 0)
+  if @env.get_env_var("OS") == Some("Windows_NT") {
+    // CI has both Ninja and MinGW on PATH. The actual release build must
+    // still select Visual Studio, and publish its multi-config output.
+    let cache = @fs.read_file(
+      root + "/.napi-mbt/cmake/release-msvc/CMakeCache.txt",
+    ).text()
+    assert_true(cache.contains("CMAKE_GENERATOR:INTERNAL=Visual Studio "))
+    assert_true(cache.contains("CMAKE_GENERATOR_PLATFORM:INTERNAL=x64"))
+    ignore(@fs.read_file(root + "/artifacts/win32-x64-msvc/napi_mbt.node"))
+    // Reject an incompatible toolchain before attempting to build sources.
+    @fs.write_file(temp + "/napi-mbt.json", "{\"builder\":\"gcc\"}")
+    let (code, _, err) = @process.collect_output(
+      "node", [cli, "build", temp],
+    )
+    assert_true(code != 0)
+    assert_true(err.text().contains("MSVC-compatible toolchain"))
+  }
   // Evaluate the actual prebuild hook for both platform configurations.
   for
     (os, flags, link) in [

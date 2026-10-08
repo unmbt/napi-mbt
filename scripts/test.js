@@ -4,6 +4,26 @@ const os = require('os');
 const path = require('path');
 const childProcess = require('child_process');
 const addon = require('../index.cjs');
+const visualStudioGenerator = require('../cli/src/cmake-generator');
+
+// VS 2022 used a year in productLineVersion; VS 2026 uses its major version.
+// Run both cases on every host, independently of the installed VS/CMake.
+const generators = { generators: [
+  { name: 'Ninja' },
+  { name: 'Visual Studio 180 2100' },
+  { name: 'Visual Studio 18 2026' },
+  { name: 'Visual Studio 17 2022' }
+] };
+assert.strictEqual(visualStudioGenerator({
+  installationVersion: '18.0.1', catalog: { productLineVersion: '18' }
+}, generators), 'Visual Studio 18 2026');
+assert.strictEqual(visualStudioGenerator({
+  installationVersion: '17.12.35506.116', catalog: { productLineVersion: '2022' }
+}, generators), 'Visual Studio 17 2022');
+assert.strictEqual(visualStudioGenerator({ installationVersion: '18.0.1' }, generators), 'Visual Studio 18 2026');
+assert.throws(() => visualStudioGenerator({ installationVersion: '18.0.1' }, {
+  generators: [{ name: 'Ninja' }, { name: 'Visual Studio 17 2022' }]
+}), /CMake has no generator for Visual Studio 18; update CMake/);
 
 assert.strictEqual(addon.add(10, 20), 30);
 assert.strictEqual(addon.concat('Hello ', 'MoonBit'), 'Hello MoonBit');

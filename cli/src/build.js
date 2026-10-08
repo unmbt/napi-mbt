@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync } = require('child_process');
 const generate = require('./generate');
+const visualStudioGenerator = require('./cmake-generator');
 
 function commandExists(command) {
   try { execFileSync(process.platform === 'win32' ? 'where.exe' : 'which', [command], { stdio: 'ignore' }); return true; } catch (_) { return false; }
@@ -14,12 +15,22 @@ function mkdirp(dir) {
   try { fs.mkdirSync(dir); } catch (error) { if (!fs.existsSync(dir)) throw error; }
 }
 
-function findLibExe() {
+function findVisualStudio() {
   if (process.platform !== 'win32') return null;
   try {
     const pf = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
     const vswhere = path.join(pf, 'Microsoft Visual Studio', 'Installer', 'vswhere.exe');
-    const root = execFileSync(vswhere, ['-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-property', 'installationPath'], { encoding: 'utf8' }).trim();
+    const instances = JSON.parse(execFileSync(vswhere, ['-latest', '-products', '*', '-requires', 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64', '-format', 'json', '-utf8'], { encoding: 'utf8' }));
+    return instances[0] || null;
+  } catch (_) {}
+  return null;
+}
+
+function findLibExe() {
+  const instance = findVisualStudio();
+  if (!instance) return null;
+  try {
+    const root = instance.installationPath;
     const msvc = path.join(root, 'VC', 'Tools', 'MSVC');
     const versions = fs.readdirSync(msvc).sort().reverse();
     for (const version of versions) {
@@ -28,6 +39,27 @@ function findLibExe() {
     }
   } catch (_) {}
   return null;
+}
+
+function cmakeGeneratorArgs(builder) {
+  if (!['auto', 'cmake', 'clang', 'gcc', 'msvc'].includes(builder)) throw new Error(`Unknown builder: ${builder}`);
+  if (process.platform === 'win32') {
+    if (builder === 'gcc') throw new Error('Windows builds require an MSVC-compatible toolchain; MinGW GCC cannot link the MoonBit MSVC artifacts');
+    const instance = findVisualStudio();
+    if (!instance) throw new Error('Visual Studio with the C++ build tools is required on Windows');
+    const capabilities = JSON.parse(execFileSync('cmake', ['-E', 'capabilities'], { encoding: 'utf8' }));
+    const generator = visualStudioGenerator(instance, capabilities);
+    // Ninja autodetection can select MinGW even though Moon produced MSVC
+    // objects. A VS generator also works outside a Developer Command Prompt.
+    return ['-G', generator, '-A', 'x64',
+      `-DCMAKE_GENERATOR_INSTANCE=${instance.installationPath}`,
+      '-T', builder === 'clang' ? 'ClangCL,host=x64' : 'host=x64'];
+  }
+  const args = commandExists('ninja') ? ['-G', 'Ninja'] : [];
+  if (builder === 'clang') args.push('-DCMAKE_C_COMPILER=clang');
+  if (builder === 'gcc') args.push('-DCMAKE_C_COMPILER=gcc');
+  if (builder === 'msvc' && commandExists('clang-cl')) args.push('-DCMAKE_C_COMPILER=clang-cl');
+  return args;
 }
 
 function napiImportLibrary(pkgDir) {
@@ -97,6 +129,11 @@ function cmakeFile(pkgDir, artifacts, config, mode, napiLib) {
     lines.push('set_target_properties(napi_mbt PROPERTIES POSITION_INDEPENDENT_CODE ON)');
     if (process.platform === 'darwin') lines.push('target_link_options(napi_mbt PRIVATE "-undefined" "dynamic_lookup")');
   } else {
+    lines.push('if(NOT MSVC)');
+    lines.push('  message(FATAL_ERROR "Windows builds require an MSVC-compatible compiler")');
+    lines.push('endif()');
+    // Moon uses /MT for its objects and runtime in both debug and release.
+    lines.push('set_property(TARGET napi_mbt PROPERTY MSVC_RUNTIME_LIBRARY MultiThreaded)');
     lines.push('target_link_libraries(napi_mbt PRIVATE "' + quoteCMake(artifacts.object) + '" "' + quoteCMake(artifacts.stub) + '" "' + quoteCMake(artifacts.runtime) + '" "' + quoteCMake(napiLib) + '")');
   }
   return lines.join('\n') + '\n';
@@ -137,6 +174,8 @@ async function main(pkgDir = '.', options = {}) {
   const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : { napiVersion: 1, builder: 'auto' };
   const mode = options.release || process.argv.includes('--release') ? 'release' : 'debug';
   const dryRun = options.dryRun || process.argv.includes('--dry-run');
+  const builder = config.builder || 'auto';
+  const generatorArgs = dryRun ? [] : cmakeGeneratorArgs(builder);
   const manifest = await generate(pkgDir, { generator: options.generator });
   const napiLib = dryRun ? null : napiImportLibrary(pkgDir);
   ensureMoonPackage(pkgDir, manifest, config, napiLib);
@@ -149,18 +188,15 @@ async function main(pkgDir = '.', options = {}) {
   const moonEnv = Object.assign({}, process.env, { MOONBIT_NEW_NATIVE: '0', MOONBIT_ALLOCATOR: 'system' });
   execFileSync('moon', ['build', '--target', 'native', mode === 'release' ? '--release' : '--debug', '.'], { cwd: pkgDir, stdio: 'inherit', env: moonEnv });
   const artifacts = locateMoonArtifacts(pkgDir, mode);
-  const buildRoot = path.join(pkgDir, '.napi-mbt', 'cmake', mode);
+  // Keep VS configurations separate from old Ninja/MinGW CMake caches.
+  const buildRoot = path.join(pkgDir, '.napi-mbt', 'cmake', process.platform === 'win32' ? `${mode}-${builder === 'clang' ? 'clangcl' : 'msvc'}` : mode);
   mkdirp(buildRoot);
   fs.writeFileSync(path.join(pkgDir, '.napi-mbt', 'CMakeLists.txt'), cmakeFile(pkgDir, artifacts, config, mode, napiLib));
-  const generatorArgs = commandExists('ninja') ? ['-G', 'Ninja'] : [];
-  const builder = config.builder || 'auto';
-  if (builder !== 'auto' && builder !== 'cmake' && builder !== 'clang' && builder !== 'gcc' && builder !== 'msvc') throw new Error(`Unknown builder: ${builder}`);
-  if (builder === 'clang') generatorArgs.push('-DCMAKE_C_COMPILER=clang');
-  if (builder === 'gcc') generatorArgs.push('-DCMAKE_C_COMPILER=gcc');
-  if (builder === 'msvc' && commandExists('clang-cl')) generatorArgs.push('-DCMAKE_C_COMPILER=clang-cl');
-  execFileSync('cmake', ['-S', path.join(pkgDir, '.napi-mbt'), '-B', buildRoot, `-DCMAKE_BUILD_TYPE=${mode === 'release' ? 'Release' : 'Debug'}`].concat(generatorArgs), { cwd: pkgDir, stdio: 'inherit' });
-  execFileSync('cmake', ['--build', buildRoot, '--config', mode], { cwd: pkgDir, stdio: 'inherit' });
-  const built = path.join(buildRoot, 'napi_mbt.node');
+  const configuration = mode === 'release' ? 'Release' : 'Debug';
+  if (process.platform !== 'win32') generatorArgs.push(`-DCMAKE_BUILD_TYPE=${configuration}`);
+  execFileSync('cmake', ['-S', path.join(pkgDir, '.napi-mbt'), '-B', buildRoot].concat(generatorArgs), { cwd: pkgDir, stdio: 'inherit' });
+  execFileSync('cmake', ['--build', buildRoot, '--config', configuration], { cwd: pkgDir, stdio: 'inherit' });
+  const built = process.platform === 'win32' ? path.join(buildRoot, configuration, 'napi_mbt.node') : path.join(buildRoot, 'napi_mbt.node');
   if (!fs.existsSync(built)) throw new Error(`CMake did not produce ${built}`);
   const outputDir = path.join(pkgDir, 'artifacts', outputTarget);
   mkdirp(outputDir);
