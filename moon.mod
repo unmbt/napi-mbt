@@ -28,7 +28,7 @@ description = "Generate and build Node-API bindings for MoonBit."
 preferred_target = "native"
 
 import {
-  "moonbitlang/async@0.20.2",
+  "moonbitlang/async@0.22.4",
 }
 
 options(
