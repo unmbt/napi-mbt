@@ -81,7 +81,7 @@ async fn read_object(
 
 ///|
 async fn write_json(path : String, value : Json) -> Unit {
-  write_file(path, value.stringify(indent=2) + "\n")
+  write_text_file(path, value.stringify(indent=2) + "\n")
 }
 
 ///|

@@ -117,5 +117,5 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
     exports.push("napi_mbt_adapter_" + item.export_name)
   }
   text = replace_option(text, "exports", exports.to_json().stringify())
-  write_file(path, text)
+  write_text_file(path, text)
 }

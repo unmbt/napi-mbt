@@ -119,8 +119,9 @@ async fn initialize(
         recursive=true,
       )
     }
-    write_file(path, text)
+    write_text_file(path, text)
   }
   ignore(generate(dir, false, None))
   println("[napi-mbt] initialized \{dir}")
+  println("[napi-mbt] next: napi-mbt-cli build --release && npm test")
 }

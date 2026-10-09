@@ -25,10 +25,7 @@ async fn generate(
       excluded.contains(file) {
       continue
     }
-    let source = @generator.parse_source(
-      @fs.read_file(dir + "/" + file).text(),
-      file,
-    )
+    let source = @generator.parse_source(read_text(dir + "/" + file), file)
     for feature in source.features {
       if !features.contains(feature) {
         features.push(feature)
@@ -84,7 +81,7 @@ async fn generate(
         fail("Generated file is not up-to-date: \{name}")
       }
     } else {
-      write_file(path, text)
+      write_text_file(path, text)
     }
   }
   if !check {

@@ -73,7 +73,7 @@ async fn build(
   mkdirp(dir + "/.napi-mbt/include", recursive=true)
   for name, text in resources {
     if !name.has_prefix("template/") {
-      write_file(dir + "/.napi-mbt/" + name, text)
+      write_text_file(dir + "/.napi-mbt/" + name, text)
     }
   }
   if windows() {
@@ -190,7 +190,7 @@ async fn build(
     ""
   }
   let build_dir = dir + "/.napi-mbt/cmake/" + mode + suffix
-  write_file(dir + "/.napi-mbt/CMakeLists.txt", lines.join("\n") + "\n")
+  write_text_file(dir + "/.napi-mbt/CMakeLists.txt", lines.join("\n") + "\n")
   let args = ["-S", dir + "/.napi-mbt", "-B", build_dir]
   args.append(generator_args)
   println(command(cmake, args, dir))
@@ -202,6 +202,10 @@ async fn build(
     "/napi_mbt.node"
   let output = dir + "/artifacts/" + target
   mkdirp(output, recursive=true)
-  write_file(output + "/napi_mbt.node", @fs.read_file(built))
-  println("[napi-mbt] built \{output}/napi_mbt.node")
+  let artifact = output + "/napi_mbt.node"
+  write_file(artifact, @fs.read_file(built))
+  if !@fs.exists(artifact) {
+    fail("Native addon was built but the artifact was not written: {artifact}")
+  }
+  println("[napi-mbt] built \{artifact}")
 }

@@ -27,6 +27,32 @@ async fn write_file(path : String, data : &@io.Data) -> Unit {
 }
 
 ///|
+// Text emitted by the CLI always goes through the UTF-8 encoder explicitly.
+// This keeps project files portable across Windows code pages and prevents a
+// native build from later failing while MoonBit decodes a generated source.
+async fn write_text_file(path : String, text : String) -> Unit {
+  @fs.write_file(path, @utf8.encode(text), create_mode=CreateOrTruncate)
+}
+
+///|
+// Native Windows tools may write diagnostics in the active code page instead
+// of UTF-8. Their output is informational, so invalid byte sequences must not
+// abort the build while being decoded.
+fn command_output(data : &@io.Data) -> String {
+  @utf8.decode_lossy(data.binary())
+}
+
+///|
+// Keep malformed source files from surfacing as the unhelpful
+// `Malformed.Malformed` exception from the UTF-8 decoder.  Project source is
+// required to be UTF-8 because the generator parses it as MoonBit text.
+async fn read_text(path : String) -> String {
+  @fs.read_file(path).text() catch {
+    _ => fail("File is not valid UTF-8: \{path}")
+  }
+}
+
+///|
 async fn command(
   program : String,
   args : Array[String],
@@ -40,9 +66,11 @@ async fn command(
     extra_env=env.unwrap_or(Map([])),
   )
   if code != 0 {
-    fail("\{program} exited with status \{code}:\n\{out.text()}\{err.text()}")
+    fail(
+      "\{program} exited with status \{code}:\n\{command_output(out)}\{command_output(err)}",
+    )
   }
-  out.text() + err.text()
+  command_output(out) + command_output(err)
 }
 
 ///|

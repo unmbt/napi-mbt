@@ -61,7 +61,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       )
     }
     write_json(path + "/package.json", child.to_json())
-    write_file(
+    write_text_file(
       path + "/index.mjs",
       "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);\nexport default require('./napi_mbt.node');\n",
     )
