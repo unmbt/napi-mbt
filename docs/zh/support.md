@@ -44,4 +44,8 @@ CMake 包含当前 Windows runner 使用的 Visual Studio 18 2026 生成器。
 本机 Windows 使用 MSVC 19.44.35211、MSBuild 17.14.14、SDK 10.0.26100.0。
 托管 runner 的编译器/SDK 仍可能更新；`doctor --json` 记录实际选择，构建以真实
 compile/link probe 验收。新 MoonBit 兼容性另设 job。
-实际运行结果见[验证记录](../validation.md)。
+2026-10-19 的 [CI 运行 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
+已在提交 `00503d9` 上通过全部 18 个验证任务，覆盖三个发布平台、Node 22/24/26、
+最低 Node 版本消费者，以及 Windows/Linux 内存检查。
+仅 tag 触发的发布任务本次正常跳过；打包验收通过不代表已完成正式发布。
+托管与本机验证证据、剩余平台限制见[验证记录](../validation.md#hosted-ci-confirmation)。

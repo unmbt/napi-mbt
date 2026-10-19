@@ -1,5 +1,10 @@
 # Implementation validation
 
+Current hosted status: [run 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
+passed all 18 validation jobs for commit `00503d9` on 2026-10-19.
+See [hosted CI confirmation](#hosted-ci-confirmation) for the tested matrix and
+the distinction between packaging validation and release publication.
+
 Local execution environment (2026-10-19): Windows x64, Moon 0.1.20261012,
 moonc v0.10.15+943464bfa, Node 26.4.0, CMake 4.0.3, MSBuild 17.14.14,
 MSVC 19.44.35211, Windows SDK 10.0.26100.0.
@@ -125,8 +130,8 @@ are suppressed. A bare worker baseline passes, and a separate deliberate
 class/callback, Promise/cancellation, I/O and worker teardown tests all passed.
 
 Strict checks, interface/format checks, generation checks and workflow actionlint
-passed. The repaired workflows have not yet been rerun on GitHub; hosted Windows
-toolset selection and macOS execution still need that confirmation.
+passed. At this repair commit, a hosted rerun was still pending; the subsequent
+CI results below record the remaining failures and their resolution.
 
 ## Dependency bootstrap and Visual Studio 2026 CI repair
 
@@ -167,5 +172,29 @@ class/callback and async I/O/cancellation/worker teardown cases.
 Strict checks, interface/format checks, documentation checks and workflow
 actionlint passed. There are no public-interface changes.
 
-Hosted VS 2026 and macOS execution of this repair still require a new GitHub run;
-local VS 2022 validation does not establish the hosted VS 2026 result.
+Hosted VS 2026 and macOS execution were pending at this repair commit. The
+following run now confirms both environments.
+
+## Hosted CI confirmation
+
+On 2026-10-19, [Build and distribution gates, run 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
+passed all 18 validation jobs for commit `00503d9`:
+
+| Gate | Confirmed successful coverage |
+| --- | --- |
+| Native build and distribution gates | Ubuntu 24.04 x64 glibc, Windows 2025 x64 MSVC, macOS 15 ARM64 |
+| Node consumers | Node 22, 24 and 26 on each of the three release platforms (9 jobs) |
+| Minimum Node consumers | Linux Node 10.16.0 CJS, 12.20.0 dual mode and 12.22.0 async |
+| Native memory | Linux ASan/LSan and Windows ASan |
+| Latest MoonBit compatibility | Ubuntu 24.04 |
+
+This confirms the dependency-bootstrap repair on all three platforms and the
+CMake 4.4.4 repair on the hosted Windows Visual Studio 2026 toolchain.
+[Copilot Setup Steps, run 39229142894](https://github.com/unmbt/napi-mbt/actions/runs/39229142894)
+also passed for the same commit.
+
+The native jobs include CLI/npm packaging, dry-run and clean-install checks,
+Mooncake archive extraction/checking and artifact uploads. `Release archives`
+was correctly skipped because this was a branch push, not a version tag. This
+run does not establish GitHub Release or registry publication. Linux ARM64 and
+macOS x64 remain outside the release matrix; macOS has no sanitizer job.

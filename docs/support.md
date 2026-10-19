@@ -47,5 +47,10 @@ the exact compiler, build tool, runner and feature flags in pinned CI jobs and W
 The local Windows toolchain uses MSVC 19.44.35211, MSBuild 17.14.14 and SDK
 10.0.26100.0. Hosted compiler/SDK images can still change; `doctor --json`
 records the selected compiler/SDK, and actual compile/link probes gate builds.
-A separate latest-MoonBit job detects compiler changes. See the
-[validation record](validation.md) for what has actually run locally.
+A separate latest-MoonBit job detects compiler changes. On 2026-10-19,
+[CI run 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
+passed all 18 validation jobs for `00503d9`, including the three release
+platforms, Node 22/24/26, minimum Node consumers and Windows/Linux memory checks.
+The tag-only release job was skipped; packaging validation does not establish
+publication. See the [validation record](validation.md#hosted-ci-confirmation)
+for hosted and local evidence and remaining platform limits.
