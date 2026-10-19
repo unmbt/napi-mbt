@@ -84,6 +84,21 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
   let adapters : Map[String, Bool] = Map([])
   for item in source.all_functions() {
     let location = "\{item.filename}:\{item.line}"
+    if item.is_async {
+      if napi_version < 8 {
+        fail("\{location}: async requires N-API 8")
+      }
+      if item.binding
+        is (ConstructorBinding(_) | GetterBinding(_) | SetterBinding(_)) {
+        fail("\{location}: constructors and accessors must be synchronous")
+      }
+      if item.parameters.any(p => borrowed_type(p.value_type, source.types, [])) ||
+        borrowed_type(item.return_type, source.types, []) {
+        fail(
+          "\{location}: BufferView cannot cross an async boundary; use Bytes",
+        )
+      }
+    }
     if !valid_export(item.export_name) || adapters.contains(item.export_name) {
       fail(
         "\{location}: duplicate or invalid generated adapter: \{item.export_name}",

@@ -24,7 +24,7 @@ extern "c" fn napi_async_closing(env : NapiEnv) -> Bool = "napi_mbt_async_closin
 extern "c" fn napi_current_env() -> NapiEnv = "napi_mbt_current_env"
 
 ///|
-fn napi_async_spawn(task : async () -> Unit) -> @napi_mbt_async.Task raise {
+pub fn napi_async_spawn(task : async () -> Unit) -> @napi_mbt_async.Task raise {
   napi_async_submit(napi_current_env(), task)
 }
 
@@ -51,4 +51,119 @@ fn napi_async_submit(env : NapiEnv, task : async () -> Unit) -> @napi_mbt_async.
   let handle = state.scheduler.submit(task)
   result_from_status(env, napi_async_schedule(env), b"Scheduling async task")
   handle
+}
+
+///|
+priv struct NapiAsyncCall {
+  env : NapiEnv
+  promise : NapiPromise
+  mut task : @napi_mbt_async.Task?
+  mut signal : NapiReference?
+  mut listener : NapiReference?
+  pin : NapiReference
+}
+
+///|
+#borrow(name, result)
+extern "c" fn napi_signal_get_raw(env : NapiEnv, object : NapiValue, name : Bytes, result : Ref[NapiValue]) -> Int32 = "napi_mbt_signal_get"
+
+///|
+extern "c" fn napi_signal_listen(env : NapiEnv, signal : NapiValue, listener : NapiValue, add : Bool) -> Int32 = "napi_mbt_signal_listen"
+
+///|
+#borrow(result)
+extern "c" fn napi_abort_reason(env : NapiEnv, signal : NapiValue, result : Ref[NapiValue]) -> Int32 = "napi_mbt_abort_reason"
+
+///|
+#borrow(reference)
+extern "c" fn napi_listener_pin(env : NapiEnv, listener : NapiValue, reference : NapiReference) -> Int32 = "napi_mbt_closure_pin"
+
+///|
+#borrow(reference)
+extern "c" fn napi_listener_unpin(reference : NapiReference) -> Int32 = "napi_mbt_closure_unpin"
+
+///|
+fn napi_signal_get(env : NapiEnv, object : NapiValue, name : Bytes) -> NapiValue raise {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(env, napi_signal_get_raw(env, object, name, result), b"Reading AbortSignal")
+  result.val
+}
+
+///|
+fn NapiAsyncCall::cleanup(self : NapiAsyncCall) -> Unit {
+  // Clear fields before invoking JS: removeEventListener may reenter the addon.
+  let signal = self.signal
+  let listener = self.listener
+  self.signal = None
+  self.listener = None
+  self.task = None
+  if !napi_async_closing(self.env) && signal is Some(signal) && listener is Some(listener) {
+    try {
+      result_from_status(self.env, napi_signal_listen(self.env, signal.get(self.env), listener.get(self.env), false), b"Removing abort listener")
+    } catch { _ => () } // Preserve the original settlement; still release payload.
+  }
+  ignore(napi_listener_unpin(self.pin))
+  if listener is Some(reference) { reference.dispose() catch { _ => () } }
+  if signal is Some(reference) { reference.dispose() catch { _ => () } }
+}
+
+///|
+fn NapiAsyncCall::reject(self : NapiAsyncCall, error : Error) -> Unit {
+  if !self.promise.settled && !napi_async_closing(self.env) {
+    try { napi_promise_reject(self.env, self.promise, napi_error_value(self.env, error)) }
+    catch { error => { eprintln("napi-mbt: rejecting async call: " + (error : Error).to_string()) } }
+  }
+  self.cleanup()
+}
+
+///|
+fn NapiAsyncCall::abort(self : NapiAsyncCall) -> Unit {
+  if self.promise.settled { return }
+  let task = self.task
+  try {
+    if self.signal is Some(signal) {
+      let reason = Ref(moonbit_dummy_napi_value())
+      result_from_status(self.env, napi_abort_reason(self.env, signal.get(self.env), reason), b"Reading abort reason")
+      napi_promise_reject(self.env, self.promise, reason.val)
+    }
+  } catch { error => self.reject(error) }
+  if task is Some(task) {
+    task.cancel() catch { error => { eprintln("napi-mbt: cancelling task: \{error}") } }
+    ignore(napi_async_schedule(self.env))
+  }
+  self.cleanup()
+}
+
+///|
+fn NapiAsyncCall::listen(self : NapiAsyncCall, options : NapiValue) -> Unit raise {
+  if napi_is_nullish(self.env, options) { return }
+  napi_require_object(self.env, options)
+  let signal = napi_signal_get(self.env, options, b"signal")
+  if napi_is_nullish(self.env, signal) { return }
+  napi_require_object(self.env, signal)
+  self.signal = Some(NapiReference::new(self.env, signal))
+  if get_Bool(self.env, napi_signal_get(self.env, signal, b"aborted")) { self.abort(); return }
+  let listener = napi_closure_new(self.env, (env, _) => { self.abort(); set_Unit(env, ()) catch { _ => moonbit_dummy_napi_value() } })
+  self.listener = Some(NapiReference::new(self.env, listener))
+  result_from_status(self.env, napi_listener_pin(self.env, listener, self.pin), b"Retaining abort listener")
+  result_from_status(self.env, napi_signal_listen(self.env, signal, listener, true), b"Adding abort listener")
+  if !self.promise.settled && get_Bool(self.env, napi_signal_get(self.env, signal, b"aborted")) { self.abort() }
+}
+
+///|
+fn napi_async_call_new(env : NapiEnv) -> NapiAsyncCall raise {
+  { env, promise: napi_promise_new(env), task: None, signal: None, listener: None, pin: napi_reference_empty() }
+}
+
+///|
+fn NapiAsyncCall::start(self : NapiAsyncCall, work : async () -> NapiValue) -> Unit raise {
+  if self.promise.settled { return }
+  self.task = Some(napi_async_submit(self.env, () => {
+    defer self.cleanup()
+    if self.promise.settled || napi_async_closing(self.env) { return }
+    try {
+      let result = work()
+      if !self.promise.settled && !napi_async_closing(self.env) { napi_promise_resolve(self.env, self.promise, result) }
+    } catch { error => self.reject(error) }
+  }))
 }

@@ -7,6 +7,7 @@ pub(all) enum NapiErrorKind {
 
 ///|
 pub(all) suberror NapiError {
+  JavaScriptException(NapiReference)
   ApiError(
     status~ : Int32,
     kind~ : NapiErrorKind,
@@ -27,11 +28,18 @@ fn napi_failure(
 
 ///|
 fn result_from_status(
-  _env : NapiEnv,
+  env : NapiEnv,
   status : Int32,
   msg : Bytes,
 ) -> Unit raise NapiError {
   if status != 0 {
+    if status == 10 {
+      let value = Ref(moonbit_dummy_napi_value())
+      let captured = napi_take_exception(env, value)
+      if captured == 0 {
+        raise JavaScriptException(NapiReference::new(env, value.val))
+      }
+    }
     match status {
       1004 =>
         raise napi_failure(
@@ -108,6 +116,18 @@ extern "c" fn throw_napi_error_raw(
 // The only JS exception boundary. The C side leaves an existing pending
 // exception intact, including errors originating from reentrant JS callbacks.
 fn throw_napi_error(env : NapiEnv, error : Error) -> Unit {
+  if error is NapiError::JavaScriptException(reference) {
+    let status = napi_reference_throw(env, reference)
+    if status == 0 || status == 10 {
+      return
+    }
+    ignore(
+      throw_napi_error_raw(
+        env, status, 0, b"ERR_NAPI_ENVIRONMENT", b"Restoring JavaScript exception",
+      ),
+    )
+    return
+  }
   let (status, kind, code, context) = match error {
     NapiError::ApiError(status~, kind~, code~, context~) =>
       (status, kind, code, context)

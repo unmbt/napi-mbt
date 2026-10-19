@@ -73,6 +73,15 @@ async fn patch_async_dependency(workspace : String) -> Unit {
   for (path, text) in outputs {
     write_file(path, text)
   }
+  let event_package = root + "/src/internal/event_loop/moon.pkg"
+  write_file(
+    event_package,
+    append_package_import(
+      @fs.read_file(event_package).text(),
+      "moonbitlang/async/io",
+      "io",
+    ),
+  )
   for name in ["napi_async.h", "napi_async.mbt", "LIBUV-LICENSE"] {
     write_file(workspace + "/" + name, assets["async/" + name])
   }
@@ -98,15 +107,17 @@ fn append_package_import(
   package_alias : String,
 ) -> String raise {
   let tokens = package_tokens(source)
-  if tokens.any(t => t.quoted && t.value == path) {
-    fail("Async adapter import conflicts with an existing import of \{path}")
-  }
   for i, token in tokens {
     if token.value == "import" &&
       tokens.get(i + 1).map(t => t.value) == Some("{") {
       let end = package_close(tokens, i + 1)
       if tokens.get(end + 1).map(t => t.value) == Some("for") {
         continue
+      }
+      if tokens[i + 1:end].any(t => t.quoted && t.value == path) {
+        fail(
+          "Async adapter import conflicts with an existing import of \{path}",
+        )
       }
       let insert = tokens[i + 1].end
       return source[:insert].to_owned() +

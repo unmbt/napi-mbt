@@ -16,12 +16,15 @@ fn class_callbacks(classes : Array[ParsedClass]) -> String {
       let instance = item.binding
         is (MethodBinding(_) | GetterBinding(_) | SetterBinding(_))
       let parameters = item.parameters[if instance { 1 } else { 0 }:]
-      let n = parameters.length()
+      let n = parameters.length() + (if item.is_async { 1 } else { 0 })
       let mut required = 0
       for i, p in parameters {
         if !(p.value_type is OptionType(_)) {
           required = i + 1
         }
+      }
+      if item.is_async {
+        required = 0
       }
       out.write_string(
         "extern napi_value napi_mbt_adapter_\{item.export_name}(napi_env",
@@ -30,6 +33,9 @@ fn class_callbacks(classes : Array[ParsedClass]) -> String {
         out.write_string(", napi_value")
       }
       for _ in item.parameters {
+        out.write_string(", napi_value")
+      }
+      if item.is_async {
         out.write_string(", napi_value")
       }
       out.write_string(");\n")

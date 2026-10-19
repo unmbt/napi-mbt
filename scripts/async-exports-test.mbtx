@@ -1,0 +1,55 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    if name == "_build" || name == ".git" { continue }
+    if @fs.kind(source + "/" + name) == Directory { copy_tree(source + "/" + name, destination + "/" + name) }
+    else { @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name)) }
+  }
+}
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(binary, args))
+  if code != 0 { fail(out.text() + err.text()) }
+  println(out.text())
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-async-exports-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "async-exports"])
+  @fs.write_file(dir + "/moon.mod", "name = \"test/async-exports\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\", \"moonbitlang/async/fs\", \"moonbitlang/async/socket\", \"moonbitlang/async/stdio\","))
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
+  copy_tree(".mooncakes/moonbitlang/async", dir + "/.mooncakes/moonbitlang/async")
+  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/async-exports.mbt.txt"))
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_file(dir + "/moon.pkg", pkg)
+    let dependency_pkg = dir + "/.mooncakes/moonbitlang/async/src/internal/event_loop/moon.pkg"
+    @fs.write_file(dependency_pkg, @fs.read_file(dependency_pkg).text().replace_all(old="options(", new="options(link: { \"native\": { \"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\" } }, "))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let expected = "tests/async-snapshots"
+  let update = @env.args().contains("--update")
+  if update && !@fs.exists(expected) { @fs.mkdir(expected, recursive=true) }
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.d.mts", "napi_manifest.json"] {
+    let actual = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
+    if update { @fs.write_file(expected + "/" + name + ".snap", actual) }
+    assert_eq(actual, @fs.read_file(expected + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+  }
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = ".napi-mbt/" + (if asan { "async-exports-asan" } else { "async-exports" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  for name in ["index.d.ts", "index.d.mts", "index.d.cts"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  checked("node", ["--expose-gc", "scripts/async-exports.test.cjs", @fs.realpath(output + "/napi_mbt.node")])
+}

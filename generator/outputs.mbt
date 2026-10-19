@@ -1,6 +1,6 @@
 ///|
 pub fn ParsedExport::manifest(self : ParsedExport) -> Json {
-  {
+  let result : Json = {
     "sourceName": self.source_name,
     "exportName": self.export_name,
     "params": self.parameters.map(p => {
@@ -11,6 +11,10 @@ pub fn ParsedExport::manifest(self : ParsedExport) -> Json {
     "line": self.line,
     "filename": self.filename,
   }
+  if self.is_async && result is Object(fields) {
+    fields["async"] = true
+  }
+  result
 }
 
 ///|
@@ -27,6 +31,10 @@ fn adapters(
   out.write_string(conversions(readers, writers, types, true))
   out.write_string(conversions(writers, readers, types, false))
   for item in exports {
+    if item.is_async {
+      out.write_string(async_adapter(item, readers, writers))
+      continue
+    }
     let name = "napi_mbt_adapter_" + item.export_name
     let params = ["env : NapiEnv"]
     if item.binding is ConstructorBinding(_) {
@@ -90,15 +98,21 @@ fn c_glue(
     for _ in item.parameters {
       out.write_string(", napi_value")
     }
+    if item.is_async {
+      out.write_string(", napi_value")
+    }
     out.write_string(");\n")
   }
   for item in exports {
-    let n = item.parameters.length()
+    let n = item.parameters.length() + (if item.is_async { 1 } else { 0 })
     let mut required = 0
     for i, p in item.parameters {
       if !(p.value_type is OptionType(_)) {
         required = i + 1
       }
+    }
+    if item.is_async {
+      required = 0
     }
     out.write_string(
       "\nstatic napi_value napi_mbt_callback_\{item.export_name}(napi_env env, napi_callback_info info) {\n  size_t argc = \{n};\n  napi_value argv[\{if n > 0 { n } else { 1 }}];\n  napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);\n  if (status != napi_ok) return napi_mbt_error(env, status, 0, \"ERR_NAPI_CALLBACK\", \"Reading callback arguments\");\n  if (argc < \{required}) return napi_mbt_error(env, napi_invalid_arg, 1, \"ERR_NAPI_ARGUMENTS\", \"Missing argument\");\n  for (size_t i = argc; i < \{n}; ++i) {\n    status = napi_get_undefined(env, &argv[i]);\n    if (status != napi_ok) return napi_mbt_error(env, status, 0, \"ERR_NAPI_CALLBACK\", \"Filling optional arguments\");\n  }\n",
@@ -137,14 +151,17 @@ fn declarations(
   class_declarations(classes) +
   exports
   .map(item => {
-    "export function \{item.export_name}(\{typescript_parameters(item.parameters)}): \{item.return_type.typescript()};"
+    "export function \{item.export_name}(\{typescript_parameters(item.parameters, is_async=item.is_async)}): \{typescript_result(item)};"
   })
   .join("\n") +
   "\n"
 }
 
 ///|
-fn typescript_parameters(parameters : Array[Parameter]) -> String {
+fn typescript_parameters(
+  parameters : Array[Parameter],
+  is_async~ : Bool = false,
+) -> String {
   let params = []
   for i, p in parameters {
     let optional = parameters[i:].all(p => p.value_type is OptionType(_))
@@ -154,5 +171,22 @@ fn typescript_parameters(parameters : Array[Parameter]) -> String {
       p.value_type.typescript(input=true),
     )
   }
+  if is_async {
+    let mut name = "options"
+    while parameters.any(p => p.name == name) {
+      name += "_"
+    }
+    params.push(name + "?: { signal?: AbortSignal }")
+  }
   params.join(", ")
+}
+
+///|
+fn typescript_result(item : ParsedExport) -> String {
+  let result = item.return_type.typescript()
+  if item.is_async {
+    "Promise<" + result + ">"
+  } else {
+    result
+  }
 }

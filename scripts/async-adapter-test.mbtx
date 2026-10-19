@@ -25,6 +25,8 @@ async fn main {
       @fs.write_file(temp + "/.mooncakes/moonbitlang/async/" + key[12:].to_owned(), text)
     }
   }
+  let event_package = temp + "/.mooncakes/moonbitlang/async/src/internal/event_loop/moon.pkg"
+  @fs.write_file(event_package, @fs.read_file(event_package).text().replace_all(old="\"moonbitlang/core/deque\",", new="\"moonbitlang/core/deque\", \"moonbitlang/async/io\","))
   if @env.args() is [_, "--posix", distro, include_dir] {
     let (code, path, err) = @process.collect_output("wsl.exe", ["-d", distro, "--", "wslpath", "-u", temp.replace_all(old="\\", new="/")])
     if code != 0 { fail(err.text()) }

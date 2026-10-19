@@ -100,6 +100,7 @@ fn class_function(
     }),
     return_type: class_type(item.return_type, configs),
     throws: item.throws,
+    is_async: item.is_async,
     filename: item.filename,
     line: item.line,
     binding: item.binding,
@@ -276,11 +277,11 @@ fn class_declarations(classes : Array[ParsedClass]) -> String {
           )
         StaticBinding(_) =>
           out.write_string(
-            "  static \{entry.name}(\{typescript_parameters(item.parameters)}): \{item.return_type.typescript()};\n",
+            "  static \{entry.name}(\{typescript_parameters(item.parameters, is_async=item.is_async)}): \{typescript_result(item)};\n",
           )
         _ =>
           out.write_string(
-            "  \{entry.name}(\{typescript_parameters(item.parameters[1:].to_owned())}): \{item.return_type.typescript()};\n",
+            "  \{entry.name}(\{typescript_parameters(item.parameters[1:].to_owned(), is_async=item.is_async)}): \{typescript_result(item)};\n",
           )
       }
     }

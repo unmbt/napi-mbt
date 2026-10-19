@@ -1,0 +1,56 @@
+///|
+let effects : Ref[Int] = Ref(0)
+///|
+#export_name("delay")
+pub async fn delay(ms : Int, value : String) -> String {
+  effects.val += 1
+  @async.sleep(ms)
+  value
+}
+///|
+#export_name("count")
+pub fn count() -> Int { effects.val }
+///|
+#export_name("callback")
+pub async fn callback(f : (() -> Int raise)) -> Int {
+  let result = try f() catch { error => { let saved = error; @async.sleep(5); raise saved } }
+  @async.sleep(2)
+  result
+}
+///|
+#export_name("file")
+pub async fn file(path : String, data : Bytes) -> Bytes {
+  @fs.write_file(path, data)
+  @fs.read_file(path).binary()
+}
+///|
+#export_name("network")
+pub async fn network(port : Int) -> String {
+  let connection = @socket.Tcp::connect_to_host("127.0.0.1", port~)
+  defer connection.close()
+  connection.write("ping")
+  @utf8.decode_lossy(connection.read_exactly(4))
+}
+///|
+#export_name("group")
+pub async fn group() -> Int {
+  @stdio.stdout.write("")
+  @async.with_task_group(group => {
+    let a = group.spawn(() => { @async.sleep(4); 2 })
+    let b = group.spawn(() => { @async.sleep(5); 3 })
+    a.wait() + b.wait()
+  })
+}
+///|
+#export_name("failure")
+pub async fn failure() -> Unit { @async.sleep(1); fail("async failure") }
+///|
+extern "c" fn resource_count() -> Int = "napi_mbt_live_resources"
+///|
+#export_name("resources")
+pub fn resources() -> Int { resource_count() }
+///|
+extern "c" fn environment_count() -> Int = "napi_mbt_live_environments"
+///|
+#export_name("environments")
+pub fn environments() -> Int { environment_count() }

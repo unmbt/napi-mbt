@@ -60,6 +60,7 @@ pub(all) struct ParsedExport {
   parameters : Array[Parameter]
   return_type : ValueType
   throws : Bool
+  is_async : Bool
   filename : String
   line : Int
   binding : BindingKind

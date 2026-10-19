@@ -1,0 +1,133 @@
+{
+  "runtimeTemplateVersion": "6",
+  "napiVersion": 8,
+  "requiredNapiVersion": 8,
+  "features": [
+    "async",
+    "buffer",
+    "callback"
+  ],
+  "targets": [],
+  "cjs": true,
+  "esm": true,
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "callback",
+      "exportName": "callback",
+      "params": [
+        {
+          "name": "f",
+          "type": "(() -> Int raise)"
+        }
+      ],
+      "ret": "Int",
+      "throws": false,
+      "line": 14,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "count",
+      "exportName": "count",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 11,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "delay",
+      "exportName": "delay",
+      "params": [
+        {
+          "name": "ms",
+          "type": "Int"
+        },
+        {
+          "name": "value",
+          "type": "String"
+        }
+      ],
+      "ret": "String",
+      "throws": false,
+      "line": 4,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "environments",
+      "exportName": "environments",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 55,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "failure",
+      "exportName": "failure",
+      "params": [],
+      "ret": "Unit",
+      "throws": false,
+      "line": 45,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "file",
+      "exportName": "file",
+      "params": [
+        {
+          "name": "path",
+          "type": "String"
+        },
+        {
+          "name": "data",
+          "type": "Bytes"
+        }
+      ],
+      "ret": "Bytes",
+      "throws": false,
+      "line": 21,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "group",
+      "exportName": "group",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 35,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "network",
+      "exportName": "network",
+      "params": [
+        {
+          "name": "port",
+          "type": "Int"
+        }
+      ],
+      "ret": "String",
+      "throws": false,
+      "line": 27,
+      "filename": "lib.mbt",
+      "async": true
+    },
+    {
+      "sourceName": "resources",
+      "exportName": "resources",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 50,
+      "filename": "lib.mbt"
+    }
+  ],
+  "types": [],
+  "classes": []
+}

@@ -12,6 +12,9 @@ async fn main {
   let root = ".mooncakes/moonbitlang/async"
   let resources_path = "internal/assets/data/resources.json"
   guard @json.parse(@fs.read_file(resources_path).text()) is Object(resources) else { fail("Invalid resources") }
+  for key in resources.keys().to_array() {
+    if key.has_prefix("async/files/") { resources.remove(key) }
+  }
   let files : Array[Json] = []
   let changes : Map[String, Array[(String, String)]] = Map([])
   let additions : Map[String, String] = Map([])
@@ -39,11 +42,47 @@ async fn main {
   additions[scheduler] = scheduler_addition
   changes["src/internal/coroutine/coroutine.mbt"] = [("scheduler.", "scheduler.val.")]
   changes["src/internal/event_loop/event_loop.mbt"] = [
+    ("  bus : EventBus", "  stdio : Map[@fd_util.Fd, IoHandle]\n  stdin_buffer : @io.ReaderBuffer\n  bus : EventBus"),
+    ("    fds: Map([]),", "    fds: Map([]),\n    stdio: Map([]),\n    stdin_buffer: @io.ReaderBuffer::new(),"),
+    ("fn EventLoop::cleanup(self : Self) -> Unit raise {", "fn EventLoop::cleanup(self : Self) -> Unit raise {\n  for _, handle in self.stdio { handle.detach_from_event_loop() }\n  self.stdio.clear()"),
     ("  mut job_id : Int", "  mut timer_id : Int\n  mut job_id : Int"),
     ("    job_id: 0,", "    timer_id: 0,\n    job_id: 0,"),
     ("  guard! curr_loop.val is None", "  if curr_loop.val is Some(_) { raise Failure::Failure(\"Nested event loop is not supported by the Node host\") }"),
     ("      let worker = Worker::spawn(job_id, job)", "      let worker = Worker::spawn(job_id, job)\n      if worker.is_null() { @os_error.check_errno(\"Starting async worker\") }"),
     ("  let extra = PlatformEventLoopExtra::new()", "  errdefer destroy_thread_pool()\n  let extra = PlatformEventLoopExtra::new()"),
+  ]
+  let stdio_path = "src/internal/event_loop/stdio.mbt"
+  let stdio_source = @fs.read_file(root + "/" + stdio_path).text().replace_all(old="\r\n", new="\n")
+  let hook_start = stdio_source.find("  register_hook(").unwrap()
+  let hook_end = stdio_source.find("  handle\n}").unwrap()
+  let globals = stdio_source.find("pub let stdin").unwrap()
+  changes[stdio_path] = [
+    ("let stdio_handles : Map[@fd_util.Fd, IoHandle] = Map([])", "pub fn napi_stdin_buffer() -> @io.ReaderBuffer { curr_loop.val.unwrap().stdin_buffer }"),
+    ("  let fd = get_stdio_handle(id)", "  guard curr_loop.val is Some(evloop) else { fail(\"stdio requires an active async environment\") }\n  let stdio_handles = evloop.stdio\n  let fd = get_stdio_handle(id)"),
+    (stdio_source[hook_start:hook_end].to_owned(), "  evloop.fds[fd] = handle\n"),
+    (stdio_source[globals:].to_owned(), "pub fn napi_stdio(id : Int) -> IoHandle raise { setup_stdio(id, context=\"Opening standard stream\") }\n"),
+  ]
+  let public_stdio = "src/stdio/stdio.mbt"
+  changes[public_stdio] = [
+    ("  io : Result[@event_loop.IoHandle, Error]\n  read_buf : @io.ReaderBuffer", "  id : Int"),
+    ("self.io.unwrap_or_error()", "@event_loop.napi_stdio(self.id)"),
+    ("self.io\n  .unwrap_or_error()", "@event_loop.napi_stdio(self.id)"),
+    ("self.read_buf", "@event_loop.napi_stdin_buffer()"),
+    ("struct Output(Result[@event_loop.IoHandle, Error])", "struct Output(Int)"),
+    ("self.0.unwrap_or_error()", "@event_loop.napi_stdio(self.0)"),
+    ("self.0\n  .unwrap_or_error()", "@event_loop.napi_stdio(self.0)"),
+    ("  io: @event_loop.stdin,\n  read_buf: @io.ReaderBuffer::new(),", "  id: 0,"),
+    ("pub let stdout : Output = @event_loop.stdout", "pub let stdout : Output = 1"),
+    ("pub let stderr : Output = @event_loop.stderr", "pub let stderr : Output = 2"),
+  ]
+  let ifname_path = "src/socket/ifname.mbt"
+  let ifname_source = @fs.read_file(root + "/" + ifname_path).text().replace_all(old="\r\n", new="\n")
+  let ifname_start = ifname_source.find("let global_ifname_socket").unwrap()
+  let ifname_end = ifname_source.find("///|\n#borrow(name)").unwrap()
+  changes[ifname_path] = [
+    (ifname_source[ifname_start:ifname_end].to_owned(), "fn napi_ifname_socket() -> @fd_util.Fd raise {\n  if @event_loop.platform is Linux { make_udp_socket(IPv4, multicast=false, context=\"Creating interface lookup socket\") } else { @fd_util.invalid_fd }\n}\n\n"),
+    ("  let index = if_nametoindex_ffi(global_ifname_socket.val, os_name)", "  let fd = napi_ifname_socket()\n  defer { if @fd_util.fd_is_valid(fd) { @fd_util.close(fd, kind=Socket, context=\"Closing interface lookup socket\") } }\n  let index = if_nametoindex_ffi(fd, os_name)"),
+    ("  let name = if_indextoname_ffi(global_ifname_socket.val, index)", "  let fd = napi_ifname_socket()\n  defer { if @fd_util.fd_is_valid(fd) { @fd_util.close(fd, kind=Socket, context=\"Closing interface lookup socket\") } }\n  let name = if_indextoname_ffi(fd, index)"),
   ]
   changes["src/internal/event_loop/thread_pool.mbt"] = [("priv type Worker", "priv type Worker\n\n///|\nextern \"C\" fn Worker::is_null(worker : Worker) -> Bool = \"napi_mbt_async_worker_is_null\"")]
   changes["src/internal/event_loop/timer.mbt"] = [
@@ -78,7 +117,7 @@ async fn main {
     resources["async/files/" + path] = Json(text)
   }
   let manifest : Json = {
-    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 1,
+    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 2,
     "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
   }
   resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")

@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "5"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "6"
 
 pub fn add(Int, Int) -> Int
 
@@ -55,6 +55,8 @@ pub fn napi_class_handle(NapiEnv, NapiValue, Int) -> UnmanagedBuffer raise NapiE
 pub fn napi_closure_new(NapiEnv, (NapiEnv, NapiArguments) -> NapiValue) -> NapiValue raise NapiError
 
 pub fn napi_enter_value(NapiEnv, NapiValue, Array[NapiValue]) -> Unit raise NapiError
+
+pub fn napi_error_value(NapiEnv, Error) -> NapiValue raise NapiError
 
 pub fn napi_field_get(NapiEnv, NapiValue, String, Bool) -> NapiValue raise NapiError
 
@@ -116,6 +118,7 @@ pub fn set_Unit(NapiEnv, Unit) -> NapiValue raise NapiError
 
 // Errors
 pub(all) suberror NapiError {
+  JavaScriptException(NapiReference)
   ApiError(status~ : Int, kind~ : NapiErrorKind, code~ : String, context~ : String)
 }
 
@@ -161,6 +164,11 @@ pub struct NapiPromise {
   deferred : NapiDeferred
   mut settled : Bool
 }
+
+pub type NapiReference
+pub fn NapiReference::dispose(Self) -> Unit raise NapiError
+pub fn NapiReference::get(Self, NapiEnv) -> NapiValue raise NapiError
+pub fn NapiReference::new(NapiEnv, NapiValue) -> Self raise NapiError
 
 #external
 pub type NapiThreadsafeFunction

@@ -7,7 +7,7 @@ async fn main {
   if args.get(1) is Some(directory) {
     environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
   }
-  let fixtures = if args.contains("--async") { ["async-runtime"] } else { ["class", "callback"] }
+  let fixtures = if args.contains("--async-exports") { ["async-exports"] } else if args.contains("--async") { ["async-runtime"] } else { ["class", "callback"] }
   for fixture in fixtures {
     let code = @async.with_timeout(240000, () => @process.run("moon", ["run", "scripts/\{fixture}-test.mbtx", "_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe", "--asan"], extra_env=environment))
     if code != 0 { fail("\{fixture} sanitizer fixture failed") }

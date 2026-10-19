@@ -15,6 +15,69 @@ MOONBIT_FFI_EXPORT void *napi_mbt_callback_empty(void) {
 }
 MOONBIT_FFI_EXPORT napi_env napi_mbt_dummy_env(void) { return NULL; }
 
+/* Box values so references retain primitives (including thrown undefined) too. */
+MOONBIT_FFI_EXPORT int napi_mbt_reference_bind(napi_env env, napi_value value, napi_mbt_callback_ref *reference) {
+    napi_value box;
+    napi_status status = napi_create_array_with_length(env, 1, &box);
+    if (status == napi_ok) status = napi_set_element(env, box, 0, value);
+    if (status != napi_ok) return (int)status;
+    napi_mbt_resource *resource = napi_mbt_new_resource(env, 5, 0);
+    if (!resource) return napi_generic_failure;
+    status = napi_create_reference(env, box, 1, &resource->reference);
+    if (status != napi_ok) { napi_mbt_free_resource(resource); return (int)status; }
+    reference->resource = resource;
+    return napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_reference_get(napi_env env, napi_mbt_callback_ref *reference, napi_value *result) {
+    int status = napi_mbt_check_resource(reference->resource, env);
+    if (status != napi_ok) return status;
+    napi_value box;
+    status = napi_get_reference_value(env, reference->resource->reference, &box);
+    if (status == napi_ok) status = napi_get_element(env, box, 0, result);
+    return status;
+}
+
+/* Own the listener payload independently of its JS wrapper. Cleanup can release
+ * it without creating JS handles or invoking JS during environment teardown. */
+MOONBIT_FFI_EXPORT int napi_mbt_closure_pin(napi_env env, napi_value value, napi_mbt_callback_ref *reference) {
+    void *pointer = NULL;
+    int status = napi_unwrap(env, value, &pointer);
+    if (status != napi_ok) return status;
+    napi_mbt_resource *resource = napi_mbt_active->resources;
+    while (resource && resource != pointer) resource = resource->next;
+    if (!resource || resource->kind != 2) return 1007;
+    /* This reference borrows the container; its JS wrapper is retained by a
+     * separate NapiReference until the pin has been disposed. */
+    reference->resource = resource;
+    return napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_closure_unpin(napi_mbt_callback_ref *reference) {
+    napi_mbt_resource *resource = reference->resource;
+    reference->resource = NULL;
+    return resource ? napi_mbt_dispose_resource(resource) : napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_owned_reference_dispose(napi_mbt_callback_ref *reference) {
+    if (!reference->resource || reference->resource->disposed) return napi_ok;
+    if (reference->resource->owner != napi_mbt_active) return 1005;
+    return napi_mbt_dispose_resource(reference->resource);
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_take_exception(napi_env env, napi_value *result) {
+    return (int)napi_get_and_clear_last_exception(env, result);
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_reference_throw(napi_env env, napi_mbt_callback_ref *reference) {
+    bool pending = false;
+    napi_status status = napi_is_exception_pending(env, &pending);
+    if (status != napi_ok || pending) return (int)status;
+    napi_value value;
+    int checked = napi_mbt_reference_get(env, reference, &value);
+    return checked == napi_ok ? (int)napi_throw(env, value) : checked;
+}
+
 MOONBIT_FFI_EXPORT int napi_mbt_callback_bind(napi_env env, napi_value value, napi_mbt_callback_ref *callback) {
     napi_valuetype type;
     napi_status status = napi_typeof(env, value, &type);

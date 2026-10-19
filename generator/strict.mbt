@@ -11,6 +11,7 @@ pub(all) struct ParsedExport {
   parameters : Array[Parameter]
   return_type : ValueType
   throws : Bool
+  is_async : Bool
   filename : String
   line : Int32
   binding : BindingKind
@@ -176,8 +177,12 @@ fn parse_signature(
       is_async = true
     }
   }
-  if is_async || child(node, "type_parameters") is Some(_) {
-    fail("\{location}: async and generic exports are unsupported")
+  if child(node, "type_parameters") is Some(_) {
+    fail("\{location}: generic exports are unsupported")
+  }
+  if is_async &&
+    binding is (ConstructorBinding(_) | GetterBinding(_) | SetterBinding(_)) {
+    fail("\{location}: constructors and accessors must be synchronous")
   }
   {
     source_name: name.tokens().join(""),
@@ -185,6 +190,7 @@ fn parse_signature(
     parameters,
     return_type,
     throws,
+    is_async,
     filename,
     line,
     binding,
@@ -278,6 +284,9 @@ pub fn parse_sources(
   }
   for item in parsed.all_functions() {
     let location = "\{item.filename}:\{item.line}"
+    if item.is_async && !features.contains("async") {
+      features.push("async")
+    }
     for p in item.parameters {
       resolve_type(
         p.value_type,
@@ -296,6 +305,22 @@ pub fn parse_sources(
       location,
       classes,
     )
+  }
+  for item in parsed.all_functions() {
+    if item.is_async {
+      for p in item.parameters {
+        if borrowed_type(p.value_type, types, []) {
+          fail(
+            "\{item.filename}:\{item.line}: BufferView cannot cross an async boundary; use Bytes",
+          )
+        }
+      }
+      if borrowed_type(item.return_type, types, []) {
+        fail(
+          "\{item.filename}:\{item.line}: BufferView cannot cross an async boundary; use Bytes",
+        )
+      }
+    }
   }
   parsed
 }
