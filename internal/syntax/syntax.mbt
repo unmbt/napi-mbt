@@ -22,15 +22,15 @@ extern "c" fn root_raw(tree : Tree) -> Bytes = "napi_mbt_root"
 
 ///|
 #borrow(tree, raw)
-extern "c" fn child_raw(tree : Tree, raw : Bytes, i : Int) -> Bytes = "napi_mbt_child"
+extern "c" fn child_raw(tree : Tree, raw : Bytes, i : Int32) -> Bytes = "napi_mbt_child"
 
 ///|
 #borrow(tree, raw)
-extern "c" fn token_child_raw(tree : Tree, raw : Bytes, i : Int) -> Bytes = "napi_mbt_token_child"
+extern "c" fn token_child_raw(tree : Tree, raw : Bytes, i : Int32) -> Bytes = "napi_mbt_token_child"
 
 ///|
 #borrow(tree, raw)
-extern "c" fn node_info(tree : Tree, raw : Bytes, what : Int) -> Int = "napi_mbt_node_info"
+extern "c" fn node_info(tree : Tree, raw : Bytes, what : Int32) -> Int32 = "napi_mbt_node_info"
 
 ///|
 #borrow(tree, raw)
@@ -68,7 +68,7 @@ pub fn Node::text(self : Node) -> String {
 }
 
 ///|
-pub fn Node::line(self : Node) -> Int {
+pub fn Node::line(self : Node) -> Int32 {
   node_info(self.tree, self.raw, 3)
 }
 

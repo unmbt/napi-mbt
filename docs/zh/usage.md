@@ -14,6 +14,16 @@
 
 ## 2. CLI 核心命令
 
+### `napi-mbt-cli doctor [directory] --json`
+
+在临时目录执行最小编译和链接检查，检测 MoonBit、CMake、C 编译器及链接器。
+Windows 上选择已安装的 Visual Studio C++ 实例，将其 MSBuild 完整路径交给
+CMake，并报告编译器和 Windows SDK 版本。检查失败时，根据诊断安装 MSBuild、
+C++ 工具及 Windows SDK 组件。省略 `--json` 可获得可读的诊断输出。
+`build` 在写入项目生成物之前执行相同检查。
+
+原生 CLI 不依赖 Node.js 或 npm；运行 addon 时才需要 Node.js。
+
 `@unmbt/napi-mbt-cli` 提供了主入口命令 `napi-mbt`。
 
 ### `napi-mbt build [--release]`

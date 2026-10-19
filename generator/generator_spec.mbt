@@ -9,7 +9,7 @@ pub(all) struct ExportSpec {
 
 ///|
 pub(all) struct GeneratorConfig {
-  napi_version : Int
+  napi_version : Int32
   builder : String
   generator : String
 }
@@ -28,6 +28,9 @@ pub fn render_moonbit_adapters(exports : Array[ExportSpec]) -> String {
 
 ///|
 #declaration_only
-pub fn render_c_glue(exports : Array[ExportSpec], napi_version : Int) -> String {
+pub fn render_c_glue(
+  exports : Array[ExportSpec],
+  napi_version : Int32,
+) -> String {
   ...
 }

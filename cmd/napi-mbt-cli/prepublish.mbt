@@ -60,14 +60,14 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
         "[napi-mbt] no artifact for \{target}; metadata was generated for CI cross-builds",
       )
     }
-    write_json(path + "/package.json", child.to_json())
+    write_json(path + "/package.json", Json(child))
     write_file(
       path + "/index.mjs",
       "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);\nexport default require('./napi_mbt.node');\n",
     )
-    optional[child_name] = version.to_json()
+    optional[child_name] = Json(version)
   }
-  pkg["optionalDependencies"] = optional.to_json()
-  write_json(dir + "/package.json", pkg.to_json())
+  pkg["optionalDependencies"] = Json(optional)
+  write_json(dir + "/package.json", Json(pkg))
   println("[napi-mbt] prepared \{targets.length()} platform package(s)")
 }

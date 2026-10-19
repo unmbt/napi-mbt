@@ -80,7 +80,7 @@ pub fn napi_bigint_to_uint64(
 /// Threadsafe Function lifecycle helper. Threadsafe Functions require N-API v4.
 pub fn napi_threadsafe_function_release(
   func : NapiThreadsafeFunction,
-  mode : Int,
+  mode : Int32,
 ) -> Unit {
   let status = napi_release_threadsafe_function(func, mode)
   if status != 0 {
@@ -96,8 +96,8 @@ pub fn napi_threadsafe_function_create(
   func : NapiValue,
   async_resource : NapiValue,
   async_resource_name : NapiValue,
-  max_queue_size : Int,
-  initial_thread_count : Int,
+  max_queue_size : Int32,
+  initial_thread_count : Int32,
   finalize_data : UnmanagedBuffer,
   finalize_cb : UnmanagedBuffer,
   context : UnmanagedBuffer,
@@ -116,7 +116,7 @@ pub fn napi_threadsafe_function_create(
 pub fn napi_threadsafe_function_call(
   func : NapiThreadsafeFunction,
   data : UnmanagedBuffer,
-  mode : Int,
+  mode : Int32,
 ) -> Unit {
   let status = napi_call_threadsafe_function(func, data, mode)
   if status != 0 {

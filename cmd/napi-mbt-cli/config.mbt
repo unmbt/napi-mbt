@@ -68,7 +68,7 @@ fn strings(items : Map[String, Json], key : String) -> Array[String] raise {
 ///|
 async fn read_object(
   path : String,
-  required? : Bool = false,
+  required~ : Bool = false,
 ) -> Map[String, Json] {
   if !@fs.exists(path) {
     if required {
@@ -86,7 +86,7 @@ async fn write_json(path : String, value : Json) -> Unit {
 
 ///|
 struct Config {
-  napi_version : Int
+  napi_version : Int32
   generator : String
   builder : String
   targets : Array[String]
@@ -94,7 +94,7 @@ struct Config {
 }
 
 ///|
-fn feature_version(name : String) -> Int raise {
+fn feature_version(name : String) -> Int32 raise {
   match name {
     "promise" => 1
     "threadsafe_function" => 4

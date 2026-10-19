@@ -86,6 +86,11 @@ async fn main {
     let source = @fs.read_file(dir + "/lib.mbt").text()
     rejected(executable, ["init", dir], temp, env)
     assert_eq(@fs.read_file(dir + "/lib.mbt").text(), source)
+    let failed_doctor = @process.collect_output(executable, ["doctor", dir, "--json"], cwd=temp, extra_env={ "PATH": "" })
+    assert_true(failed_doctor.0 != 0)
+    assert_true(@json.parse(failed_doctor.1.text()) is { "ok": false, "error": String(_), .. })
+    let report = @json.parse(checked(executable, ["doctor", dir, "--json"], temp, env))
+    assert_true(report is { "ok": true, "toolchain": { "probe": "passed", .. }, .. })
     ignore(checked(executable, ["init", dir, "--name", "native-fixture", "--force"], temp, env))
     ignore(checked(executable, ["generate", dir, "--check"], temp, { "PATH": "" }))
     let missing = checked(executable, ["prepublish", dir], temp, { "PATH": "" })
@@ -111,6 +116,7 @@ async fn main {
     rejected(executable, ["generate", dir], temp, env)
     @fs.write_file(dir + "/napi-mbt.json", config)
     rejected(executable, ["build", dir], temp, { "PATH": "" })
+    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
     let extra =
       #|
       #|///|
@@ -151,6 +157,7 @@ async fn main {
       let cache = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/CMakeCache.txt").text()
       assert_true(cache.contains("CMAKE_GENERATOR:INTERNAL=Visual Studio "))
       assert_true(cache.contains("CMAKE_GENERATOR_PLATFORM:INTERNAL=x64"))
+      assert_true(cache.contains("MSBuild.exe"))
       let project = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/napi_mbt.vcxproj").text()
       assert_true(project.contains("<RuntimeLibrary>MultiThreaded</RuntimeLibrary>"))
     }
@@ -159,7 +166,7 @@ async fn main {
     guard @json.parse(@fs.read_file(pkg_path).text()) is Object(pkg) else { fail("Invalid fixture package") }
     pkg["custom"] = { "preserve": true }
     pkg["optionalDependencies"] = { "unrelated": "1.0.0", "native-fixture-old": "0.0.1" }
-    @fs.write_file(pkg_path, pkg.to_json().stringify(indent=2))
+    @fs.write_file(pkg_path, Json(pkg).stringify(indent=2))
     rejected(executable, ["prepublish", dir, "--target=invalid"], temp, env)
     ignore(checked(executable, ["prepublish", dir], temp, env))
     let published = @json.parse(@fs.read_file(pkg_path).text())

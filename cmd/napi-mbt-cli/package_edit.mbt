@@ -1,6 +1,6 @@
 ///|
 // Find the end of a quoted option value or an array/object, respecting escapes.
-fn option_end(text : String, start : Int) -> Int raise {
+fn option_end(text : String, start : Int32) -> Int32 raise {
   let mut quoted = false
   let mut escaped = false
   let mut depth = 0
@@ -109,13 +109,13 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
   } else {
     "-c"
   }
-  text = replace_option(text, "cc-flags", cflags.to_json().stringify())
-  text = replace_option(text, "stub-cc-flags", stubflags.to_json().stringify())
-  text = replace_option(text, "cc-link-flags", linkflags.to_json().stringify())
+  text = replace_option(text, "cc-flags", Json(cflags).stringify())
+  text = replace_option(text, "stub-cc-flags", Json(stubflags).stringify())
+  text = replace_option(text, "cc-link-flags", Json(linkflags).stringify())
   let exports = ["moonbit_init"]
   for item in generated.exports {
     exports.push("napi_mbt_adapter_" + item.export_name)
   }
-  text = replace_option(text, "exports", exports.to_json().stringify())
+  text = replace_option(text, "exports", Json(exports).stringify())
   write_file(path, text)
 }

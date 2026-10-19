@@ -53,16 +53,21 @@ pub fn adapters(exports : Array[ParsedExport]) -> String {
       }
     }
     let call = "\{item.source_name}(\{arguments.join(", ")})"
+    let result_type = if item.return_type == "Int" {
+      "Int32"
+    } else {
+      item.return_type
+    }
     if item.throws {
       out.write_string(
-        "  let result : \{item.return_type} = \{call} catch {\n    error => {\n",
+        "  let result : \{result_type} = \{call} catch {\n    error => {\n",
       )
       out.write_string(invalidations.to_string())
       out.write_string(
         "      ignore(napi_throw_error(env, b\"\", @utf8.encode(error.to_string())))\n      return moonbit_dummy_napi_value()\n    }\n  }\n",
       )
     } else {
-      out.write_string("  let result : \{item.return_type} = \{call}\n")
+      out.write_string("  let result : \{result_type} = \{call}\n")
     }
     out.write_string(invalidations.to_string())
     out.write_string("  set_\{item.return_type}(env, result)\n}\n")
@@ -144,9 +149,9 @@ pub fn declarations(exports : Array[ParsedExport]) -> String {
 pub fn loaders(
   exports : Array[ParsedExport],
   package_name : String,
-  version : Int,
+  version : Int32,
 ) -> (String, String) {
-  let name = (package_name + "-").to_json().stringify()
+  let name = Json(package_name + "-").stringify()
   let cjs =
     $|const path = require('path');
     $|const requiredNapi = \{version};

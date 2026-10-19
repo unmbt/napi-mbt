@@ -16,7 +16,7 @@ async fn main {
     let mut end = if start + 2000 < json.length() { start + 2000 } else { json.length() }
     // Never split a UTF-16 surrogate pair between generated literals.
     if end < json.length() && json[end - 1].to_int() >= 0xD800 && json[end - 1].to_int() <= 0xDBFF { end -= 1 }
-    chunks.push(json[start:end].to_owned().to_json().stringify())
+    chunks.push(Json(json[start:end].to_owned()).stringify())
     start = end
   }
   @fs.write_file(output, "// Generated from data/resources.json. Do not edit.\n///|\nlet bundled : String = [\n  " + chunks.join(",\n  ") + ",\n].join(\"\")\n")

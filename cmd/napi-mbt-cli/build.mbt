@@ -17,17 +17,7 @@ async fn build(
       "Cross-compiling \{target} requires a matching host toolchain; current host is \{host_target()}",
     )
   }
-  if !["auto", "cmake", "gcc", "clang", "msvc"].contains(conf.builder) {
-    fail("Unknown builder: \{conf.builder}")
-  }
-  if windows() && conf.builder == "gcc" {
-    fail(
-      "Windows requires an MSVC-compatible toolchain; MinGW GCC cannot link MoonBit artifacts",
-    )
-  }
-  if !windows() && conf.builder == "msvc" {
-    fail("MSVC builds require Windows")
-  }
+  validate_builder(conf.builder, windows())
   let mode = if release { "release" } else { "debug" }
   let configuration = if release { "Release" } else { "Debug" }
   if dry_run {
@@ -36,36 +26,12 @@ async fn build(
     )
     return
   }
-  let moon = require_command("moon")
-  let cmake = require_command("cmake")
-  let generator_args = []
-  let mut vs_root = ""
-  if windows() {
-    let (root, version) = visual_studio(dir)
-    vs_root = root
-    let capabilities = @json.parse(command(cmake, ["-E", "capabilities"], dir))
-    let generator = visual_studio_generator(version, capabilities)
-    let toolset = if conf.builder == "clang" {
-      "ClangCL,host=x64"
-    } else {
-      "host=x64"
-    }
-    generator_args.append([
-      "-G",
-      generator,
-      "-A",
-      "x64",
-      "-DCMAKE_GENERATOR_INSTANCE=" + root,
-      "-T",
-      toolset,
-    ])
-  } else {
-    if find_command("ninja") is Some(_) {
-      generator_args.append(["-G", "Ninja"])
-    }
-    if conf.builder == "gcc" || conf.builder == "clang" {
-      generator_args.push("-DCMAKE_C_COMPILER=" + require_command(conf.builder))
-    }
+  let toolchain = detect_toolchain(dir, conf.builder)
+  defer toolchain.close()
+  let moon = toolchain.moon
+  let cmake = toolchain.cmake
+  let generator_args = toolchain.configure_args
+  if !windows() {
     generator_args.push("-DCMAKE_BUILD_TYPE=" + configuration)
   }
   let generated = generate(dir, false, generator_override)
@@ -77,18 +43,9 @@ async fn build(
     }
   }
   if windows() {
-    let tools_dir = vs_root + "/VC/Tools/MSVC"
-    let versions = @fs.readdir(tools_dir, sort=true)
-    versions.sort_by((a, b) => lexical_compare(b, a))
-    let mut librarian : String? = None
-    for version in versions {
-      let path = tools_dir + "/" + version + "/bin/Hostx64/x64/lib.exe"
-      if @fs.exists(path) {
-        librarian = Some(path)
-        break
-      }
+    guard toolchain.librarian is Some(lib) else {
+      fail("MSVC lib.exe is required")
     }
-    guard librarian is Some(lib) else { fail("MSVC lib.exe is required") }
     println(
       command(
         lib,

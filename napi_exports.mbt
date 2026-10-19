@@ -9,7 +9,7 @@ pub fn napi_mbt_adapter_add(
 ) -> NapiValue {
   let p0 = get_Int(env, a0)
   let p1 = get_Int(env, a1)
-  let result : Int = add(p0, p1)
+  let result : Int32 = add(p0, p1)
   set_Int(env, result)
 }
 

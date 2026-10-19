@@ -1,12 +1,12 @@
 ///|
 pub struct NapiBufferView {
   buf : UnmanagedBuffer
-  len : Int
+  len : Int32
   mut is_alive : Bool
 }
 
 ///|
-pub fn NapiBufferView::length(self : NapiBufferView) -> Int {
+pub fn NapiBufferView::length(self : NapiBufferView) -> Int32 {
   if !self.is_alive {
     abort("Buffer view is no longer valid") // This should be a panic or error, but we'll use panic for now, generator wrapper handles typed error if possible.
   }
@@ -14,7 +14,7 @@ pub fn NapiBufferView::length(self : NapiBufferView) -> Int {
 }
 
 ///|
-pub fn NapiBufferView::load8(self : NapiBufferView, offset : Int) -> Int {
+pub fn NapiBufferView::load8(self : NapiBufferView, offset : Int32) -> Int32 {
   if !self.is_alive {
     abort("Buffer view is no longer valid")
   }
@@ -27,8 +27,8 @@ pub fn NapiBufferView::load8(self : NapiBufferView, offset : Int) -> Int {
 ///|
 pub fn NapiBufferView::store8(
   self : NapiBufferView,
-  offset : Int,
-  val : Int,
+  offset : Int32,
+  val : Int32,
 ) -> Unit {
   if !self.is_alive {
     abort("Buffer view is no longer valid")
@@ -46,7 +46,7 @@ pub fn NapiBufferView::invalidate(self : NapiBufferView) -> Unit {
 }
 
 ///|
-fn result_from_status(env : NapiEnv, status : Int, msg : Bytes) -> Unit {
+fn result_from_status(env : NapiEnv, status : Int32, msg : Bytes) -> Unit {
   if status != 0 {
     let _ = napi_throw_error(env, b"", msg)
     ()
@@ -56,7 +56,7 @@ fn result_from_status(env : NapiEnv, status : Int, msg : Bytes) -> Unit {
 // 供生成的包装函数调用的转换器
 
 ///|
-pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int {
+pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int32 {
   let res = Ref(0)
   let status = napi_get_value_int32(env, val, res)
   result_from_status(env, status, b"Invalid argument, expected Int")
@@ -64,7 +64,7 @@ pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int {
 }
 
 ///|
-pub fn set_Int(env : NapiEnv, val : Int) -> NapiValue {
+pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue {
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_create_int32(env, val, res)
   result_from_status(env, status, b"Failed to create Int")
@@ -190,7 +190,7 @@ pub fn set_Unit(env : NapiEnv, _val : Unit) -> NapiValue {
 
 ///|
 #export_name("add")
-pub fn add(a : Int, b : Int) -> Int {
+pub fn add(a : Int32, b : Int32) -> Int32 {
   a + b
 }
 

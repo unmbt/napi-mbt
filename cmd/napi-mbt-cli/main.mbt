@@ -20,6 +20,7 @@ async fn main {
   }
   let dir = args[1]
   match args[0] {
+    "doctor" => doctor(dir, flags.contains("--json"))
     "init" => initialize(dir, options.get("--name"), flags.contains("--force"))
     "generate" =>
       ignore(

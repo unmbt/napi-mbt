@@ -54,6 +54,18 @@ fn cli_command() -> @argparse.Command {
         ],
       ),
       Command(
+        "doctor",
+        about="Check the native compiler, linker and platform SDK",
+        positionals=[directory],
+        flags=[
+          FlagArg(
+            "json",
+            long="json",
+            about="Print machine-readable diagnostics",
+          ),
+        ],
+      ),
+      Command(
         "prepublish",
         about="Prepare platform npm packages",
         positionals=[directory],
@@ -84,7 +96,7 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
       normalized.push(value)
     }
   }
-  for flag in ["force", "check", "release", "dry-run"] {
+  for flag in ["force", "check", "release", "dry-run", "json"] {
     if values.flags.get(flag) == Some(true) {
       normalized.push("--" + flag)
     }

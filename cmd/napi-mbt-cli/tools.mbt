@@ -1,5 +1,5 @@
 ///|
-fn lexical_compare(a : String, b : String) -> Int {
+fn lexical_compare(a : String, b : String) -> Int32 {
   let length = if a.length() < b.length() { a.length() } else { b.length() }
   for i in 0..<length {
     let difference = a[i].to_int() - b[i].to_int()
@@ -11,7 +11,7 @@ fn lexical_compare(a : String, b : String) -> Int {
 }
 
 ///|
-async fn mkdirp(path : String, recursive? : Bool = true) -> Unit {
+async fn mkdirp(path : String, recursive~ : Bool = true) -> Unit {
   if @fs.exists(path) {
     if @fs.kind(path) != Directory {
       fail("Not a directory: \{path}")

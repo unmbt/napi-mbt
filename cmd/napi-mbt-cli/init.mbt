@@ -52,7 +52,7 @@ async fn initialize(
       Json).stringify(indent=2) +
     "\n"
   files["moon.mod"] = "name = " +
-    name.replace_all(old="@", new="").to_json().stringify() +
+    Json(name.replace_all(old="@", new="")).stringify() +
     "\nversion = \"0.1.0\"\npreferred_target = \"native\"\nsupported_targets = \"native\"\n"
   let moon_package =
     #|import { "moonbitlang/core/encoding/utf8" }

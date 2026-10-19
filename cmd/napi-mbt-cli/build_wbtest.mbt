@@ -1,4 +1,26 @@
 ///|
+test "doctor accepts an optional directory and JSON output" {
+  assert_eq(parse_cli(["doctor", "--json"]), ["doctor", ".", "--json"])
+  assert_eq(parse_cli(["doctor", "project 空格", "--json"]), [
+    "doctor", "project 空格", "--json",
+  ])
+}
+
+///|
+test "builder validation rejects incompatible host toolchains" {
+  validate_builder("auto", true)
+  validate_builder("clang", true)
+  validate_builder("gcc", false)
+  for (builder, host) in [("gcc", true), ("msvc", false), ("invalid", false)] {
+    try validate_builder(builder, host) catch {
+      _ => ()
+    } noraise {
+      _ => fail("Expected incompatible builder rejection")
+    }
+  }
+}
+
+///|
 test "Visual Studio generator names come from CMake capabilities" {
   let capabilities : Json = {
     "generators": [

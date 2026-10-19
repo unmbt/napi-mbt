@@ -14,6 +14,17 @@ Before you start, ensure your environment meets the following dependencies:
 
 ## 2. CLI Commands
 
+### `napi-mbt-cli doctor [directory] --json`
+
+Checks MoonBit, CMake, the selected C compiler and linker with a disposable
+compile/link probe. On Windows it selects an installed Visual Studio C++
+instance, explicitly passes its MSBuild path to CMake, and reports the compiler
+and Windows SDK versions. Install the MSBuild, C++ tools and Windows SDK
+components if the probe fails. Omit `--json` for readable diagnostics.
+`build` runs this same check before writing generated project files.
+
+The native CLI does not require Node.js or npm. Node.js is needed to run addons.
+
 The `@unmbt/napi-mbt-cli` exposes the `napi-mbt` bin command.
 
 ### `napi-mbt build [--release]`

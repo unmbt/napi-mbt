@@ -12,7 +12,7 @@ pub(all) struct ParsedExport {
   return_type : String
   throws : Bool
   filename : String
-  line : Int
+  line : Int32
 }
 
 ///|
@@ -54,7 +54,7 @@ fn child(node : @syntax.Node, kind : String) -> @syntax.Node? {
 }
 
 ///|
-fn syntax_error_line(node : @syntax.Node) -> Int {
+fn syntax_error_line(node : @syntax.Node) -> Int32 {
   for item in node.children() {
     if item.has_error() || item.is_error() {
       return syntax_error_line(item)
@@ -102,7 +102,8 @@ fn parse_function(
       fail("\{location}: parameter must have a type")
     }
     let name = text[:colon].trim().to_owned()
-    let type_name = text[colon + 1:].trim().to_owned()
+    let raw_type = text[colon + 1:].trim().to_owned()
+    let type_name = if raw_type == "Int32" { "Int" } else { raw_type }
     if !valid_identifier(name) ||
       !["Int", "Double", "Bool", "String", "Bytes", "NapiBufferView"].contains(
         type_name,
@@ -128,6 +129,9 @@ fn parse_function(
   }
   if ret.is_empty() {
     ret = "Unit"
+  }
+  if ret == "Int32" {
+    ret = "Int"
   }
   if !["Int", "Double", "Bool", "String", "Bytes", "Unit"].contains(ret) {
     fail("\{location}: unsupported return type \{ret}")
