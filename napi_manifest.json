@@ -1,4 +1,5 @@
 {
+  "runtimeTemplateVersion": "2",
   "napiVersion": 7,
   "requiredNapiVersion": 7,
   "features": [
@@ -27,8 +28,8 @@
       ],
       "ret": "Int",
       "throws": false,
-      "line": 229,
-      "filename": "lib.mbt"
+      "line": 2,
+      "filename": "examples.mbt"
     },
     {
       "sourceName": "check_bool",
@@ -41,8 +42,8 @@
       ],
       "ret": "Bool",
       "throws": false,
-      "line": 256,
-      "filename": "lib.mbt"
+      "line": 28,
+      "filename": "examples.mbt"
     },
     {
       "sourceName": "check_double",
@@ -55,8 +56,8 @@
       ],
       "ret": "Double",
       "throws": false,
-      "line": 262,
-      "filename": "lib.mbt"
+      "line": 34,
+      "filename": "examples.mbt"
     },
     {
       "sourceName": "concat",
@@ -73,8 +74,8 @@
       ],
       "ret": "String",
       "throws": false,
-      "line": 235,
-      "filename": "lib.mbt"
+      "line": 8,
+      "filename": "examples.mbt"
     },
     {
       "sourceName": "mutate_buffer",
@@ -87,8 +88,8 @@
       ],
       "ret": "Unit",
       "throws": true,
-      "line": 241,
-      "filename": "lib.mbt"
+      "line": 14,
+      "filename": "examples.mbt"
     },
     {
       "sourceName": "roundtrip_bytes",
@@ -101,8 +102,8 @@
       ],
       "ret": "Bytes",
       "throws": false,
-      "line": 250,
-      "filename": "lib.mbt"
+      "line": 22,
+      "filename": "examples.mbt"
     }
   ]
 }

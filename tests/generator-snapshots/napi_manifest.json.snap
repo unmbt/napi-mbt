@@ -1,0 +1,56 @@
+{
+  "runtimeTemplateVersion": "2",
+  "napiVersion": 7,
+  "requiredNapiVersion": 7,
+  "features": [
+    "buffer"
+  ],
+  "targets": [],
+  "generator": "auto",
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "noop",
+      "exportName": "noop",
+      "params": [],
+      "ret": "Unit",
+      "throws": false,
+      "line": 5,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "internal_name",
+      "exportName": "public_name",
+      "params": [
+        {
+          "name": "a",
+          "type": "Int"
+        },
+        {
+          "name": "text",
+          "type": "String"
+        },
+        {
+          "name": "flag",
+          "type": "Bool"
+        },
+        {
+          "name": "d",
+          "type": "Double"
+        },
+        {
+          "name": "data",
+          "type": "Bytes"
+        },
+        {
+          "name": "view",
+          "type": "NapiBufferView"
+        }
+      ],
+      "ret": "String",
+      "throws": true,
+      "line": 2,
+      "filename": "lib.mbt"
+    }
+  ]
+}

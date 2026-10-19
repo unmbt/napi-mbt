@@ -47,8 +47,12 @@ napi-mbt-cli prepublish
 该指令会在 `npm/` 文件夹中输出各平台包的元数据。生成的 `index.cjs` 和 `index.mjs` 负责加载这些平台包。
 
 ### 如何添加对新数据类型 (如 Object/Array) 的支持
-1. 在 `generator/strict.mbt` 中扩展导出签名校验与类型模型。
-2. 在 `generator/outputs.mbt` 中扩展适配代码和 TypeScript 声明；运行时模板变化时同步更新 `internal/assets/data/resources.json`。
+1. 在 `generator/strict.mbt` 扩展 AST 校验，在 `generator/types.mbt` 扩展类型 IR。
+2. 扩展 `generator/render.mbt` 及私有输出函数；MoonBit、C、TypeScript 和 loader 共用同一 IR。通过 `scripts/generator-snapshot-test.mbtx` 更新完整输出快照，并加入真实 Node 测试。
+3. 仓库根目录的 runtime 源码是唯一来源，运行 `moon run scripts/sync-runtime.mbtx` 自动派生内嵌模板，不手工修改 JSON 中的副本。生成物与 runtime 契约变化时更新 `napi_runtime_version.mbt`。CI 使用 `--check` 检测模板漂移。
+
+生成器先完成所有校验和渲染，再暂存完整输出。每个文件通过 rename 替换，后续
+文件失败时回滚此前替换。`generate --check` 仅读取文件，不创建工作目录。
 3. 在 `lib.mbt` 内: 调用底层的 Node-API（如 `napi_get_named_property` 等等），编写底层的内存提取和安全检验逻辑。
 
 ### 常见问题排查 (Troubleshooting)

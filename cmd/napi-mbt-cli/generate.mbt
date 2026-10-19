@@ -55,12 +55,13 @@ async fn generate(
   }
   exports.sort_by((a, b) => lexical_compare(a.export_name, b.export_name))
   let pkg = read_object(dir + "/package.json")
-  let (cjs, esm) = @generator.loaders(
+  let outputs = @generator.render(
     exports,
     str(pkg, "name", "napi-mbt-package"),
     conf.napi_version,
   )
   let manifest : Json = {
+    "runtimeTemplateVersion": @assets.runtime_version(),
     "napiVersion": conf.napi_version,
     "requiredNapiVersion": conf.napi_version,
     "features": features,
@@ -69,24 +70,8 @@ async fn generate(
     "builder": conf.builder,
     "exports": exports.map(e => e.manifest()),
   }
-  let outputs = [
-    ("napi_exports.mbt", @generator.adapters(exports)),
-    ("napi_glue.c", @generator.c_glue(exports)),
-    ("napi_manifest.json", manifest.stringify(indent=2) + "\n"),
-    ("index.d.ts", @generator.declarations(exports)),
-    ("index.cjs", cjs),
-    ("index.mjs", esm),
-  ]
-  for (name, text) in outputs {
-    let path = dir + "/" + name
-    if check {
-      if !@fs.exists(path) || @fs.read_file(path).text() != text {
-        fail("Generated file is not up-to-date: \{name}")
-      }
-    } else {
-      write_file(path, text)
-    }
-  }
+  outputs.push(("napi_manifest.json", manifest.stringify(indent=2) + "\n"))
+  install_outputs(dir, outputs, check)
   if !check {
     println("Generated \{exports.length()} N-API export(s).")
   }

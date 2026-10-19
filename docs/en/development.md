@@ -48,8 +48,13 @@ napi-mbt-cli prepublish
 This generates the target JSON layouts within the `npm/` folder. The generated `index.cjs` and `index.mjs` resolve these platform packages.
 
 ### Adding New Types (e.g., Object, Array)
-1. In `generator/strict.mbt`: Extend the exported-signature validation and type model.
-2. In `generator/outputs.mbt`: Extend adapters and TypeScript declarations; update the embedded templates in `internal/assets/data/resources.json` when runtime support changes.
+1. Extend AST validation in `generator/strict.mbt` and the typed IR in `generator/types.mbt`.
+2. Extend `generator/render.mbt` and its private output helpers. MoonBit, C, TypeScript and loaders consume this same IR. Add complete artifact snapshots with `scripts/generator-snapshot-test.mbtx` and actual Node tests.
+3. Runtime source files at the repository root are canonical. Run `moon run scripts/sync-runtime.mbtx` to derive embedded templates; do not edit their JSON copies. Bump `napi_runtime_version.mbt` when the generated/runtime contract changes. CI runs the script with `--check` to detect stale templates.
+
+Generation validates and renders the complete output set before staging it.
+Each replacement uses a filesystem rename, with rollback if a later file fails.
+`generate --check` only reads files and creates no working directory.
 3. In `lib.mbt`: Implement the extraction primitives utilizing underlying raw N-API signatures (`napi_get_named_property`, etc.).
 
 ### Troubleshooting

@@ -2,6 +2,8 @@ import { "moonbitlang/async", "moonbitlang/async/process" }
 async fn main {
   let status = @process.run("moon", ["run", "scripts/build-rules-test.mbtx"])
   if status != 0 { fail("Build rule tests failed") }
+  let status = @process.run("moon", ["run", "scripts/generator-snapshot-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  if status != 0 { fail("Generator snapshot tests failed") }
   let status = @process.run("moon", ["run", "scripts/cli-native-test.mbtx"])
   if status != 0 { fail("Native CLI regression tests failed") }
   let status = @process.run("moon", ["run", "scripts/build-isolation-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])

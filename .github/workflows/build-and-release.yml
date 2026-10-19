@@ -39,6 +39,9 @@ jobs:
       - name: Update Registry & Dependencies
         run: moon update
 
+      - name: Check runtime template consistency
+        run: moon run scripts/sync-runtime.mbtx --check
+
       - name: Build native CLI
         run: moon build --target native --release cmd/napi-mbt-cli
 

@@ -10,3 +10,11 @@ pub fn files() -> Map[String, String] raise {
   }
   result
 }
+
+///|
+pub fn runtime_version() -> String raise {
+  guard files().get("runtime-version") is Some(version) else {
+    fail("Missing runtime template version")
+  }
+  version
+}

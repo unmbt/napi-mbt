@@ -1,0 +1,29 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (status, out, err) = @process.collect_output(binary, args)
+  if status != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let update = @env.args().contains("--update")
+  let temp = @fs.tmpdir(prefix="napi-mbt-snapshot-")
+  defer @fs.rmdir(temp, recursive=true)
+  checked(binary, ["init", temp + "/project", "--name", "snapshot-fixture"])
+  let dir = temp + "/project"
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
+  @fs.write_file(dir + "/lib.mbt", "///|\n#export_name(\"public_name\")\npub fn internal_name(a : Int32, text : String, flag : Bool, d : Double, data : Bytes, view : NapiBufferView) -> String raise { text }\n///|\n#export_name(\"noop\")\npub fn noop() -> Unit { () }\n")
+  checked(binary, ["generate", dir])
+  let expected = "tests/generator-snapshots"
+  if update && !@fs.exists(expected) { @fs.mkdir(expected, recursive=true) }
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.cjs", "index.mjs", "napi_manifest.json"] {
+    let actual = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
+    if update { @fs.write_file(expected + "/" + name + ".snap", actual) }
+    assert_eq(actual, @fs.read_file(expected + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+  }
+  checked(binary, ["generate", dir, "--check"])
+  println("Complete generator artifact snapshots passed")
+}

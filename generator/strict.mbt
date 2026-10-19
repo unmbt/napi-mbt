@@ -1,7 +1,7 @@
 ///|
 pub(all) struct Parameter {
   name : String
-  type_name : String
+  value_type : ValueType
 }
 
 ///|
@@ -9,7 +9,7 @@ pub(all) struct ParsedExport {
   source_name : String
   export_name : String
   parameters : Array[Parameter]
-  return_type : String
+  return_type : ValueType
   throws : Bool
   filename : String
   line : Int32
@@ -103,14 +103,13 @@ fn parse_function(
     }
     let name = text[:colon].trim().to_owned()
     let raw_type = text[colon + 1:].trim().to_owned()
-    let type_name = if raw_type == "Int32" { "Int" } else { raw_type }
-    if !valid_identifier(name) ||
-      !["Int", "Double", "Bool", "String", "Bytes", "NapiBufferView"].contains(
-        type_name,
-      ) {
+    if !valid_identifier(name) {
       fail("\{location}: unsupported parameter \{text}")
     }
-    parameters.push({ name, type_name, })
+    parameters.push({
+      name,
+      value_type: parse_value_type(raw_type, location, true),
+    })
   }
   let return_text = child(node, "return_type")
     .map(n => n.tokens().join(" "))
@@ -130,12 +129,7 @@ fn parse_function(
   if ret.is_empty() {
     ret = "Unit"
   }
-  if ret == "Int32" {
-    ret = "Int"
-  }
-  if !["Int", "Double", "Bool", "String", "Bytes", "Unit"].contains(ret) {
-    fail("\{location}: unsupported return type \{ret}")
-  }
+  let return_type = parse_value_type(ret, location, false)
   let mut is_async = false
   for token in node.tokens() {
     if token == "fn" {
@@ -152,7 +146,7 @@ fn parse_function(
     source_name: name.tokens().join(""),
     export_name,
     parameters,
-    return_type: ret,
+    return_type,
     throws,
     filename,
     line: attr.line(),
@@ -203,10 +197,8 @@ pub fn parse_source(source : String, filename : String) -> ParsedSource raise {
   let features = []
   visit(tree, filename, exports, features)
   if exports.any(item => {
-      item.parameters.any(p => {
-        p.type_name == "NapiBufferView" || p.type_name == "Bytes"
-      }) ||
-      item.return_type == "Bytes"
+      item.parameters.any(p => p.value_type is (BufferViewType | BytesType)) ||
+      item.return_type is BytesType
     }) {
     features.push("buffer")
   }

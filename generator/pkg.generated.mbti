@@ -2,48 +2,23 @@
 package "unmbt/napi-mbt/generator"
 
 // Values
-pub fn adapters(Array[ParsedExport]) -> String
-
-pub fn c_glue(Array[ParsedExport]) -> String
-
-pub fn declarations(Array[ParsedExport]) -> String
-
-pub fn loaders(Array[ParsedExport], String, Int) -> (String, String)
-
 pub fn parse_source(String, String) -> ParsedSource raise
 
-pub fn render_c_glue(Array[ExportSpec], Int) -> String
-
-pub fn render_moonbit_adapters(Array[ExportSpec]) -> String
-
-pub fn scan_source(String) -> Array[ExportSpec]
+pub fn render(Array[ParsedExport], String, Int) -> Array[(String, String)] raise
 
 // Errors
 
 // Types and methods
-pub(all) struct ExportSpec {
-  source_name : String
-  export_name : String
-  parameters : Array[String]
-  return_type : String
-}
-
-pub(all) struct GeneratorConfig {
-  napi_version : Int
-  builder : String
-  generator : String
-}
-
 pub(all) struct Parameter {
   name : String
-  type_name : String
+  value_type : ValueType
 }
 
 pub(all) struct ParsedExport {
   source_name : String
   export_name : String
   parameters : Array[Parameter]
-  return_type : String
+  return_type : ValueType
   throws : Bool
   filename : String
   line : Int
@@ -54,6 +29,17 @@ pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
   features : Array[String]
 }
+
+pub(all) enum ValueType {
+  IntType
+  DoubleType
+  BoolType
+  StringType
+  BytesType
+  BufferViewType
+  UnitType
+}
+pub fn ValueType::runtime_name(Self) -> String
 
 // Type aliases
 

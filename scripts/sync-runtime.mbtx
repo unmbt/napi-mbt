@@ -5,15 +5,20 @@ async fn main {
   let path = "internal/assets/data/resources.json"
   guard @json.parse(@fs.read_file(path).text()) is Object(files) else { fail("Invalid resources") }
   let check = @env.args().contains("--check")
-  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "stub.c", "lib.mbt"] {
+  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
     let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
     let (target, source) = if name == "lib.mbt" {
-      guard source.find("///|\n#export_name") is Some(end) else { fail("Missing sample boundary") }
-      ("napi_runtime.mbt", source[:end].to_owned())
+      ("napi_runtime.mbt", source)
     } else { (name, source) }
     let key = "template/" + target
     if check && files.get(key) != Some(Json(source)) { fail("Runtime template is stale: \{key}") }
     files[key] = Json(source)
+    if name == "napi_runtime_version.mbt" {
+      guard source.find("=") is Some(index) else { fail("Invalid runtime version declaration") }
+      let version = @json.parse(source[index + 1:].trim().to_owned())
+      if check && files.get("runtime-version") != Some(version) { fail("Runtime version is stale") }
+      files["runtime-version"] = version
+    }
   }
   if !check { @fs.write_file(path, Json(files).stringify(indent=2) + "\n") }
 }

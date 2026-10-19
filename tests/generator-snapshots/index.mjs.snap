@@ -1,0 +1,6 @@
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
+const addon = require('./index.cjs');
+export default addon;
+export const noop = addon.noop;
+export const public_name = addon.public_name;

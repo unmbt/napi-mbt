@@ -4,6 +4,8 @@ package "unmbt/napi-mbt/internal/assets"
 // Values
 pub fn files() -> Map[String, String] raise
 
+pub fn runtime_version() -> String raise
+
 // Errors
 
 // Types and methods
