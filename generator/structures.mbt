@@ -18,7 +18,11 @@ pub fn TypeDefinition::manifest(self : TypeDefinition) -> Json {
 }
 
 ///|
-fn definition(node : @syntax.Node, filename : String) -> TypeDefinition raise {
+fn definition(
+  node : @syntax.Node,
+  filename : String,
+  classes : Array[ClassConfig],
+) -> TypeDefinition raise {
   let location = "\{filename}:\{node.line()}"
   if child(node, "type_parameters") is Some(_) ||
     child(node, "struct_constructor_declaration") is Some(_) {
@@ -89,6 +93,25 @@ fn definition(node : @syntax.Node, filename : String) -> TypeDefinition raise {
     }
     EnumShape(variants)
   }
+  let shape = match shape {
+    StructShape(fields) =>
+      StructShape(
+        fields.map(p => {
+          name: p.name,
+          value_type: class_type(p.value_type, classes),
+        }),
+      )
+    EnumShape(variants) =>
+      EnumShape(
+        variants.map(v => {
+          name: v.name,
+          parameters: v.parameters.map(p => {
+            name: p.name,
+            value_type: class_type(p.value_type, classes),
+          }),
+        }),
+      )
+  }
   { name, shape, filename, line: node.line(), }
 }
 
@@ -99,10 +122,20 @@ fn resolve_type(
   types : Array[TypeDefinition],
   features : Array[String],
   location : String,
+  classes : Array[ClassConfig],
 ) -> Unit raise {
   match value {
+    CallbackType(params, ret, _) => {
+      if !features.contains("callback") {
+        features.push("callback")
+      }
+      for p in params {
+        resolve_type(p, declarations, types, features, location, classes)
+      }
+      resolve_type(ret, declarations, types, features, location, classes)
+    }
     OptionType(inner) | ArrayType(inner) =>
-      resolve_type(inner, declarations, types, features, location)
+      resolve_type(inner, declarations, types, features, location, classes)
     NamedType(name) => {
       if types.any(t => t.name == name) {
         return
@@ -110,7 +143,7 @@ fn resolve_type(
       guard declarations.get(name) is Some((node, filename)) else {
         fail("\{location}: unresolved exported type \{name}")
       }
-      let def = definition(node, filename)
+      let def = definition(node, filename, classes)
       types.push(def)
       let fields = match def.shape {
         StructShape(fields) => fields
@@ -128,6 +161,7 @@ fn resolve_type(
           types,
           features,
           "\{filename}:\{def.line}",
+          classes,
         )
       }
     }

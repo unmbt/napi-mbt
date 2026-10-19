@@ -1,0 +1,81 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String], cwd? : StringView) -> Unit {
+  @async.with_timeout(120000, () => {
+    let (code, out, err) = @process.collect_output(binary, args, cwd?)
+    if code != 0 { fail(out.text() + err.text()) }
+  })
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-callback-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "callback-fixture"])
+  let source =
+    #|///|
+    #|let saved : Ref[Option[(Int) -> Int raise]] = Ref(None)
+    #|///|
+    #|#export_name("invoke")
+    #|pub fn invoke(callback : (Int) -> Int raise, value : Int) -> Int raise { callback(value) }
+    #|///|
+    #|#export_name("retain")
+    #|pub fn retain(callback : (Int) -> Int raise) -> Unit { saved.val = Some(callback) }
+    #|///|
+    #|#export_name("call_saved")
+    #|pub fn call_saved(value : Int) -> Int raise { match saved.val { Some(f) => f(value); None => -1 } }
+    #|///|
+    #|#export_name("clear")
+    #|pub fn clear() -> Unit { saved.val = None }
+    #|///|
+    #|#export_name("make_adder")
+    #|pub fn make_adder(delta : Int) -> ((Int) -> Int) { fn(value) { value + delta } }
+    #|///|
+    #|#export_name("wrap")
+    #|pub fn wrap(callback : (Int) -> Int raise) -> ((Int) -> Int raise) { value => callback(value) }
+    #|///|
+    #|#export_name("notify")
+    #|pub fn notify(callback : () -> Unit raise) -> Unit raise { callback() }
+    #|///|
+    #|#export_name("map_strings")
+    #|pub fn map_strings(callback : (Array[String]) -> Array[String] raise) -> Array[String] raise { callback(["one", "two"]) }
+    #|///|
+    #|extern "c" fn live_resources() -> Int = "napi_mbt_live_resources"
+    #|///|
+    #|#export_name("resources")
+    #|pub fn resources() -> Int { live_resources() }
+    #|///|
+    #|extern "c" fn resource_kind(kind : Int) -> Int = "napi_mbt_live_resource_kind"
+    #|///|
+    #|#export_name("resource_kind")
+    #|pub fn count_kind(kind : Int) -> Int { resource_kind(kind) }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_file(dir + "/moon.pkg", pkg)
+  }
+  checked(binary, ["build", dir, "--release"])
+  checked("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], cwd=dir)
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let snapshots = root + "/tests/callback-snapshots"
+  let update = @env.args().contains("--update")
+  if update && !@fs.exists(snapshots) { @fs.mkdir(snapshots, recursive=true) }
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.cts", "index.d.mts", "napi_manifest.json"] {
+    let text = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
+    if update { @fs.write_file(snapshots + "/" + name + ".snap", text) }
+    assert_eq(text, @fs.read_file(snapshots + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+  }
+  let output = root + "/.napi-mbt/" + (if asan { "callback-asan" } else { "callback-smoke" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  for name in ["index.d.cts", "index.d.mts"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  checked("node", ["--expose-gc", "scripts/callback.test.cjs", output + "/napi_mbt.node"])
+  println("Callback conversion, exceptions, references and disposal passed")
+}

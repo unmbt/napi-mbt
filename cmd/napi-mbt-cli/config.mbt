@@ -98,6 +98,7 @@ struct Config {
   features : Array[String]
   cjs : Bool
   esm : Bool
+  classes : Array[@generator.ClassConfig]
 }
 
 ///|
@@ -107,6 +108,7 @@ fn feature_version(name : String) -> Int32 raise {
     "threadsafe_function" => 4
     "bigint" => 6
     "buffer" => 7
+    "class" | "callback" => 3
     _ => fail("Unknown N-API feature: \{name}")
   }
 }
@@ -117,6 +119,7 @@ fn parse_config(value : Json) -> Config raise {
   for key in items.keys() {
     if ![
         "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
+        "classes",
       ].contains(key) {
       fail("Unknown napi-mbt.json field: \{key}")
     }
@@ -152,7 +155,11 @@ fn parse_config(value : Json) -> Config raise {
       )
     }
   }
-  { napi_version: version, builder, targets, features, cjs, esm, }
+  let classes = class_configurations(items.get("classes"))
+  if !classes.is_empty() && version < 3 {
+    fail("Classes require N-API 3 for environment cleanup")
+  }
+  { napi_version: version, builder, targets, features, cjs, esm, classes, }
 }
 
 ///|

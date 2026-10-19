@@ -1,0 +1,154 @@
+{
+  "runtimeTemplateVersion": "4",
+  "napiVersion": 4,
+  "requiredNapiVersion": 4,
+  "features": [
+    "callback"
+  ],
+  "targets": [
+    "win32-x64-msvc",
+    "darwin-arm64",
+    "linux-x64-gnu"
+  ],
+  "cjs": true,
+  "esm": true,
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "call_saved",
+      "exportName": "call_saved",
+      "params": [
+        {
+          "name": "value",
+          "type": "Int"
+        }
+      ],
+      "ret": "Int",
+      "throws": true,
+      "line": 10,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "clear",
+      "exportName": "clear",
+      "params": [],
+      "ret": "Unit",
+      "throws": false,
+      "line": 13,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "invoke",
+      "exportName": "invoke",
+      "params": [
+        {
+          "name": "callback",
+          "type": "((Int) -> Int raise)"
+        },
+        {
+          "name": "value",
+          "type": "Int"
+        }
+      ],
+      "ret": "Int",
+      "throws": true,
+      "line": 4,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "make_adder",
+      "exportName": "make_adder",
+      "params": [
+        {
+          "name": "delta",
+          "type": "Int"
+        }
+      ],
+      "ret": "((Int) -> Int)",
+      "throws": false,
+      "line": 16,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "map_strings",
+      "exportName": "map_strings",
+      "params": [
+        {
+          "name": "callback",
+          "type": "((Array[String]) -> Array[String] raise)"
+        }
+      ],
+      "ret": "Array[String]",
+      "throws": true,
+      "line": 25,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "notify",
+      "exportName": "notify",
+      "params": [
+        {
+          "name": "callback",
+          "type": "(() -> Unit raise)"
+        }
+      ],
+      "ret": "Unit",
+      "throws": true,
+      "line": 22,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "count_kind",
+      "exportName": "resource_kind",
+      "params": [
+        {
+          "name": "kind",
+          "type": "Int"
+        }
+      ],
+      "ret": "Int",
+      "throws": false,
+      "line": 35,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "resources",
+      "exportName": "resources",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 30,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "retain",
+      "exportName": "retain",
+      "params": [
+        {
+          "name": "callback",
+          "type": "((Int) -> Int raise)"
+        }
+      ],
+      "ret": "Unit",
+      "throws": false,
+      "line": 7,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "wrap",
+      "exportName": "wrap",
+      "params": [
+        {
+          "name": "callback",
+          "type": "((Int) -> Int raise)"
+        }
+      ],
+      "ret": "((Int) -> Int raise)",
+      "throws": false,
+      "line": 19,
+      "filename": "lib.mbt"
+    }
+  ],
+  "types": [],
+  "classes": []
+}

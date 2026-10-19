@@ -20,26 +20,34 @@ fn conversion_types(
   definitions : Array[TypeDefinition],
   read : Bool,
 ) -> Array[ValueType] {
-  let types : Array[ValueType] = []
-  fn collect(value : ValueType) -> Unit {
+  let readers : Array[ValueType] = []
+  let writers : Array[ValueType] = []
+  fn collect(value : ValueType, read : Bool) -> Unit {
+    let types = if read { readers } else { writers }
     if types.any(t => t.runtime_name() == value.runtime_name()) {
       return
     }
     types.push(value)
     match value {
-      OptionType(inner) | ArrayType(inner) => collect(inner)
+      OptionType(inner) | ArrayType(inner) => collect(inner, read)
+      CallbackType(params, ret, _) => {
+        for p in params {
+          collect(p, !read)
+        }
+        collect(ret, read)
+      }
       NamedType(name) =>
         for def in definitions {
           if def.name == name {
             match def.shape {
               StructShape(fields) =>
                 for field in fields {
-                  collect(field.value_type)
+                  collect(field.value_type, read)
                 }
               EnumShape(variants) =>
                 for v in variants {
                   for p in v.parameters {
-                    collect(p.value_type)
+                    collect(p.value_type, read)
                   }
                 }
             }
@@ -49,20 +57,24 @@ fn conversion_types(
     }
   }
   for item in exports {
-    if read {
-      for p in item.parameters {
-        collect(p.value_type)
-      }
-    } else {
-      collect(item.return_type)
+    for p in item.parameters {
+      collect(p.value_type, true)
+    }
+    if !(item.binding is ConstructorBinding(_)) {
+      collect(item.return_type, false)
     }
   }
-  types
+  if read {
+    readers
+  } else {
+    writers
+  }
 }
 
 ///|
 fn conversions(
   types : Array[ValueType],
+  opposite : Array[ValueType],
   definitions : Array[TypeDefinition],
   read : Bool,
 ) -> String {
@@ -72,7 +84,7 @@ fn conversions(
     let mbt = value.moonbit()
     if read {
       out.write_string(
-        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt} raise {\n",
+        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt}\{if value is UnitType { "" } else { " raise" }} {\n",
       )
     } else {
       out.write_string(
@@ -95,6 +107,26 @@ fn conversions(
       )
     }
     match value {
+      CallbackType(params, ret, _) =>
+        out.write_string(
+          callback_conversion(
+            params,
+            ret,
+            if read {
+              types
+            } else {
+              opposite
+            },
+            if read {
+              opposite
+            } else {
+              types
+            },
+            read,
+          ),
+        )
+      UnitType if read =>
+        out.write_string("  ignore(env)\n  ignore(value)\n  ()\n")
       OptionType(inner) =>
         if read {
           out.write_string(
@@ -253,6 +285,16 @@ fn conversions(
               }
             }
           }
+        }
+      ClassType(_, _, id) =>
+        if read {
+          out.write_string(
+            "  let handle = napi_class_handle(env, value, \{id})\n  napi_mbt_class_payload_\{id}(handle)\n",
+          )
+        } else {
+          out.write_string(
+            "  let result = Ref(moonbit_dummy_napi_value())\n  result_from_status(env, napi_mbt_class_create_\{id}(env, value, \{id}, result), b\"Creating native instance\")\n  result.val\n",
+          )
         }
       _ =>
         out.write_string(

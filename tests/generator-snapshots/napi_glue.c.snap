@@ -3,11 +3,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern void moonbit_init(void);
+extern int napi_mbt_enter(napi_env, void **);
+extern void napi_mbt_leave(void *);
+extern int moonbit_napi_field_set(napi_env, napi_value, const char *, napi_value);
 extern int napi_mbt_throw_status(napi_env, int, int, const char *, const char *);
-static napi_value napi_mbt_error(napi_env env, napi_status status, int kind, const char *code, const char *context) {
+static napi_value napi_mbt_error(napi_env env, int status, int kind, const char *code, const char *context) {
   (void)napi_mbt_throw_status(env, status, kind, code, context);
   return NULL;
+}
+static napi_value napi_mbt_registration_error(napi_env env, int status, void *previous, const char *context) {
+  napi_mbt_leave(previous);
+  return napi_mbt_error(env, status, 0, "ERR_NAPI_REGISTER", context);
 }
 extern napi_value napi_mbt_adapter_noop(napi_env env);
 extern napi_value napi_mbt_adapter_public_name(napi_env env, napi_value, napi_value, napi_value, napi_value, napi_value, napi_value);
@@ -22,7 +28,12 @@ static napi_value napi_mbt_callback_noop(napi_env env, napi_callback_info info) 
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_noop(env);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_noop(env);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_public_name(napi_env env, napi_callback_info info) {
@@ -35,7 +46,12 @@ static napi_value napi_mbt_callback_public_name(napi_env env, napi_callback_info
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_public_name(env, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_public_name(env, argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 #if defined(_WIN32)
@@ -45,16 +61,19 @@ static napi_value napi_mbt_callback_public_name(napi_env env, napi_callback_info
 #endif
 
 NAPI_MBT_EXPORT napi_value napi_register_module_v1(napi_env env, napi_value exports) {
-  moonbit_init();
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Initializing MoonBit environment");
   napi_value fn_noop;
-  napi_status status_noop = napi_create_function(env, "noop", NAPI_AUTO_LENGTH, napi_mbt_callback_noop, NULL, &fn_noop);
-  if (status_noop != napi_ok) return napi_mbt_error(env, status_noop, 0, "ERR_NAPI_REGISTER", "Creating export noop");
-  status_noop = napi_set_named_property(env, exports, "noop", fn_noop);
-  if (status_noop != napi_ok) return napi_mbt_error(env, status_noop, 0, "ERR_NAPI_REGISTER", "Setting export noop");
+  int status_noop = napi_create_function(env, "noop", NAPI_AUTO_LENGTH, napi_mbt_callback_noop, NULL, &fn_noop);
+  if (status_noop != napi_ok) return napi_mbt_registration_error(env, status_noop, previous, "Creating export noop");
+  status_noop = moonbit_napi_field_set(env, exports, "noop", fn_noop);
+  if (status_noop != napi_ok) return napi_mbt_registration_error(env, status_noop, previous, "Setting export noop");
   napi_value fn_public_name;
-  napi_status status_public_name = napi_create_function(env, "public_name", NAPI_AUTO_LENGTH, napi_mbt_callback_public_name, NULL, &fn_public_name);
-  if (status_public_name != napi_ok) return napi_mbt_error(env, status_public_name, 0, "ERR_NAPI_REGISTER", "Creating export public_name");
-  status_public_name = napi_set_named_property(env, exports, "public_name", fn_public_name);
-  if (status_public_name != napi_ok) return napi_mbt_error(env, status_public_name, 0, "ERR_NAPI_REGISTER", "Setting export public_name");
+  int status_public_name = napi_create_function(env, "public_name", NAPI_AUTO_LENGTH, napi_mbt_callback_public_name, NULL, &fn_public_name);
+  if (status_public_name != napi_ok) return napi_mbt_registration_error(env, status_public_name, previous, "Creating export public_name");
+  status_public_name = moonbit_napi_field_set(env, exports, "public_name", fn_public_name);
+  if (status_public_name != napi_ok) return napi_mbt_registration_error(env, status_public_name, previous, "Setting export public_name");
+  napi_mbt_leave(previous);
   return exports;
 }

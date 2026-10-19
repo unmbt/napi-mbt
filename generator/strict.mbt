@@ -13,6 +13,7 @@ pub(all) struct ParsedExport {
   throws : Bool
   filename : String
   line : Int32
+  binding : BindingKind
 }
 
 ///|
@@ -20,6 +21,7 @@ pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
   features : Array[String]
   types : Array[TypeDefinition]
+  classes : Array[ParsedClass]
 }
 
 ///|
@@ -94,6 +96,20 @@ fn parse_function(
   guard @json.parse(raw) is String(export_name) && valid_export(export_name) else {
     fail("\{location}: invalid export name")
   }
+  Some(
+    parse_signature(node, filename, export_name, attr.line(), FunctionBinding),
+  )
+}
+
+///|
+fn parse_signature(
+  node : @syntax.Node,
+  filename : String,
+  export_name : String,
+  line : Int32,
+  binding : BindingKind,
+) -> ParsedExport raise {
+  let location = "\{filename}:\{line}"
   let name = child(node, "function_identifier")
   guard name is Some(name) && child(node, "parameters") is Some(params) else {
     fail("\{location}: expected an ordinary function")
@@ -120,16 +136,31 @@ fn parse_function(
   let return_text = child(node, "return_type")
     .map(n => n.tokens().join(" "))
     .unwrap_or("")
-  let mut ret = return_text.replace_all(old="->", new="").trim().to_owned()
+  let mut ret = return_text.trim().to_owned()
+  if ret.has_prefix("->") {
+    ret = ret[2:].trim().to_owned()
+  }
   let error_annotation = child(node, "error_annotation")
     .map(n => n.text())
     .unwrap_or("")
-  let throws = (ret.contains("raise") && !ret.contains("noraise")) ||
-    ret.contains("!") ||
-    error_annotation.has_prefix("raise")
-  for separator in ["noraise", "raise", "!"] {
-    if ret.find(separator) is Some(index) {
-      ret = ret[:index].trim().to_owned()
+  let mut throws = error_annotation.has_prefix("raise")
+  let mut depth = 0
+  for i, c in ret {
+    if c == '(' || c == '[' {
+      depth += 1
+    }
+    if c == ')' || c == ']' {
+      depth -= 1
+    }
+    if depth == 0 &&
+      (
+        ret[i:].has_prefix(" raise") ||
+        ret[i:].has_prefix(" noraise") ||
+        c == '!'
+      ) {
+      throws = !ret[i:].has_prefix(" noraise")
+      ret = ret[:i].trim().to_owned()
+      break
     }
   }
   if ret.is_empty() {
@@ -148,15 +179,16 @@ fn parse_function(
   if is_async || child(node, "type_parameters") is Some(_) {
     fail("\{location}: async and generic exports are unsupported")
   }
-  Some({
+  {
     source_name: name.tokens().join(""),
     export_name,
     parameters,
     return_type,
     throws,
     filename,
-    line: attr.line(),
-  })
+    line,
+    binding,
+  }
 }
 
 ///|
@@ -200,16 +232,25 @@ pub fn parse_source(source : String, filename : String) -> ParsedSource raise {
 
 ///|
 /// Resolve all exported types across the package before rendering any output.
-pub fn parse_sources(sources : Array[(String, String)]) -> ParsedSource raise {
+pub fn parse_sources(
+  sources : Array[(String, String)],
+  classes~ : Array[ClassConfig] = [],
+) -> ParsedSource raise {
   let exports = []
   let features = []
   let declarations : Map[String, (@syntax.Node, String)] = Map([])
+  let functions : Map[String, (@syntax.Node, String)] = Map([])
   for (filename, source) in sources {
     let tree = @syntax.parse(source.replace_all(old="\r\n", new="\n"))
     if tree.has_error() {
       fail("\{filename}:\{syntax_error_line(tree)}: MoonBit syntax error")
     }
     for node in tree.children() {
+      if node.kind() == "function_definition" {
+        if child(node, "function_identifier") is Some(name) {
+          functions[name.tokens().join("")] = (node, filename)
+        }
+      }
       if node.kind() == "struct_definition" || node.kind() == "enum_definition" {
         if child(node, "identifier") is Some(name) {
           let name = name.text()
@@ -223,12 +264,38 @@ pub fn parse_sources(sources : Array[(String, String)]) -> ParsedSource raise {
     visit(tree, filename, exports, features)
   }
   let types : Array[TypeDefinition] = []
-  for item in exports {
+  for i, item in exports {
+    exports[i] = class_function(item, classes)
+  }
+  let parsed = {
+    exports,
+    features,
+    types,
+    classes: parse_classes(classes, functions, declarations),
+  }
+  if !classes.is_empty() {
+    features.push("class")
+  }
+  for item in parsed.all_functions() {
     let location = "\{item.filename}:\{item.line}"
     for p in item.parameters {
-      resolve_type(p.value_type, declarations, types, features, location)
+      resolve_type(
+        p.value_type,
+        declarations,
+        types,
+        features,
+        location,
+        classes,
+      )
     }
-    resolve_type(item.return_type, declarations, types, features, location)
+    resolve_type(
+      item.return_type,
+      declarations,
+      types,
+      features,
+      location,
+      classes,
+    )
   }
-  { exports, features, types, }
+  parsed
 }

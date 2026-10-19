@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "3"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "4"
 
 pub fn add(Int, Int) -> Int
 
@@ -28,8 +28,6 @@ pub fn get_String(NapiEnv, NapiValue) -> String raise NapiError
 
 pub fn get_UInt64(NapiEnv, NapiValue) -> UInt64 raise NapiError
 
-pub fn moonbit_release_handle(Int) -> Unit
-
 pub fn mutate_buffer(NapiBufferView) -> Unit raise NapiError
 
 pub fn napi_array_get(NapiEnv, NapiValue, Int) -> NapiValue raise NapiError
@@ -49,6 +47,12 @@ pub fn napi_bigint_to_int64(NapiEnv, NapiValue) -> (Int64, Bool) raise NapiError
 pub fn napi_bigint_to_uint64(NapiEnv, NapiValue) -> (UInt64, Bool) raise NapiError
 
 pub fn napi_check_depth(Int) -> Unit raise NapiError
+
+pub fn napi_class_dispose(NapiEnv, NapiValue, Int) -> Unit raise NapiError
+
+pub fn napi_class_handle(NapiEnv, NapiValue, Int) -> UnmanagedBuffer raise NapiError
+
+pub fn napi_closure_new(NapiEnv, (NapiEnv, NapiArguments) -> NapiValue) -> NapiValue raise NapiError
 
 pub fn napi_enter_value(NapiEnv, NapiValue, Array[NapiValue]) -> Unit raise NapiError
 
@@ -92,12 +96,6 @@ pub fn napi_threadsafe_function_create(NapiEnv, NapiValue, NapiValue, NapiValue,
 
 pub fn napi_threadsafe_function_release(NapiThreadsafeFunction, NapiTsfnReleaseMode) -> NapiTsfnStatus raise NapiError
 
-pub fn registry_get(Int) -> String?
-
-pub fn registry_release(Int) -> Unit
-
-pub fn registry_retain(String) -> Int
-
 pub fn roundtrip_bytes(Bytes) -> Bytes
 
 pub fn set_Bool(NapiEnv, Bool) -> NapiValue raise NapiError
@@ -122,6 +120,11 @@ pub(all) suberror NapiError {
 }
 
 // Types and methods
+#external
+pub type NapiArguments
+pub fn NapiArguments::get(Self, NapiEnv, Int) -> NapiValue raise NapiError
+pub fn NapiArguments::require(Self, Int) -> Unit raise NapiError
+
 pub struct NapiBufferView {
   env : NapiEnv
   value : NapiValue
@@ -131,6 +134,12 @@ pub fn NapiBufferView::invalidate(Self) -> Unit
 pub fn NapiBufferView::length(Self) -> Int raise NapiError
 pub fn NapiBufferView::load8(Self, Int) -> Int raise NapiError
 pub fn NapiBufferView::store8(Self, Int, Int) -> Unit raise NapiError
+
+pub type NapiCallback
+pub fn NapiCallback::call(Self, NapiValue) -> NapiValue raise NapiError
+pub fn NapiCallback::dispose(Self) -> Unit raise NapiError
+pub fn NapiCallback::environment(Self) -> NapiEnv raise NapiError
+pub fn NapiCallback::new(NapiEnv, NapiValue) -> Self raise NapiError
 
 #external
 pub type NapiCallbackInfo

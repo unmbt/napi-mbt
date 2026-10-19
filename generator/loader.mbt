@@ -1,6 +1,6 @@
 ///|
 fn loaders(
-  exports : Array[ParsedExport],
+  exports : Array[String],
   package_name : String,
   package_version : String,
   version : Int32,
@@ -70,11 +70,7 @@ fn loaders(
   let esm = "import { createRequire as $napiRequire } from 'module';\nimport { fileURLToPath as $napiFileURL } from 'url';\nimport { dirname as $napiDirname } from 'path';\nconst $napiAddon = (() => {\nconst require = $napiRequire(import.meta.url);\nconst __dirname = $napiDirname($napiFileURL(import.meta.url));\n" +
     body +
     "return addon;\n})();\nexport default $napiAddon;\n" +
-    exports
-    .map(item => {
-      "export const \{item.export_name} = $napiAddon.\{item.export_name};"
-    })
-    .join("\n") +
+    exports.map(item => "export const \{item} = $napiAddon.\{item};").join("\n") +
     "\n"
   (cjs, esm)
 }

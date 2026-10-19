@@ -1,0 +1,44 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let (code, out, err) = @process.collect_output(binary, args)
+    if code != 0 { fail(out.text() + err.text()) }
+  })
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-lifecycle-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "lifecycle-fixture"])
+  let source =
+    #|///|
+    #|let counter : Ref[Int] = Ref(0)
+    #|///|
+    #|#export_name("bump")
+    #|pub fn bump() -> Int { counter.val += 1; counter.val }
+    #|///|
+    #|extern "c" fn live_environments() -> Int = "napi_mbt_live_environments"
+    #|///|
+    #|extern "c" fn live_resources() -> Int = "napi_mbt_live_resources"
+    #|///|
+    #|#export_name("environments")
+    #|pub fn environments() -> Int { live_environments() }
+    #|///|
+    #|#export_name("resources")
+    #|pub fn resources() -> Int { live_resources() }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = root + "/.napi-mbt/lifecycle-smoke"
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  checked("node", ["scripts/lifecycle.test.cjs"])
+  println("Environment lifecycle and worker serialization passed")
+}

@@ -4,17 +4,55 @@ package "unmbt/napi-mbt/generator"
 // Values
 pub fn parse_source(String, String) -> ParsedSource raise
 
-pub fn parse_sources(Array[(String, String)]) -> ParsedSource raise
+pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig]) -> ParsedSource raise
 
 pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
 
 // Errors
 
 // Types and methods
+pub(all) enum BindingKind {
+  FunctionBinding
+  ConstructorBinding(Int)
+  MethodBinding(Int)
+  StaticBinding(Int)
+  GetterBinding(Int)
+  SetterBinding(Int)
+}
+
+pub(all) struct ClassConfig {
+  name : String
+  type_name : String
+  construct : String
+  methods : Array[(String, String)]
+  static_methods : Array[(String, String)]
+  properties : Array[ClassProperty]
+}
+
+pub(all) struct ClassMember {
+  name : String
+  function : ParsedExport
+}
+
+pub(all) struct ClassProperty {
+  name : String
+  getter : String?
+  setter : String?
+}
+
 pub(all) struct Parameter {
   name : String
   value_type : ValueType
 }
+
+pub(all) struct ParsedClass {
+  id : Int
+  name : String
+  type_name : String
+  construct : ParsedExport
+  members : Array[ClassMember]
+}
+pub fn ParsedClass::manifest(Self) -> Json
 
 pub(all) struct ParsedExport {
   source_name : String
@@ -24,6 +62,7 @@ pub(all) struct ParsedExport {
   throws : Bool
   filename : String
   line : Int
+  binding : BindingKind
 }
 pub fn ParsedExport::manifest(Self) -> Json
 
@@ -31,7 +70,9 @@ pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
   features : Array[String]
   types : Array[TypeDefinition]
+  classes : Array[ParsedClass]
 }
+pub fn ParsedSource::native_exports(Self) -> Array[String]
 
 pub(all) struct TypeDefinition {
   name : String
@@ -59,6 +100,8 @@ pub(all) enum ValueType {
   OptionType(ValueType)
   ArrayType(ValueType)
   NamedType(String)
+  ClassType(String, String, Int)
+  CallbackType(Array[ValueType], ValueType, Bool)
 }
 pub fn ValueType::runtime_name(Self) -> String
 

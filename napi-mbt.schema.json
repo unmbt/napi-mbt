@@ -44,7 +44,9 @@
           "promise",
           "threadsafe_function",
           "bigint",
-          "buffer"
+          "buffer",
+          "class",
+          "callback"
         ]
       }
     },
@@ -55,6 +57,75 @@
     "esm": {
       "type": "boolean",
       "default": true
+    },
+    "classes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "type",
+          "constructor"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1
+          },
+          "type": {
+            "type": "string",
+            "minLength": 1
+          },
+          "constructor": {
+            "type": "string",
+            "minLength": 1
+          },
+          "methods": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "staticMethods": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "properties": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "get": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "set": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "anyOf": [
+                {
+                  "required": [
+                    "get"
+                  ]
+                },
+                {
+                  "required": [
+                    "set"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   },
   "not": {
@@ -158,6 +229,67 @@
         "properties": {
           "napiVersion": {
             "minimum": 7
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "class"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "callback"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "classes"
+        ],
+        "properties": {
+          "classes": {
+            "minItems": 1
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 3
           }
         }
       }

@@ -3,11 +3,17 @@
 #include <stddef.h>
 #include <stdint.h>
 
-extern void moonbit_init(void);
+extern int napi_mbt_enter(napi_env, void **);
+extern void napi_mbt_leave(void *);
+extern int moonbit_napi_field_set(napi_env, napi_value, const char *, napi_value);
 extern int napi_mbt_throw_status(napi_env, int, int, const char *, const char *);
-static napi_value napi_mbt_error(napi_env env, napi_status status, int kind, const char *code, const char *context) {
+static napi_value napi_mbt_error(napi_env env, int status, int kind, const char *code, const char *context) {
   (void)napi_mbt_throw_status(env, status, kind, code, context);
   return NULL;
+}
+static napi_value napi_mbt_registration_error(napi_env env, int status, void *previous, const char *context) {
+  napi_mbt_leave(previous);
+  return napi_mbt_error(env, status, 0, "ERR_NAPI_REGISTER", context);
 }
 extern napi_value napi_mbt_adapter_arrays(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_color(napi_env env, napi_value);
@@ -30,7 +36,12 @@ static napi_value napi_mbt_callback_arrays(napi_env env, napi_callback_info info
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_arrays(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_arrays(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_color(napi_env env, napi_callback_info info) {
@@ -43,7 +54,12 @@ static napi_value napi_mbt_callback_color(napi_env env, napi_callback_info info)
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_color(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_color(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_echo_i64(napi_env env, napi_callback_info info) {
@@ -56,7 +72,12 @@ static napi_value napi_mbt_callback_echo_i64(napi_env env, napi_callback_info in
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_echo_i64(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_echo_i64(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_echo_u64(napi_env env, napi_callback_info info) {
@@ -69,7 +90,12 @@ static napi_value napi_mbt_callback_echo_u64(napi_env env, napi_callback_info in
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_echo_u64(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_echo_u64(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_effects(napi_env env, napi_callback_info info) {
@@ -82,7 +108,12 @@ static napi_value napi_mbt_callback_effects(napi_env env, napi_callback_info inf
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_effects(env);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_effects(env);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_link(napi_env env, napi_callback_info info) {
@@ -95,7 +126,12 @@ static napi_value napi_mbt_callback_link(napi_env env, napi_callback_info info) 
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_link(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_link(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_nested(napi_env env, napi_callback_info info) {
@@ -108,7 +144,12 @@ static napi_value napi_mbt_callback_nested(napi_env env, napi_callback_info info
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_nested(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_nested(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_optional(napi_env env, napi_callback_info info) {
@@ -121,7 +162,12 @@ static napi_value napi_mbt_callback_optional(napi_env env, napi_callback_info in
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_optional(env, argv[0], argv[1], argv[2]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_optional(env, argv[0], argv[1], argv[2]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_person(napi_env env, napi_callback_info info) {
@@ -134,7 +180,12 @@ static napi_value napi_mbt_callback_person(napi_env env, napi_callback_info info
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_person(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_person(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 static napi_value napi_mbt_callback_shape(napi_env env, napi_callback_info info) {
@@ -147,7 +198,12 @@ static napi_value napi_mbt_callback_shape(napi_env env, napi_callback_info info)
     status = napi_get_undefined(env, &argv[i]);
     if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
   }
-  return napi_mbt_adapter_shape(env, argv[0]);
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
+  napi_value result = napi_mbt_adapter_shape(env, argv[0]);
+  napi_mbt_leave(previous);
+  return result;
 }
 
 #if defined(_WIN32)
@@ -157,56 +213,59 @@ static napi_value napi_mbt_callback_shape(napi_env env, napi_callback_info info)
 #endif
 
 NAPI_MBT_EXPORT napi_value napi_register_module_v1(napi_env env, napi_value exports) {
-  moonbit_init();
+  void *previous;
+  int enter_status = napi_mbt_enter(env, &previous);
+  if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Initializing MoonBit environment");
   napi_value fn_arrays;
-  napi_status status_arrays = napi_create_function(env, "arrays", NAPI_AUTO_LENGTH, napi_mbt_callback_arrays, NULL, &fn_arrays);
-  if (status_arrays != napi_ok) return napi_mbt_error(env, status_arrays, 0, "ERR_NAPI_REGISTER", "Creating export arrays");
-  status_arrays = napi_set_named_property(env, exports, "arrays", fn_arrays);
-  if (status_arrays != napi_ok) return napi_mbt_error(env, status_arrays, 0, "ERR_NAPI_REGISTER", "Setting export arrays");
+  int status_arrays = napi_create_function(env, "arrays", NAPI_AUTO_LENGTH, napi_mbt_callback_arrays, NULL, &fn_arrays);
+  if (status_arrays != napi_ok) return napi_mbt_registration_error(env, status_arrays, previous, "Creating export arrays");
+  status_arrays = moonbit_napi_field_set(env, exports, "arrays", fn_arrays);
+  if (status_arrays != napi_ok) return napi_mbt_registration_error(env, status_arrays, previous, "Setting export arrays");
   napi_value fn_color;
-  napi_status status_color = napi_create_function(env, "color", NAPI_AUTO_LENGTH, napi_mbt_callback_color, NULL, &fn_color);
-  if (status_color != napi_ok) return napi_mbt_error(env, status_color, 0, "ERR_NAPI_REGISTER", "Creating export color");
-  status_color = napi_set_named_property(env, exports, "color", fn_color);
-  if (status_color != napi_ok) return napi_mbt_error(env, status_color, 0, "ERR_NAPI_REGISTER", "Setting export color");
+  int status_color = napi_create_function(env, "color", NAPI_AUTO_LENGTH, napi_mbt_callback_color, NULL, &fn_color);
+  if (status_color != napi_ok) return napi_mbt_registration_error(env, status_color, previous, "Creating export color");
+  status_color = moonbit_napi_field_set(env, exports, "color", fn_color);
+  if (status_color != napi_ok) return napi_mbt_registration_error(env, status_color, previous, "Setting export color");
   napi_value fn_echo_i64;
-  napi_status status_echo_i64 = napi_create_function(env, "echo_i64", NAPI_AUTO_LENGTH, napi_mbt_callback_echo_i64, NULL, &fn_echo_i64);
-  if (status_echo_i64 != napi_ok) return napi_mbt_error(env, status_echo_i64, 0, "ERR_NAPI_REGISTER", "Creating export echo_i64");
-  status_echo_i64 = napi_set_named_property(env, exports, "echo_i64", fn_echo_i64);
-  if (status_echo_i64 != napi_ok) return napi_mbt_error(env, status_echo_i64, 0, "ERR_NAPI_REGISTER", "Setting export echo_i64");
+  int status_echo_i64 = napi_create_function(env, "echo_i64", NAPI_AUTO_LENGTH, napi_mbt_callback_echo_i64, NULL, &fn_echo_i64);
+  if (status_echo_i64 != napi_ok) return napi_mbt_registration_error(env, status_echo_i64, previous, "Creating export echo_i64");
+  status_echo_i64 = moonbit_napi_field_set(env, exports, "echo_i64", fn_echo_i64);
+  if (status_echo_i64 != napi_ok) return napi_mbt_registration_error(env, status_echo_i64, previous, "Setting export echo_i64");
   napi_value fn_echo_u64;
-  napi_status status_echo_u64 = napi_create_function(env, "echo_u64", NAPI_AUTO_LENGTH, napi_mbt_callback_echo_u64, NULL, &fn_echo_u64);
-  if (status_echo_u64 != napi_ok) return napi_mbt_error(env, status_echo_u64, 0, "ERR_NAPI_REGISTER", "Creating export echo_u64");
-  status_echo_u64 = napi_set_named_property(env, exports, "echo_u64", fn_echo_u64);
-  if (status_echo_u64 != napi_ok) return napi_mbt_error(env, status_echo_u64, 0, "ERR_NAPI_REGISTER", "Setting export echo_u64");
+  int status_echo_u64 = napi_create_function(env, "echo_u64", NAPI_AUTO_LENGTH, napi_mbt_callback_echo_u64, NULL, &fn_echo_u64);
+  if (status_echo_u64 != napi_ok) return napi_mbt_registration_error(env, status_echo_u64, previous, "Creating export echo_u64");
+  status_echo_u64 = moonbit_napi_field_set(env, exports, "echo_u64", fn_echo_u64);
+  if (status_echo_u64 != napi_ok) return napi_mbt_registration_error(env, status_echo_u64, previous, "Setting export echo_u64");
   napi_value fn_effects;
-  napi_status status_effects = napi_create_function(env, "effects", NAPI_AUTO_LENGTH, napi_mbt_callback_effects, NULL, &fn_effects);
-  if (status_effects != napi_ok) return napi_mbt_error(env, status_effects, 0, "ERR_NAPI_REGISTER", "Creating export effects");
-  status_effects = napi_set_named_property(env, exports, "effects", fn_effects);
-  if (status_effects != napi_ok) return napi_mbt_error(env, status_effects, 0, "ERR_NAPI_REGISTER", "Setting export effects");
+  int status_effects = napi_create_function(env, "effects", NAPI_AUTO_LENGTH, napi_mbt_callback_effects, NULL, &fn_effects);
+  if (status_effects != napi_ok) return napi_mbt_registration_error(env, status_effects, previous, "Creating export effects");
+  status_effects = moonbit_napi_field_set(env, exports, "effects", fn_effects);
+  if (status_effects != napi_ok) return napi_mbt_registration_error(env, status_effects, previous, "Setting export effects");
   napi_value fn_link;
-  napi_status status_link = napi_create_function(env, "link", NAPI_AUTO_LENGTH, napi_mbt_callback_link, NULL, &fn_link);
-  if (status_link != napi_ok) return napi_mbt_error(env, status_link, 0, "ERR_NAPI_REGISTER", "Creating export link");
-  status_link = napi_set_named_property(env, exports, "link", fn_link);
-  if (status_link != napi_ok) return napi_mbt_error(env, status_link, 0, "ERR_NAPI_REGISTER", "Setting export link");
+  int status_link = napi_create_function(env, "link", NAPI_AUTO_LENGTH, napi_mbt_callback_link, NULL, &fn_link);
+  if (status_link != napi_ok) return napi_mbt_registration_error(env, status_link, previous, "Creating export link");
+  status_link = moonbit_napi_field_set(env, exports, "link", fn_link);
+  if (status_link != napi_ok) return napi_mbt_registration_error(env, status_link, previous, "Setting export link");
   napi_value fn_nested;
-  napi_status status_nested = napi_create_function(env, "nested", NAPI_AUTO_LENGTH, napi_mbt_callback_nested, NULL, &fn_nested);
-  if (status_nested != napi_ok) return napi_mbt_error(env, status_nested, 0, "ERR_NAPI_REGISTER", "Creating export nested");
-  status_nested = napi_set_named_property(env, exports, "nested", fn_nested);
-  if (status_nested != napi_ok) return napi_mbt_error(env, status_nested, 0, "ERR_NAPI_REGISTER", "Setting export nested");
+  int status_nested = napi_create_function(env, "nested", NAPI_AUTO_LENGTH, napi_mbt_callback_nested, NULL, &fn_nested);
+  if (status_nested != napi_ok) return napi_mbt_registration_error(env, status_nested, previous, "Creating export nested");
+  status_nested = moonbit_napi_field_set(env, exports, "nested", fn_nested);
+  if (status_nested != napi_ok) return napi_mbt_registration_error(env, status_nested, previous, "Setting export nested");
   napi_value fn_optional;
-  napi_status status_optional = napi_create_function(env, "optional", NAPI_AUTO_LENGTH, napi_mbt_callback_optional, NULL, &fn_optional);
-  if (status_optional != napi_ok) return napi_mbt_error(env, status_optional, 0, "ERR_NAPI_REGISTER", "Creating export optional");
-  status_optional = napi_set_named_property(env, exports, "optional", fn_optional);
-  if (status_optional != napi_ok) return napi_mbt_error(env, status_optional, 0, "ERR_NAPI_REGISTER", "Setting export optional");
+  int status_optional = napi_create_function(env, "optional", NAPI_AUTO_LENGTH, napi_mbt_callback_optional, NULL, &fn_optional);
+  if (status_optional != napi_ok) return napi_mbt_registration_error(env, status_optional, previous, "Creating export optional");
+  status_optional = moonbit_napi_field_set(env, exports, "optional", fn_optional);
+  if (status_optional != napi_ok) return napi_mbt_registration_error(env, status_optional, previous, "Setting export optional");
   napi_value fn_person;
-  napi_status status_person = napi_create_function(env, "person", NAPI_AUTO_LENGTH, napi_mbt_callback_person, NULL, &fn_person);
-  if (status_person != napi_ok) return napi_mbt_error(env, status_person, 0, "ERR_NAPI_REGISTER", "Creating export person");
-  status_person = napi_set_named_property(env, exports, "person", fn_person);
-  if (status_person != napi_ok) return napi_mbt_error(env, status_person, 0, "ERR_NAPI_REGISTER", "Setting export person");
+  int status_person = napi_create_function(env, "person", NAPI_AUTO_LENGTH, napi_mbt_callback_person, NULL, &fn_person);
+  if (status_person != napi_ok) return napi_mbt_registration_error(env, status_person, previous, "Creating export person");
+  status_person = moonbit_napi_field_set(env, exports, "person", fn_person);
+  if (status_person != napi_ok) return napi_mbt_registration_error(env, status_person, previous, "Setting export person");
   napi_value fn_shape;
-  napi_status status_shape = napi_create_function(env, "shape", NAPI_AUTO_LENGTH, napi_mbt_callback_shape, NULL, &fn_shape);
-  if (status_shape != napi_ok) return napi_mbt_error(env, status_shape, 0, "ERR_NAPI_REGISTER", "Creating export shape");
-  status_shape = napi_set_named_property(env, exports, "shape", fn_shape);
-  if (status_shape != napi_ok) return napi_mbt_error(env, status_shape, 0, "ERR_NAPI_REGISTER", "Setting export shape");
+  int status_shape = napi_create_function(env, "shape", NAPI_AUTO_LENGTH, napi_mbt_callback_shape, NULL, &fn_shape);
+  if (status_shape != napi_ok) return napi_mbt_registration_error(env, status_shape, previous, "Creating export shape");
+  status_shape = moonbit_napi_field_set(env, exports, "shape", fn_shape);
+  if (status_shape != napi_ok) return napi_mbt_registration_error(env, status_shape, previous, "Setting export shape");
+  napi_mbt_leave(previous);
   return exports;
 }

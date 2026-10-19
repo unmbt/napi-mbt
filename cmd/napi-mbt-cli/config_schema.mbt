@@ -1,6 +1,8 @@
 ///|
 fn config_schema() -> Json raise {
-  let features = ["promise", "threadsafe_function", "bigint", "buffer"]
+  let features = [
+    "promise", "threadsafe_function", "bigint", "buffer", "class", "callback",
+  ]
   let conditions : Array[Json] = features.map(name => {
     let level = feature_version(name)
     (
@@ -19,6 +21,13 @@ fn config_schema() -> Json raise {
           ({ "properties": { "napiVersion": { "minimum": level } } } : Json)
         },
       } : Json)
+  })
+  conditions.push({
+    "if": {
+      "required": ["classes"],
+      "properties": { "classes": { "minItems": 1 } },
+    },
+    "then": { "properties": { "napiVersion": { "minimum": 3 } } },
   })
   {
     "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -49,6 +58,7 @@ fn config_schema() -> Json raise {
       },
       "cjs": { "type": "boolean", "default": true },
       "esm": { "type": "boolean", "default": true },
+      "classes": class_configuration_schema(),
     },
     "not": {
       "required": ["cjs", "esm"],

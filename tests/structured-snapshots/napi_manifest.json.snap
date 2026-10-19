@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "3",
+  "runtimeTemplateVersion": "4",
   "napiVersion": 7,
   "requiredNapiVersion": 7,
   "features": [
@@ -260,5 +260,6 @@
         }
       ]
     }
-  ]
+  ],
+  "classes": []
 }

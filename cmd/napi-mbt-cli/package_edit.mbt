@@ -1,9 +1,6 @@
 ///|
 async fn prepare_package(dir : String, generated : Generated) -> Unit {
-  let exports = ["moonbit_init"]
-  for item in generated.exports {
-    exports.push("napi_mbt_adapter_" + item.export_name)
-  }
+  let exports = generated.source.native_exports()
   let path = dir + "/moon.pkg"
   let overlay = build_package_overlay(
     @fs.read_file(path).text(),

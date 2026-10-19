@@ -1,7 +1,7 @@
 ///|
 struct Generated {
   config : Config
-  exports : Array[@generator.ParsedExport]
+  source : @generator.ParsedSource
 }
 
 ///|
@@ -15,7 +15,8 @@ async fn generate(dir : String, check : Bool) -> Generated {
   }
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
-    "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt",
+    "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt",
+    "napi_callbacks.mbt",
   ]
   let features = conf.features.copy()
   let seen : Map[String, String] = Map([])
@@ -29,7 +30,7 @@ async fn generate(dir : String, check : Bool) -> Generated {
     }
     sources.push((file, @fs.read_file(dir + "/" + file).text()))
   }
-  let source = @generator.parse_sources(sources)
+  let source = @generator.parse_sources(sources, classes=conf.classes)
   let exports = source.exports
   for feature in source.features {
     if !features.contains(feature) {
@@ -74,6 +75,7 @@ async fn generate(dir : String, check : Bool) -> Generated {
     "builder": conf.builder,
     "exports": exports.map(e => e.manifest()),
     "types": source.types.map(t => t.manifest()),
+    "classes": source.classes.map(c => c.manifest()),
   }
   outputs.push(("napi_manifest.json", manifest.stringify(indent=2) + "\n"))
   outputs.push(
@@ -93,5 +95,5 @@ async fn generate(dir : String, check : Bool) -> Generated {
   if !check {
     println("Generated \{exports.length()} N-API export(s).")
   }
-  { config: conf, exports, }
+  { config: conf, source, }
 }

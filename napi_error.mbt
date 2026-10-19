@@ -32,6 +32,37 @@ fn result_from_status(
   msg : Bytes,
 ) -> Unit raise NapiError {
   if status != 0 {
+    match status {
+      1004 =>
+        raise napi_failure(
+          status,
+          Error,
+          "ERR_NAPI_ENV_CLOSED",
+          "JavaScript environment has closed",
+        )
+      1005 =>
+        raise napi_failure(
+          status,
+          Error,
+          "ERR_NAPI_ENVIRONMENT",
+          "Value belongs to a different JavaScript environment or thread",
+        )
+      1006 =>
+        raise napi_failure(
+          status,
+          Error,
+          "ERR_NAPI_DISPOSED",
+          "Native resource has been disposed",
+        )
+      1007 =>
+        raise napi_failure(
+          status,
+          TypeError,
+          "ERR_NAPI_RECEIVER",
+          "Invalid receiver or native type",
+        )
+      _ => ()
+    }
     if status == 1001 {
       raise napi_failure(
         status,

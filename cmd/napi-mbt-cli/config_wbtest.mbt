@@ -16,6 +16,63 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         { "features": ["unknown"] },
         { "features": ["bigint"] },
         { "features": ["buffer"], "napiVersion": 6 },
+        { "classes": {} },
+        { "classes": [{}] },
+        {
+          "classes": [
+            {
+              "name": "C",
+              "type": "C",
+              "constructor": "C::new",
+              "unknown": true,
+            },
+          ],
+        },
+        {
+          "classes": [
+            {
+              "name": "C",
+              "type": "C",
+              "constructor": "C::new",
+              "methods": { "f": "" },
+            },
+          ],
+        },
+        {
+          "classes": [
+            {
+              "name": "C",
+              "type": "C",
+              "constructor": "C::new",
+              "properties": { "x": {} },
+            },
+          ],
+        },
+        {
+          "classes": [
+            {
+              "name": "C",
+              "type": "C",
+              "constructor": "C::new",
+              "properties": { "x": { "get": "", "set": "C::set" } },
+            },
+          ],
+        },
+        {
+          "classes": [
+            {
+              "name": "C",
+              "type": "C",
+              "constructor": "C::new",
+              "properties": { "x": { "typo": "C::get" } },
+            },
+          ],
+        },
+        {
+          "classes": [{ "name": "C", "type": "C", "constructor": "C::new" }],
+          "napiVersion": 2,
+        },
+        { "features": ["callback"], "napiVersion": 2 },
       ] : Array[Json]) {
     try parse_config(value) catch {
       _ => ()

@@ -3,6 +3,8 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include "napi_lifecycle.h"
+#include "napi_callbacks.h"
 
 /* Shared exception boundary for C callbacks and MoonBit adapters. Never replace
  * a JS exception already pending on the environment. Every operation is checked. */

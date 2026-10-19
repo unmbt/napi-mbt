@@ -22,19 +22,28 @@ pub fn render(
     }
     names[item.export_name] = true
   }
+  for cls in source.classes {
+    if names.contains(cls.name) {
+      fail("Duplicate class/export name: \{cls.name}")
+    }
+    names[cls.name] = true
+  }
+  let export_names = exports.map(e => e.export_name)
+  export_names.append(source.classes.map(c => c.name))
   let (cjs_loader, esm_loader) = loaders(
-    exports, package_name, package_version, napi_version,
+    export_names, package_name, package_version, napi_version,
   )
-  let types = declarations(exports, source.types)
+  let types = declarations(exports, source.types, source.classes)
   let esm_types = types +
     "\ndeclare const $napiAddon: {\n" +
-    exports
-    .map(e => "  " + e.export_name + ": typeof " + e.export_name + ";")
-    .join("\n") +
+    export_names.map(name => "  " + name + ": typeof " + name + ";").join("\n") +
     "\n};\nexport default $napiAddon;\n"
   let outputs = [
-    ("napi_exports.mbt", adapters(exports, source.types)),
-    ("napi_glue.c", c_glue(exports)),
+    (
+      "napi_exports.mbt",
+      adapters(source.all_functions(), source.types, source.classes),
+    ),
+    ("napi_glue.c", c_glue(exports, source.classes)),
     ("index.d.ts", if cjs { types } else { esm_types }),
   ]
   if cjs {

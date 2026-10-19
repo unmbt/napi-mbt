@@ -1,0 +1,196 @@
+{
+  "runtimeTemplateVersion": "4",
+  "napiVersion": 4,
+  "requiredNapiVersion": 4,
+  "features": [
+    "class"
+  ],
+  "targets": [],
+  "cjs": true,
+  "esm": true,
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "read_counter",
+      "exportName": "read_counter",
+      "params": [
+        {
+          "name": "value",
+          "type": "Counter"
+        }
+      ],
+      "ret": "Int",
+      "throws": false,
+      "line": 24,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "resources",
+      "exportName": "resources",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 29,
+      "filename": "lib.mbt"
+    }
+  ],
+  "types": [],
+  "classes": [
+    {
+      "name": "Counter",
+      "type": "Counter",
+      "constructor": {
+        "sourceName": "Counter::new",
+        "exportName": "class_0_construct",
+        "params": [
+          {
+            "name": "value",
+            "type": "Int"
+          }
+        ],
+        "ret": "Counter",
+        "throws": false,
+        "line": 4,
+        "filename": "lib.mbt"
+      },
+      "members": [
+        {
+          "name": "copy",
+          "kind": "method",
+          "function": {
+            "sourceName": "Counter::copy",
+            "exportName": "class_0_method_0",
+            "params": [
+              {
+                "name": "self",
+                "type": "Counter"
+              }
+            ],
+            "ret": "Counter",
+            "throws": false,
+            "line": 12,
+            "filename": "lib.mbt"
+          }
+        },
+        {
+          "name": "increment",
+          "kind": "method",
+          "function": {
+            "sourceName": "Counter::increment",
+            "exportName": "class_0_method_1",
+            "params": [
+              {
+                "name": "self",
+                "type": "Counter"
+              },
+              {
+                "name": "delta",
+                "type": "Int"
+              }
+            ],
+            "ret": "Int",
+            "throws": false,
+            "line": 6,
+            "filename": "lib.mbt"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "getter",
+          "function": {
+            "sourceName": "Counter::value",
+            "exportName": "class_0_get_0",
+            "params": [
+              {
+                "name": "self",
+                "type": "Counter"
+              }
+            ],
+            "ret": "Int",
+            "throws": false,
+            "line": 8,
+            "filename": "lib.mbt"
+          }
+        },
+        {
+          "name": "value",
+          "kind": "setter",
+          "function": {
+            "sourceName": "Counter::set_value",
+            "exportName": "class_0_set_0",
+            "params": [
+              {
+                "name": "self",
+                "type": "Counter"
+              },
+              {
+                "name": "value",
+                "type": "Int"
+              }
+            ],
+            "ret": "Unit",
+            "throws": false,
+            "line": 10,
+            "filename": "lib.mbt"
+          }
+        },
+        {
+          "name": "twice",
+          "kind": "static",
+          "function": {
+            "sourceName": "Counter::twice",
+            "exportName": "class_0_static_0",
+            "params": [
+              {
+                "name": "value",
+                "type": "Int"
+              }
+            ],
+            "ret": "Counter",
+            "throws": false,
+            "line": 14,
+            "filename": "lib.mbt"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Other",
+      "type": "Other",
+      "constructor": {
+        "sourceName": "Other::new",
+        "exportName": "class_1_construct",
+        "params": [
+          {
+            "name": "value",
+            "type": "Int"
+          }
+        ],
+        "ret": "Other",
+        "throws": false,
+        "line": 20,
+        "filename": "lib.mbt"
+      },
+      "members": [
+        {
+          "name": "value",
+          "kind": "getter",
+          "function": {
+            "sourceName": "Other::value",
+            "exportName": "class_1_get_0",
+            "params": [
+              {
+                "name": "self",
+                "type": "Other"
+              }
+            ],
+            "ret": "Int",
+            "throws": false,
+            "line": 22,
+            "filename": "lib.mbt"
+          }
+        }
+      ]
+    }
+  ]
+}

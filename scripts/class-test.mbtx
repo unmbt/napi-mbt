@@ -1,0 +1,88 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let (code, out, err) = @process.collect_output(binary, args)
+    if code != 0 { fail(out.text() + err.text()) }
+  })
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-class-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "class-fixture"])
+  let config : Json = {
+    "napiVersion": 4,
+    "classes": [
+      { "name": "Counter", "type": "Counter", "constructor": "Counter::new",
+        "methods": { "increment": "Counter::increment", "copy": "Counter::copy" },
+        "staticMethods": { "twice": "Counter::twice" },
+        "properties": { "value": { "get": "Counter::value", "set": "Counter::set_value" } } },
+      { "name": "Other", "type": "Other", "constructor": "Other::new", "properties": { "value": { "get": "Other::value" } } },
+    ],
+  }
+  @fs.write_file(dir + "/napi-mbt.json", config.stringify())
+  let source =
+    #|///|
+    #|pub struct Counter { mut value : Int }
+    #|///|
+    #|pub fn Counter::new(value : Int) -> Counter { { value, } }
+    #|///|
+    #|pub fn Counter::increment(self : Counter, delta : Int) -> Int { self.value += delta; self.value }
+    #|///|
+    #|pub fn Counter::value(self : Counter) -> Int { self.value }
+    #|///|
+    #|pub fn Counter::set_value(self : Counter, value : Int) -> Unit { self.value = value }
+    #|///|
+    #|pub fn Counter::copy(self : Counter) -> Counter { { value: self.value } }
+    #|///|
+    #|pub fn Counter::twice(value : Int) -> Counter { { value: value * 2 } }
+    #|///|
+    #|pub fn Counter::hidden(self : Counter) -> Int { self.value }
+    #|///|
+    #|pub struct Other { value : Int }
+    #|///|
+    #|pub fn Other::new(value : Int) -> Other { { value, } }
+    #|///|
+    #|pub fn Other::value(self : Other) -> Int { self.value }
+    #|///|
+    #|#export_name("read_counter")
+    #|pub fn read_counter(value : Counter) -> Int { value.value }
+    #|///|
+    #|extern "c" fn live_resources() -> Int = "napi_mbt_live_resources"
+    #|///|
+    #|#export_name("resources")
+    #|pub fn resources() -> Int { live_resources() }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_file(dir + "/moon.pkg", pkg)
+  }
+  checked(binary, ["build", dir, "--release"])
+  let (code, out, err) = @process.collect_output("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], cwd=dir)
+  if code != 0 { fail(out.text() + err.text()) }
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let snapshots = root + "/tests/class-snapshots"
+  let update = @env.args().contains("--update")
+  if update && !@fs.exists(snapshots) { @fs.mkdir(snapshots, recursive=true) }
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.cts", "index.d.mts", "napi_manifest.json"] {
+    let text = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
+    if update { @fs.write_file(snapshots + "/" + name + ".snap", text) }
+    assert_eq(text, @fs.read_file(snapshots + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+  }
+  let output = root + "/.napi-mbt/" + (if asan { "class-asan" } else { "class-smoke" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  @fs.write_file(output + "/second.node", @fs.read_file(output + "/napi_mbt.node"))
+  for name in ["index.d.cts", "index.d.mts"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  checked("node", ["--expose-gc", "scripts/class.test.cjs", output + "/napi_mbt.node"])
+  println("Class construction, methods, receivers and disposal passed")
+}
