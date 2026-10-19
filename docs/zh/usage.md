@@ -22,6 +22,11 @@ CMake，并报告编译器和 Windows SDK 版本。检查失败时，根据诊�
 C++ 工具及 Windows SDK 组件。省略 `--json` 可获得可读的诊断输出。
 `build` 在写入项目生成物之前执行相同检查。
 
+编译在隔离工作区执行，仅在副本中追加必需的 flags 和 exports，保留已有的
+原生 stub 和链接库，并由 Moon 按完整包依赖图完成链接。原工程的 `moon.pkg`、
+`moon.mod` 及依赖缓存不会被改写。N-API 宏定义冲突会报错。只有构建成功后才
+替换最终 addon，失败时保留上一次成功产物。
+
 原生 CLI 不依赖 Node.js 或 npm；运行 addon 时才需要 Node.js。
 
 `@unmbt/napi-mbt-cli` 提供了主入口命令 `napi-mbt`。

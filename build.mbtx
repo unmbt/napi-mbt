@@ -13,11 +13,10 @@ fn main {
       } else {
         "-fPIC"
       },
-      // CMake performs the Unix shared-library link with a PIC runtime.
       "NAPI_LINK_FLAGS": if windows {
         "/LD \"./.napi-mbt/napi.lib\""
       } else {
-        "-c"
+        "-shared -fPIC"
       },
     },
   }

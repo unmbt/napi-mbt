@@ -153,14 +153,8 @@ async fn main {
     rejected(executable, ["build", dir, "--release"], temp, env)
     @fs.write_file(dir + "/stub.c", stub)
     ignore(checked(executable, ["build", dir, "--release"], temp, env))
-    if @env.get_env_var("OS") == Some("Windows_NT") {
-      let cache = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/CMakeCache.txt").text()
-      assert_true(cache.contains("CMAKE_GENERATOR:INTERNAL=Visual Studio "))
-      assert_true(cache.contains("CMAKE_GENERATOR_PLATFORM:INTERNAL=x64"))
-      assert_true(cache.contains("MSBuild.exe"))
-      let project = @fs.read_file(dir + "/.napi-mbt/cmake/release-msvc/napi_mbt.vcxproj").text()
-      assert_true(project.contains("<RuntimeLibrary>MultiThreaded</RuntimeLibrary>"))
-    }
+    assert_eq(@fs.read_file(dir + "/moon.pkg").text(), before)
+    assert_true(!@fs.exists(dir + "/_build"))
     if label == "release" { ignore(checked(executable, ["build", dir], temp, env)) }
     let pkg_path = dir + "/package.json"
     guard @json.parse(@fs.read_file(pkg_path).text()) is Object(pkg) else { fail("Invalid fixture package") }

@@ -1,8 +1,6 @@
 ///|
 struct NativeToolchain {
   moon : String
-  cmake : String
-  configure_args : Array[String]
   librarian : String?
   workspace : String
   report : Json
@@ -169,14 +167,7 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
     report["windowsSdk"] = Json(details[2].trim().to_owned())
   }
   report["probe"] = "passed"
-  {
-    moon,
-    cmake,
-    configure_args: args,
-    librarian,
-    workspace: probe,
-    report: Json(report),
-  }
+  { moon, librarian, workspace: probe, report: Json(report), }
 }
 
 ///|

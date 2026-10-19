@@ -12,6 +12,8 @@ type Generated
 
 type NativeToolchain
 
+type PackageToken
+
 // Type aliases
 
 // Traits

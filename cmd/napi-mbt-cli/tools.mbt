@@ -71,17 +71,6 @@ async fn require_command(name : String) -> String {
 }
 
 ///|
-fn cmake_quote(value : String) -> String {
-  "\"" +
-  value
-  .replace_all(old="\\", new="/")
-  .replace_all(old="\"", new="\\\"")
-  .replace_all(old="$", new="\\$")
-  .replace_all(old=";", new="\\;") +
-  "\""
-}
-
-///|
 fn visual_studio_generator(
   version : String,
   capabilities : Json,

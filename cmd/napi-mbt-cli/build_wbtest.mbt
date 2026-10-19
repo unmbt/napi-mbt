@@ -46,17 +46,64 @@ test "Visual Studio generator names come from CMake capabilities" {
 }
 
 ///|
-test "package option editing preserves unrelated configuration and escaped strings" {
-  assert_eq(
-    insert_package_option("options()", "link: {}"),
-    "options(link: {},\n)",
+test "package overlay preserves user fields flags exports and stubs" {
+  let input = "// \"exports\": [\"not_a_field\"]\noptions(\"native-stub\": [\"extra.c\",], link: { \"native\": { \"cc-flags\": \"-DKEEP=1\", \"cc-link-flags\": \"\\\"my lib.a\\\"\", exports: [\"custom\",], \"other\": \"keep\" } })"
+  let output = build_package_overlay(
+    input,
+    ["moonbit_init", "custom"],
+    4,
+    false,
   )
-  let input = "options(link: { \"native\": { \"cc-link-flags\": \"/LD \\\"old.lib\\\"\", \"exports\": [\"old\"], \"other\": \"keep\" } })"
-  let output = replace_option(input, "cc-link-flags", "\"-c\"")
-  assert_true(output.contains("\"cc-link-flags\": \"-c\""))
-  assert_true(output.contains("\"other\": \"keep\""))
-  let output = replace_option(output, "exports", "[\"moonbit_init\"]")
-  assert_true(output.contains("[\"moonbit_init\"]"))
+  let open = native_block(output)
+  assert_eq(package_strings(package_value(output, open, "exports")), [
+    "custom", "moonbit_init",
+  ])
+  assert_eq(package_value(output, open, "cc-flags"), Some("\"-DKEEP=1 -fPIC\""))
+  assert_eq(
+    package_value(output, open, "cc-link-flags"),
+    Some("\"\\\"my lib.a\\\" -shared -fPIC\""),
+  )
+  assert_eq(package_value(output, open, "other"), Some("\"keep\""))
+  let options = package_call(package_tokens(output), "options").unwrap()
+  assert_eq(package_strings(package_value(output, options, "native-stub")), [
+    "extra.c", "stub.c", "napi_glue.c",
+  ])
+  assert_true(output.has_prefix("// \"exports\": [\"not_a_field\"]\n"))
+}
+
+///|
+test "package overlay accepts native DSL and rejects conflicting NAPI flags" {
+  let input = "link(native(\"stub-cc-flags\": \"-DKEEP=42\", exports: [\"keep\"]))"
+  let output = build_package_overlay(input, ["moonbit_init"], 4, true)
+  assert_eq(
+    package_strings(package_value(output, native_block(output), "exports")),
+    ["keep", "moonbit_init"],
+  )
+  for
+    input in [
+      "link(native(\"stub-cc-flags\": \"-DNAPI_VERSION=1\"))", "pkgtype(kind: \"executable\")",
+    ] {
+    try build_package_overlay(input, [], 4, true) catch {
+      _ => ()
+    } noraise {
+      _ => fail("Expected conflict")
+    }
+  }
+}
+
+///|
+test "package overlay treats punctuation inside strings as data" {
+  let output = build_package_overlay(
+    "options(link: {\"native\": {\"other\": \"}\", \"exports\": [\"{\", \",\"]}})",
+    ["moonbit_init"],
+    4,
+    false,
+  )
+  assert_eq(
+    package_strings(package_value(output, native_block(output), "exports")),
+    ["{", ",", "moonbit_init"],
+  )
+  assert_eq(package_value(output, native_block(output), "other"), Some("\"}\""))
 }
 
 ///|

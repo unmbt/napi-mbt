@@ -23,6 +23,12 @@ and Windows SDK versions. Install the MSBuild, C++ tools and Windows SDK
 components if the probe fails. Omit `--json` for readable diagnostics.
 `build` runs this same check before writing generated project files.
 
+Compilation runs in an isolated workspace. The addon overlay appends required
+flags and exports, preserves existing native stubs and libraries, and lets Moon
+link the full package dependency graph. Your `moon.pkg`, `moon.mod` and dependency
+cache are not edited. Conflicting N-API definitions are errors. The final binary
+replaces the previous addon only after a successful build.
+
 The native CLI does not require Node.js or npm. Node.js is needed to run addons.
 
 The `@unmbt/napi-mbt-cli` exposes the `napi-mbt` bin command.
