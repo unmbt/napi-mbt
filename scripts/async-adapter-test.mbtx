@@ -1,0 +1,71 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/json", "moonbitlang/core/env" }
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    if name == "_build" || name == ".git" { continue }
+    if @fs.kind(source + "/" + name) == Directory { copy_tree(source + "/" + name, destination + "/" + name) }
+    else { @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name)) }
+  }
+}
+
+///|
+async fn main {
+  let temp = @fs.tmpdir(prefix="napi-mbt-async-adapter-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.write_file(temp + "/moon.mod", "name = \"test/async-adapter\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(temp + "/moon.pkg", "import { \"moonbitlang/async/napi_host\", \"moonbitlang/async\", \"moonbitlang/core/env\" }\n")
+  copy_tree(".mooncakes/moonbitlang/async", temp + "/.mooncakes/moonbitlang/async")
+  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is Object(resources) else { fail("Invalid resources") }
+  for key, value in resources {
+    if key.has_prefix("async/files/") {
+      guard value is String(text) else { fail("Invalid resource") }
+      if !@fs.exists(temp + "/.mooncakes/moonbitlang/async/src/napi_host") { @fs.mkdir(temp + "/.mooncakes/moonbitlang/async/src/napi_host", recursive=true) }
+      @fs.write_file(temp + "/.mooncakes/moonbitlang/async/" + key[12:].to_owned(), text)
+    }
+  }
+  if @env.args() is [_, "--posix", distro, include_dir] {
+    let (code, path, err) = @process.collect_output("wsl.exe", ["-d", distro, "--", "wslpath", "-u", temp.replace_all(old="\\", new="/")])
+    if code != 0 { fail(err.text()) }
+    let (code, include_path, err) = @process.collect_output("wsl.exe", ["-d", distro, "--", "wslpath", "-u", include_dir.replace_all(old="\\", new="/")])
+    if code != 0 { fail(err.text()) }
+    let (status, out, err) = @process.collect_output("wsl.exe", ["-d", distro, "--", "cc", "-std=c11", "-D_GNU_SOURCE", "-fsyntax-only", "-I" + include_path.text().trim().to_owned(), path.text().trim().to_owned() + "/.mooncakes/moonbitlang/async/src/internal/event_loop/thread_pool.c"])
+    if status != 0 { fail(out.text() + err.text()) }
+    println("POSIX thread-pool C syntax check passed (not a runtime test)")
+    return
+  }
+  let source =
+    #|///|
+    #|test "host steps independent async environments" {
+    #|  let a = @napi_host.Loop::new()
+    #|  let b = @napi_host.Loop::new()
+    #|  let results = Ref(0)
+    #|  ignore(a.submit(() => { @async.sleep(10); results.val += 1 }))
+    #|  ignore(b.submit(() => { @async.sleep(20); results.val += 10 }))
+    #|  let begin = @env.now()
+    #|  while results.val != 11 {
+    #|    ignore(a.step())
+    #|    ignore(b.step())
+    #|    if @env.now() - begin > 2000UL { fail("Timed out") }
+    #|  }
+    #|  assert_eq(a.next_wake(), -1)
+    #|  a.close(); b.close()
+    #|}
+    #|///|
+    #|test "host cancellation drains before shutdown" {
+    #|  let evloop = @napi_host.Loop::new()
+    #|  let cleaned = Ref(false)
+    #|  ignore(evloop.submit(() => { defer { cleaned.val = true }; @async.sleep(10000) }))
+    #|  ignore(evloop.step())
+    #|  evloop.cancel_all()
+    #|  ignore(evloop.step())
+    #|  assert_true(cleaned.val)
+    #|  evloop.close(); evloop.close()
+    #|}
+    #|
+  @fs.write_file(temp + "/adapter_test.mbt", source)
+  let (code, out, err) = @async.with_timeout(120000, () => @process.collect_output("moon", ["test", "--target", "native", "--release"], cwd=temp, extra_env={ "MOONBIT_NEW_NATIVE": "0", "MOONBIT_ALLOCATOR": "system" }))
+  println(out.text())
+  if code != 0 { fail(err.text()) }
+}

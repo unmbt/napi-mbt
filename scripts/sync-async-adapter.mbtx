@@ -1,0 +1,92 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env", "moonbitlang/core/json", "moonbitlang/core/encoding/utf8" }
+
+///|
+fn checksum(text : String) -> String {
+  let mut digest = 14695981039346656037UL
+  for byte in @utf8.encode(text) { digest = (digest ^ byte.to_uint64()) * 1099511628211UL }
+  digest.to_string(radix=16)
+}
+
+///|
+async fn main {
+  let root = ".mooncakes/moonbitlang/async"
+  let resources_path = "internal/assets/data/resources.json"
+  guard @json.parse(@fs.read_file(resources_path).text()) is Object(resources) else { fail("Invalid resources") }
+  let files : Array[Json] = []
+  let changes : Map[String, Array[(String, String)]] = Map([])
+  let additions : Map[String, String] = Map([])
+  let scheduler = "src/internal/coroutine/scheduler.mbt"
+  let initial = "let scheduler : Scheduler = {\n  coro_id: 0,\n  curr_coro: None,\n  run_later: Deque([]),\n  all_coros: Set([]),\n}"
+  changes[scheduler] = [
+    ("priv struct Scheduler", "pub struct Scheduler"),
+    (initial, "let scheduler : Ref[Scheduler] = Ref(embedded_new_scheduler())"),
+    ("scheduler.", "scheduler.val."),
+  ]
+  let scheduler_addition =
+    #|
+    #|///|
+    #|pub fn embedded_new_scheduler() -> Scheduler {
+    #|  { coro_id: 0, curr_coro: None, run_later: Deque([]), all_coros: Set([]) }
+    #|}
+    #|
+    #|///|
+    #|pub fn embedded_swap_scheduler(next : Scheduler) -> Scheduler {
+    #|  let previous = scheduler.val
+    #|  scheduler.val = next
+    #|  previous
+    #|}
+    #|
+  additions[scheduler] = scheduler_addition
+  changes["src/internal/coroutine/coroutine.mbt"] = [("scheduler.", "scheduler.val.")]
+  changes["src/internal/event_loop/event_loop.mbt"] = [
+    ("  mut job_id : Int", "  mut timer_id : Int\n  mut job_id : Int"),
+    ("    job_id: 0,", "    timer_id: 0,\n    job_id: 0,"),
+    ("  guard! curr_loop.val is None", "  if curr_loop.val is Some(_) { raise Failure::Failure(\"Nested event loop is not supported by the Node host\") }"),
+    ("      let worker = Worker::spawn(job_id, job)", "      let worker = Worker::spawn(job_id, job)\n      if worker.is_null() { @os_error.check_errno(\"Starting async worker\") }"),
+    ("  let extra = PlatformEventLoopExtra::new()", "  errdefer destroy_thread_pool()\n  let extra = PlatformEventLoopExtra::new()"),
+  ]
+  changes["src/internal/event_loop/thread_pool.mbt"] = [("priv type Worker", "priv type Worker\n\n///|\nextern \"C\" fn Worker::is_null(worker : Worker) -> Bool = \"napi_mbt_async_worker_is_null\"")]
+  changes["src/internal/event_loop/timer.mbt"] = [
+    ("let timer_id : Ref[Int] = { val: 0, }", "// Timer identifiers belong to the active environment."),
+    ("timer_id.val", "evloop.timer_id"),
+  ]
+  let thread_pool = "src/internal/event_loop/thread_pool.c"
+  let original = @fs.read_file(root + "/" + thread_pool).text().replace_all(old="\r\n", new="\n")
+  let begin = original.find("struct {\n  int initialized;").unwrap()
+  let end = original.find("#ifndef _WIN32\nint32_t moonbitlang_async_fetch_completion").unwrap()
+  changes[thread_pool] = [(original[begin:end].to_owned(), @fs.read_file("internal/async-adapter/thread_pool.c.patch").text().replace_all(old="\r\n", new="\n") + "\n"), ("return err == EINTR;", "return err == EINTR || err == ECANCELED;")]
+  for path, replacements in changes {
+    let source = @fs.read_file(root + "/" + path).text().replace_all(old="\r\n", new="\n")
+    let mut patched = source
+    for (before, after) in replacements {
+      if !patched.contains(before) { fail("Patch mismatch in \{path}") }
+      patched = patched.replace_all(old=before, new=after)
+    }
+    patched += additions.get(path).unwrap_or("")
+    files.push({ "path": path, "before": checksum(source), "after": checksum(patched) })
+    resources["async/files/" + path] = Json(patched)
+  }
+  let embedded_path = "src/internal/event_loop/napi_embedded.mbt"
+  let embedded = @fs.read_file("internal/async-adapter/embedded.mbt.patch").text().replace_all(old="\r\n", new="\n")
+  files.push({ "path": embedded_path, "before": null, "after": checksum(embedded) })
+  resources["async/files/" + embedded_path] = Json(embedded)
+  for (path, text) in [
+    ("src/napi_host/moon.pkg", "import { \"moonbitlang/async/internal/event_loop\", \"moonbitlang/async/internal/coroutine\" }\n"),
+    ("src/napi_host/host.mbt", @fs.read_file("internal/async-adapter/host.mbt.patch").text().replace_all(old="\r\n", new="\n")),
+  ] {
+    files.push({ "path": path, "before": null, "after": checksum(text) })
+    resources["async/files/" + path] = Json(text)
+  }
+  let manifest : Json = {
+    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 1,
+    "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
+  }
+  resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")
+  resources["async/LICENSE"] = Json(@fs.read_file(root + "/LICENSE").text().replace_all(old="\r\n", new="\n"))
+  for (path, source) in [("napi_async.h", "napi_async.h"), ("napi_async.mbt", "napi_async.mbt.patch"), ("LIBUV-LICENSE", "LIBUV-LICENSE")] {
+    resources["async/" + path] = Json(@fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n"))
+  }
+  let output = Json(resources).stringify(indent=2) + "\n"
+  if @env.args().contains("--check") { assert_eq(output, @fs.read_file(resources_path).text()) }
+  else { @fs.write_file(resources_path, output) }
+}

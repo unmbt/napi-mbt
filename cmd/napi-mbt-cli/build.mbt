@@ -27,14 +27,27 @@ async fn build(
   let toolchain = detect_toolchain(dir, conf.builder)
   defer toolchain.close()
   let generated = generate(dir, false)
+  let uses_async = conf.features.contains("async") ||
+    generated.source.features.contains("async")
   let workspace = @fs.tmpdir(prefix="napi-mbt-build-")
   defer @fs.rmdir(workspace, recursive=true)
   copy_build_workspace(dir, workspace, [])
+  if uses_async {
+    patch_async_dependency(workspace)
+  }
   mkdirp(workspace + "/.napi-mbt/include")
   for name, text in @assets.files() {
-    if !name.has_prefix("template/") {
+    if !name.has_prefix("template/") && !name.has_prefix("async/") {
       write_file(workspace + "/.napi-mbt/" + name, text)
     }
+  }
+  if uses_async {
+    let definition = workspace + "/.napi-mbt/node_api.def"
+    write_file(
+      definition,
+      @fs.read_file(definition).text() +
+      "\nuv_handle_size\nuv_handle_get_data\nuv_handle_set_data\nuv_timer_init\nuv_timer_start\nuv_timer_stop\nuv_close\n",
+    )
   }
   if windows() {
     guard toolchain.librarian is Some(lib) else {

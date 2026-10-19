@@ -211,7 +211,7 @@ fn visit(
     kind == "function_identifier" ||
     kind == "lowercase_identifier" {
     let text = node.text()
-    for feature in ["threadsafe_function", "bigint", "promise"] {
+    for feature in ["threadsafe_function", "bigint", "promise", "async"] {
       if text.has_prefix("napi_") &&
         text.contains(feature) &&
         !features.contains(feature) {

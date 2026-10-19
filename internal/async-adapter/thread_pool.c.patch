@@ -1,0 +1,243 @@
+/* Per-environment worker pool. No process signal handlers are installed.
+ * Windows uses CancelSynchronousIo. POSIX cancellation is enabled only inside
+ * upstream cancellable syscall regions; cancellation cleanup only updates C
+ * job state and notifies the owning loop. MoonBit RC stays on the host thread. */
+struct napi_mbt_async_pool {
+  int initialized;
+  HANDLE notify_send;
+  HANDLE notify_recv;
+#ifndef _WIN32
+  sigset_t old_sigmask;
+#endif
+};
+#ifdef _WIN32
+#define NAPI_MBT_ASYNC_TLS __declspec(thread)
+#else
+#define NAPI_MBT_ASYNC_TLS _Thread_local
+#endif
+static NAPI_MBT_ASYNC_TLS struct napi_mbt_async_pool *active_pool;
+static NAPI_MBT_ASYNC_TLS struct worker *current_worker;
+#define pool (*active_pool)
+MOONBIT_FFI_EXPORT void *napi_mbt_async_pool_current(void) { return active_pool; }
+MOONBIT_FFI_EXPORT void *napi_mbt_async_pool_null(void) { return NULL; }
+MOONBIT_FFI_EXPORT void *napi_mbt_async_pool_swap(void *next) {
+  void *previous = active_pool; active_pool = next; return previous;
+}
+
+enum WorkerState { Running = 0, Cancelling, Cancelled, Waiting };
+struct worker {
+#ifdef _WIN32
+  HANDLE id;
+  HANDLE event;
+#else
+  pthread_t id;
+  int thread_valid;
+#endif
+  struct napi_mbt_async_pool *owner;
+  int32_t job_id;
+  struct job *job;
+  atomic_int32_t state;
+  atomic_int32_t inside_cancellable_region;
+};
+enum { CANCELLATION_STATUS_RETRY_LATER = 0, CANCELLATION_STATUS_NEED_WAIT = 1 };
+
+void moonbitlang_async_notify_event_loop(int32_t data) {
+#ifdef _WIN32
+  PostQueuedCompletionStatus(pool.notify_send, data, (ULONG_PTR)pool.notify_recv, 0);
+#else
+  while (write(pool.notify_send, &data, sizeof(data)) < 0 && errno == EINTR) {}
+#endif
+}
+struct worker *moonbitlang_async_get_current_worker(void) { return current_worker; }
+
+#ifndef _WIN32
+static void worker_cancelled(void *data) {
+  struct worker *worker = data;
+  worker->job->ret = -1;
+  worker->job->err = ECANCELED;
+  worker->inside_cancellable_region = 0;
+  worker->state = Waiting;
+  moonbitlang_async_notify_event_loop(worker->job_id);
+}
+// A POSIX job owns its thread until completion/cancellation. Joining before
+// reuse makes deferred pthread cancellation incapable of affecting a later job.
+static void *worker_loop(void *data) {
+  struct worker *worker = data;
+  active_pool = worker->owner;
+  current_worker = worker;
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+  pthread_cleanup_push(worker_cancelled, worker);
+  worker->job->err = 0;
+  worker->job->ret = worker->job->worker(worker->job->payload, &worker->job->err);
+  worker->inside_cancellable_region = 0;
+  worker->state = Waiting;
+  moonbitlang_async_notify_event_loop(worker->job_id);
+  pthread_cleanup_pop(0);
+  return NULL;
+}
+#else
+static DWORD WINAPI worker_loop(void *data) {
+  struct worker *worker = data;
+  active_pool = worker->owner;
+  current_worker = worker;
+  while (worker->job) {
+    worker->job->err = 0;
+    worker->job->ret = worker->job->worker(worker->job->payload, &worker->job->err);
+    worker->inside_cancellable_region = 0;
+    worker->state = Waiting;
+    moonbitlang_async_notify_event_loop(worker->job_id);
+    WaitForSingleObject(worker->event, INFINITE);
+  }
+  return 0;
+}
+#endif
+
+int32_t moonbitlang_async_enter_cancellable_region(struct worker *worker) {
+  if (!worker) return 0;
+  worker->inside_cancellable_region = 1;
+  if (worker->state == Cancelling) {
+    worker->state = Cancelled;
+    worker->inside_cancellable_region = 0;
+    return 1;
+  }
+#ifndef _WIN32
+  pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+  pthread_testcancel();
+#endif
+  return 0;
+}
+void moonbitlang_async_leave_cancellable_region(struct worker *worker) {
+  if (!worker) return;
+#ifndef _WIN32
+  pthread_setcancelstate(PTHREAD_CANCEL_DISABLE, NULL);
+#endif
+  worker->inside_cancellable_region = 0;
+}
+MOONBIT_FFI_EXPORT void moonbitlang_async_worker_enter_idle(struct worker *worker) {
+  worker->job = NULL;
+}
+MOONBIT_FFI_EXPORT int32_t moonbitlang_async_cancel_worker(struct worker *worker) {
+  if (worker->state == Cancelled || worker->state == Waiting) return CANCELLATION_STATUS_NEED_WAIT;
+  worker->state = Cancelling;
+  if (worker->job->cancel_handler) return worker->job->cancel_handler(worker->job->payload);
+#ifdef _WIN32
+  if (CancelSynchronousIo(worker->id)) return CANCELLATION_STATUS_NEED_WAIT;
+  return GetLastError() == ERROR_NOT_FOUND ? CANCELLATION_STATUS_RETRY_LATER : -1;
+#else
+  int result = pthread_cancel(worker->id);
+  if (result) { errno = result; return -1; }
+  return CANCELLATION_STATUS_NEED_WAIT;
+#endif
+}
+MOONBIT_FFI_EXPORT int32_t moonbitlang_async_worker_check_cancellation_retry(struct worker *worker) {
+  if (worker->state == Waiting) return 0;
+  moonbitlang_async_cancel_worker(worker);
+  return 1;
+}
+
+MOONBIT_FFI_EXPORT void moonbitlang_async_wake_worker(struct worker *worker, int32_t job_id, void *job) {
+#ifndef _WIN32
+  if (worker->thread_valid) pthread_join(worker->id, NULL);
+  worker->thread_valid = 0;
+#endif
+  worker->job_id = job_id;
+  worker->job = job ? JOB_HEADER(job) : NULL;
+  worker->state = Running;
+#ifdef _WIN32
+  SetEvent(worker->event);
+#else
+  if (worker->job) {
+    int status = pthread_create(&worker->id, NULL, worker_loop, worker);
+    if (status) {
+      worker->job->ret = -1; worker->job->err = status; worker->state = Waiting;
+      moonbitlang_async_notify_event_loop(job_id);
+    } else worker->thread_valid = 1;
+  }
+#endif
+}
+MOONBIT_FFI_EXPORT void moonbitlang_async_free_worker(struct worker *worker) {
+#ifdef _WIN32
+  moonbitlang_async_wake_worker(worker, 0, NULL);
+  WaitForSingleObject(worker->id, INFINITE);
+  CloseHandle(worker->id);
+  CloseHandle(worker->event);
+#else
+  if (worker->thread_valid) pthread_join(worker->id, NULL);
+#endif
+  free(worker);
+}
+
+#ifndef _WIN32
+int moonbitlang_async_event_bus_register(int event_bus, int fd, int32_t read_only);
+#endif
+MOONBIT_FFI_EXPORT HANDLE moonbitlang_async_init_thread_pool(HANDLE event_bus) {
+  if (active_pool) {
+#ifdef _WIN32
+    SetLastError(ERROR_INVALID_STATE); return NULL;
+#else
+    errno = EBUSY; return -1;
+#endif
+  }
+  active_pool = calloc(1, sizeof(*active_pool));
+  if (!active_pool) {
+#ifdef _WIN32
+    SetLastError(ERROR_OUTOFMEMORY); return NULL;
+#else
+    errno = ENOMEM; return -1;
+#endif
+  }
+#ifdef _WIN32
+  pool.notify_send = pool.notify_recv = event_bus;
+#else
+  pthread_sigmask(SIG_SETMASK, NULL, &pool.old_sigmask);
+  int pipefds[2];
+  if (pipe(pipefds) < 0) { free(active_pool); active_pool = NULL; return -1; }
+  pool.notify_recv = pipefds[0]; pool.notify_send = pipefds[1];
+  for (int i = 0; i < 2; ++i) {
+    int flags = fcntl(pipefds[i], F_GETFD);
+    if (flags < 0 || fcntl(pipefds[i], F_SETFD, flags | FD_CLOEXEC) < 0) goto failed;
+  }
+  if (moonbitlang_async_event_bus_register(event_bus, pool.notify_recv, 1) < 0) goto failed;
+#endif
+  pool.initialized = 1;
+  return pool.notify_recv;
+#ifndef _WIN32
+failed:
+  { int saved = errno; close(pipefds[0]); close(pipefds[1]); free(active_pool); active_pool = NULL; errno = saved; return -1; }
+#endif
+}
+MOONBIT_FFI_EXPORT void moonbitlang_async_destroy_thread_pool(void) {
+  if (!active_pool) return;
+#ifndef _WIN32
+  close(pool.notify_recv); close(pool.notify_send);
+#endif
+  free(active_pool); active_pool = NULL;
+}
+
+MOONBIT_FFI_EXPORT struct worker *moonbitlang_async_spawn_worker(int32_t init_job_id, void *init_job) {
+  struct worker *worker = calloc(1, sizeof(*worker));
+  if (!worker) {
+#ifdef _WIN32
+    SetLastError(ERROR_OUTOFMEMORY);
+#else
+    errno = ENOMEM;
+#endif
+    return NULL;
+  }
+  worker->owner = active_pool;
+  worker->job_id = init_job_id;
+  worker->job = JOB_HEADER(init_job);
+  worker->state = Running;
+#ifdef _WIN32
+  worker->event = CreateEventA(NULL, FALSE, FALSE, NULL);
+  if (!worker->event) { free(worker); return NULL; }
+  worker->id = CreateThread(NULL, 0, worker_loop, worker, 0, NULL);
+  if (!worker->id) { CloseHandle(worker->event); free(worker); return NULL; }
+#else
+  int status = pthread_create(&worker->id, NULL, worker_loop, worker);
+  if (status) { free(worker); errno = status; return NULL; }
+  worker->thread_valid = 1;
+#endif
+  return worker;
+}
+MOONBIT_FFI_EXPORT int32_t napi_mbt_async_worker_is_null(struct worker *worker) { return worker == NULL; }

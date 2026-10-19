@@ -1,0 +1,110 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    if name == "_build" || name == ".git" { continue }
+    if @fs.kind(source + "/" + name) == Directory { copy_tree(source + "/" + name, destination + "/" + name) }
+    else { @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name)) }
+  }
+}
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(binary, args))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-async-runtime-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "async-fixture"])
+  @fs.write_file(dir + "/moon.mod", "name = \"test/async-runtime\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\", \"moonbitlang/async/fs\", \"moonbitlang/async/socket\","))
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"features\":[\"async\"]}")
+  copy_tree(".mooncakes/moonbitlang/async", dir + "/.mooncakes/moonbitlang/async")
+  let original = @fs.read_file(dir + "/.mooncakes/moonbitlang/async/src/internal/coroutine/scheduler.mbt").text()
+  let source =
+    #|///|
+    #|let completed : Ref[Int] = Ref(0)
+    #|///|
+    #|let failed : Ref[String] = Ref("")
+    #|///|
+    #|#export_name("start")
+    #|pub fn start(path : String, port : Int) -> Unit raise {
+    #|  ignore(napi_async_spawn(() => {
+    #|    try {
+    #|      @async.sleep(20)
+    #|      @fs.write_file(path, "async-content")
+    #|      let data = @fs.read_file(path)
+    #|      if data.text() != "async-content" { fail("File mismatch") }
+    #|      let socket = @socket.Tcp::connect_to_host("127.0.0.1", port~)
+    #|      defer socket.close()
+    #|      socket.write("ping")
+    #|      if socket.read_exactly(4) != b"pong" { fail("Network mismatch") }
+    #|      @async.with_task_group(group => {
+    #|        let a = group.spawn(() => { @async.sleep(5); 1 })
+    #|        let b = group.spawn(() => { @async.sleep(7); 2 })
+    #|        if a.wait() + b.wait() != 3 { fail("Task group mismatch") }
+    #|      })
+    #|      completed.val += 1
+    #|    } catch { error => { failed.val = error.to_string() } }
+    #|  }))
+    #|}
+    #|///|
+    #|#export_name("pending")
+    #|pub fn pending() -> Unit raise {
+    #|  ignore(napi_async_spawn(() => { @async.sleep(100000) }))
+    #|}
+    #|///|
+    #|#export_name("wait_socket")
+    #|pub fn wait_socket(port : Int) -> Unit raise {
+    #|  ignore(napi_async_spawn(() => {
+    #|    let socket = @socket.Tcp::connect_to_host("127.0.0.1", port~)
+    #|    defer socket.close()
+    #|    socket.write("wait")
+    #|    ignore(socket.read_exactly(4))
+    #|  }))
+    #|}
+    #|///|
+    #|#export_name("completed")
+    #|pub fn count() -> Int { completed.val }
+    #|///|
+    #|#export_name("failure")
+    #|pub fn failure() -> String { failed.val }
+    #|///|
+    #|extern "c" fn environment_count() -> Int = "napi_mbt_live_environments"
+    #|///|
+    #|#export_name("environments")
+    #|pub fn environments() -> Int { environment_count() }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_file(dir + "/moon.pkg", pkg)
+    let dependency_pkg = dir + "/.mooncakes/moonbitlang/async/src/internal/event_loop/moon.pkg"
+    @fs.write_file(dependency_pkg, @fs.read_file(dependency_pkg).text().replace_all(old="options(", new="options(link: { \"native\": { \"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\" } }, "))
+  }
+  checked(binary, ["build", dir, "--release"])
+  assert_eq(@fs.read_file(dir + "/.mooncakes/moonbitlang/async/src/internal/coroutine/scheduler.mbt").text(), original)
+  @fs.write_file(dir + "/.mooncakes/moonbitlang/async/src/internal/coroutine/scheduler.mbt", original + "\n// modified upstream\n")
+  let (status, _, err) = @process.collect_output(binary, ["build", dir, "--release"])
+  assert_true(status != 0 && err.text().contains("checksum mismatch"))
+  @fs.write_file(dir + "/.mooncakes/moonbitlang/async/src/internal/coroutine/scheduler.mbt", original)
+  let dependency_mod = @fs.read_file(dir + "/.mooncakes/moonbitlang/async/moon.mod").text()
+  @fs.write_file(dir + "/.mooncakes/moonbitlang/async/moon.mod", dependency_mod.replace_all(old="0.22.4", new="0.22.5"))
+  let (status, _, err) = @process.collect_output(binary, ["build", dir, "--release"])
+  assert_true(status != 0 && err.text().contains("requires exactly"))
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = ".napi-mbt/" + (if asan { "async-asan" } else { "async-smoke" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  checked("node", ["scripts/async-runtime.test.cjs", @fs.realpath(output + "/napi_mbt.node")])
+  println("Node host async timers, filesystem and worker cleanup passed")
+}

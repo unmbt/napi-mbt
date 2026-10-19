@@ -73,6 +73,7 @@ test "configuration rejects silent mistakes and invalid feature levels" {
           "napiVersion": 2,
         },
         { "features": ["callback"], "napiVersion": 2 },
+        { "features": ["async"], "napiVersion": 7 },
       ] : Array[Json]) {
     try parse_config(value) catch {
       _ => ()

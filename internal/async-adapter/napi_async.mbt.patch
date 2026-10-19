@@ -1,0 +1,54 @@
+///|
+priv struct NapiAsyncState {
+  scheduler : @napi_mbt_async.Loop
+  mut cancelled : Bool
+}
+
+///|
+extern "c" fn napi_async_has(env : NapiEnv) -> Bool = "napi_mbt_async_has"
+
+///|
+extern "c" fn napi_async_get(env : NapiEnv) -> NapiAsyncState = "napi_mbt_async_get"
+
+///|
+#borrow(state)
+extern "c" fn napi_async_attach(env : NapiEnv, state : NapiAsyncState, tick : FuncRef[(NapiAsyncState, Bool) -> Int32]) -> Int32 = "napi_mbt_async_attach"
+
+///|
+extern "c" fn napi_async_schedule(env : NapiEnv) -> Int32 = "napi_mbt_async_schedule"
+
+///|
+extern "c" fn napi_async_closing(env : NapiEnv) -> Bool = "napi_mbt_async_closing"
+
+///|
+extern "c" fn napi_current_env() -> NapiEnv = "napi_mbt_current_env"
+
+///|
+fn napi_async_spawn(task : async () -> Unit) -> @napi_mbt_async.Task raise {
+  napi_async_submit(napi_current_env(), task)
+}
+
+///|
+fn napi_async_tick(state : NapiAsyncState, closing : Bool) -> Int32 {
+  try {
+    if closing && !state.cancelled { state.cancelled = true; state.scheduler.cancel_all() }
+    let pending = state.scheduler.step()
+    if closing && pending == 0 { state.scheduler.close(); -2 } else { state.scheduler.next_wake() }
+  } catch {
+    error => { eprintln("napi-mbt async scheduler: \{error}"); 2 }
+  }
+}
+
+///|
+fn napi_async_submit(env : NapiEnv, task : async () -> Unit) -> @napi_mbt_async.Task raise {
+  if napi_async_closing(env) { raise napi_failure(1004, Error, "ERR_NAPI_ENV_CLOSED", "Starting asynchronous task") }
+  let state = if napi_async_has(env) { napi_async_get(env) } else {
+    let state = { scheduler: @napi_mbt_async.Loop::new(), cancelled: false }
+    errdefer { state.scheduler.close() catch { _ => () } }
+    result_from_status(env, napi_async_attach(env, state, fn(state, closing) { napi_async_tick(state, closing) }), b"Attaching async scheduler")
+    state
+  }
+  let handle = state.scheduler.submit(task)
+  result_from_status(env, napi_async_schedule(env), b"Scheduling async task")
+  handle
+}

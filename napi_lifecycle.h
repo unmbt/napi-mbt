@@ -69,6 +69,9 @@ struct napi_mbt_environment {
     bool closing;
     int cleanup_status;
     napi_mbt_construction *construction;
+    void *async_context;
+    void (*async_close)(napi_mbt_environment *);
+    bool cleanup_requested;
 };
 
 static napi_mbt_environment *napi_mbt_environments = NULL;
@@ -142,6 +145,12 @@ static void napi_mbt_flush_resources(napi_mbt_environment *owner) {
 static void napi_mbt_cleanup_environment(void *data) {
     napi_mbt_lock();
     napi_mbt_environment *owner = (napi_mbt_environment *)data;
+    if (owner->async_context) {
+        owner->cleanup_requested = true;
+        owner->async_close(owner);
+        napi_mbt_unlock();
+        return;
+    }
     napi_mbt_environment *previous = napi_mbt_active;
     napi_mbt_active = owner;
     owner->closing = true;

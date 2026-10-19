@@ -1,0 +1,29 @@
+// Copyright 2026 napi-mbt contributors. Apache-2.0.
+///|
+pub struct Loop { priv inner : @event_loop.EmbeddedLoop }
+
+///|
+pub struct Task { priv owner : Loop; priv inner : @coroutine.Coroutine }
+
+///|
+pub fn Loop::new() -> Loop raise { { inner: @event_loop.EmbeddedLoop::new() } }
+
+///|
+pub fn Loop::submit(self : Loop, f : async () -> Unit) -> Task raise {
+  { owner: self, inner: self.inner.submit(f) }
+}
+
+///|
+pub fn Task::cancel(self : Task) -> Unit raise { self.owner.inner.cancel(self.inner) }
+
+///|
+pub fn Loop::cancel_all(self : Loop) -> Unit raise { self.inner.cancel_all() }
+
+///|
+pub fn Loop::step(self : Loop) -> Int raise { self.inner.step() }
+
+///|
+pub fn Loop::next_wake(self : Loop) -> Int raise { self.inner.next_wake() }
+
+///|
+pub fn Loop::close(self : Loop) -> Unit raise { self.inner.close() }

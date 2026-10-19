@@ -46,7 +46,8 @@
           "bigint",
           "buffer",
           "class",
-          "callback"
+          "callback",
+          "async"
         ]
       }
     },
@@ -271,6 +272,30 @@
         "properties": {
           "napiVersion": {
             "minimum": 3
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "async"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
           }
         }
       }

@@ -1,0 +1,106 @@
+// Copyright 2026 napi-mbt contributors. Apache-2.0, matching moonbitlang/async.
+// Host-driven event loop. Each operation activates one environment's scheduler
+// and C thread pool, and restores the previous context on every exit path.
+
+///|
+pub struct EmbeddedLoop {
+  priv evloop : EventLoop
+  priv scheduler : @coroutine.Scheduler
+  priv pool : @c_buffer.Buffer
+  priv mut closed : Bool
+  priv mut stepping : Bool
+}
+
+///|
+extern "C" fn embedded_pool_current() -> @c_buffer.Buffer = "napi_mbt_async_pool_current"
+
+///|
+extern "C" fn embedded_pool_swap(pool : @c_buffer.Buffer) -> @c_buffer.Buffer = "napi_mbt_async_pool_swap"
+
+///|
+extern "C" fn embedded_pool_null() -> @c_buffer.Buffer = "napi_mbt_async_pool_null"
+
+///|
+pub fn EmbeddedLoop::new() -> EmbeddedLoop raise {
+  let previous = embedded_pool_swap(embedded_pool_null())
+  defer ignore(embedded_pool_swap(previous))
+  let evloop = EventLoop::new(max_worker_count=64)
+  { evloop, scheduler: @coroutine.embedded_new_scheduler(), pool: embedded_pool_current(), closed: false, stepping: false }
+}
+
+///|
+fn[T] EmbeddedLoop::activate(self : EmbeddedLoop, f : () -> T raise) -> T raise {
+  if self.closed { raise Failure::Failure("Embedded async environment is closed") }
+  let previous_scheduler = @coroutine.embedded_swap_scheduler(self.scheduler)
+  let previous_loop = curr_loop.val
+  let previous_pool = embedded_pool_swap(self.pool)
+  curr_loop.val = Some(self.evloop)
+  defer {
+    curr_loop.val = previous_loop
+    ignore(@coroutine.embedded_swap_scheduler(previous_scheduler))
+    ignore(embedded_pool_swap(previous_pool))
+  }
+  f()
+}
+
+///|
+pub fn EmbeddedLoop::submit(self : EmbeddedLoop, f : async () -> Unit) -> @coroutine.Coroutine raise {
+  self.activate(() => @coroutine.spawn(f))
+}
+
+///|
+pub fn EmbeddedLoop::cancel(self : EmbeddedLoop, task : @coroutine.Coroutine) -> Unit raise {
+  self.activate(() => task.cancel())
+}
+
+///|
+pub fn EmbeddedLoop::cancel_all(self : EmbeddedLoop) -> Unit raise {
+  self.activate(() => {
+    for task in @coroutine.all_coroutines().iter().to_array() { task.cancel() }
+  })
+}
+
+///|
+/// One bounded scheduling round. No blocking wait and no nested main loop.
+pub fn EmbeddedLoop::step(self : EmbeddedLoop) -> Int raise {
+  if self.stepping { raise Failure::Failure("Nested embedded async scheduling") }
+  self.stepping = true
+  defer { self.stepping = false }
+  self.activate(() => {
+    let n = self.evloop.wait_for_event(timeout=0)
+    self.evloop.handle_timers()
+    for i in 0..<n {
+      let event = self.evloop.bus.get_event(i)
+      self.evloop.extra.handle_event(self.evloop, event)
+    }
+    @coroutine.reschedule()
+    @coroutine.all_coroutines().length()
+  })
+}
+
+///|
+/// -1 means idle. Timer deadlines and immediately runnable tasks are exact;
+/// pending OS I/O is polled at most two milliseconds later by the host.
+pub fn EmbeddedLoop::next_wake(self : EmbeddedLoop) -> Int raise {
+  self.activate(() => {
+    if @coroutine.all_coroutines().is_empty() { return -1 }
+    let timeout = self.evloop.get_next_timeout()
+    if self.evloop.blocked_tasks > 0 {
+      if timeout < 0 { 2 } else { @cmp.minimum(timeout, 2) }
+    } else if timeout < 0 { 2 } else { timeout }
+  })
+}
+
+///|
+/// Call only after cancellation has drained all coroutines and outstanding I/O.
+pub fn EmbeddedLoop::close(self : EmbeddedLoop) -> Unit raise {
+  if self.closed { return }
+  self.activate(() => {
+    if !@coroutine.all_coroutines().is_empty() || !self.evloop.running_workers.is_empty() {
+      raise Failure::Failure("Cannot close embedded async loop with pending work")
+    }
+    self.evloop.cleanup()
+    self.evloop.destroy()
+  })
+  self.closed = true
+}
