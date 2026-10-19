@@ -36,3 +36,16 @@ avoid overwriting the user's changes. Stop watch with Ctrl+C.
 The original module/package manifests, flags, stub sources, dependencies and
 link inputs remain the source of truth. Build configuration is supplemented in
 the isolated copy, and Moon resolves the full native dependency graph.
+
+On POSIX, dependency stubs and MoonBit runtime objects must all be position
+independent. The isolated build adds PIC flags and uses a small native compiler
+driver for runtime objects, because the pinned Moon builder does not forward
+package flags to those objects. It delegates to the compiler selected by the
+probe, preserving arguments. Explicit compiler choices and MOON_CC are included
+in toolchain selection; the original manifests and installed toolchain remain
+untouched.
+
+Conflicting package compiler choices and explicit `-fno-PIC` flags fail rather
+than being discarded. Linux also hides bundled runtime/dependency symbols and
+binds internal references locally, preventing simdutf collisions with Node.
+The Node-API registration and user-configured exports remain visible.

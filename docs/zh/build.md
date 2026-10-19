@@ -27,3 +27,12 @@ watch 先构建一次，合并 150 ms 内的变更，最多延迟一秒。构建
 
 原工程的 module/package 配置、编译参数、stub、依赖和链接输入是构建依据。
 补充配置仅应用于隔离副本，由 Moon 解析完整的原生依赖图。
+
+POSIX 下，依赖包 stub 和 MoonBit runtime 对象都需要 PIC。隔离副本补充 PIC 参数，
+并使用小型原生编译器 driver 为 runtime 对象补充参数：固定版本 Moon 不会将包内
+flags 传递给这些对象。Driver 委托给 probe 已验证的编译器，保留所有参数。
+显式编译器配置和 MOON_CC 参与工具链选择；原 manifests 与已安装工具链不变。
+
+显式配置的编译器冲突和 `-fno-PIC` 会报错。Linux 隐藏运行时及依赖的内部符号，
+并将内部符号引用绑定到 addon 自身，避免与 Node 的 simdutf 冲突；Node-API 注册入口
+和用户在包配置中声明的导出保持可见。

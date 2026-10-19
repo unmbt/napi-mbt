@@ -121,3 +121,61 @@ test "generator selector is not an accepted CLI option" {
     _ => fail("Node must not be available")
   }
 }
+
+///|
+test "dependency PIC overlay preserves flags and rejects explicit conflicts" {
+  let pure = "import { \"moonbitlang/core/json\" }"
+  assert_eq(dependency_pic_overlay(pure), pure)
+  for
+    input in [
+      "options(\"native-stub\": [\"extra.c\"])", "options(\"native-stub\": [\"extra.c\"], link: { \"native\": { \"stub-cc-flags\": \"-DUSER=1\" } })",
+      "options(\"native-stub\": [\"extra.c\"])\nlink(native(\"stub-cc-flags\": \"-DUSER=1\"))",
+    ] {
+    let output = dependency_pic_overlay(input)
+    assert_eq(
+      package_value(output, native_block(output), "stub-cc-flags"),
+      Some(
+        if input.contains("-DUSER") {
+          "\"-DUSER=1 -fPIC\""
+        } else {
+          "\"-fPIC\""
+        },
+      ),
+    )
+    let options = package_call(package_tokens(output), "options").unwrap()
+    assert_eq(package_strings(package_value(output, options, "native-stub")), [
+      "extra.c",
+    ])
+  }
+  try
+    dependency_pic_overlay(
+      "options(\"native-stub\": [\"extra.c\"])\nlink(native(\"stub-cc-flags\": \"-fno-PIC\"))",
+    )
+  catch {
+    _ => ()
+  } noraise {
+    _ => fail("Expected explicit PIC conflict")
+  }
+}
+
+///|
+test "root PIC conflicts fail and ELF exports preserve the user contract" {
+  for key in ["cc-flags", "stub-cc-flags"] {
+    try
+      build_package_overlay(
+        "link(native(\"\{key}\": \"-fno-PIC\"))",
+        [],
+        4,
+        false,
+      )
+    catch {
+      _ => ()
+    } noraise {
+      _ => fail("Expected PIC conflict")
+    }
+  }
+  assert_eq(
+    elf_export_map(["keep", "moonbit_init"]),
+    "{\n  global:\n    \"keep\";\n    \"moonbit_init\";\n    \"napi_register_module_v1\";\n  local: *;\n};\n",
+  )
+}

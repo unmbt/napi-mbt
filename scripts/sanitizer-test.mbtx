@@ -22,8 +22,18 @@ async fn main {
     environment["PATH"] = directories.join(";") + ";" + @env.get_env_var("PATH").unwrap_or("")
   } else {
     let (code, out, err) = @process.collect_output("cc", ["-print-file-name=libasan.so"])
-    let library = out.text().trim().to_owned()
+    let mut library = out.text().trim().to_owned()
     if code != 0 || !@fs.exists(library) { fail("GCC ASan runtime unavailable: " + err.text()) }
+    // Some distributions return a linker script instead of a preloadable ELF.
+    let bytes = @fs.read_file(library).binary()
+    if bytes.length() < 4 || bytes[:4] != b"\x7fELF" {
+      let text = @fs.read_file(library).text().trim()
+      guard text.has_prefix("INPUT (") && text.has_suffix(")") else { fail("Unrecognized ASan linker script: " + library) }
+      library = text[7:text.length() - 1].trim().to_owned()
+      if !library.has_prefix("/") || !@fs.exists(library) { fail("Invalid ASan runtime path: " + library) }
+      let resolved = @fs.read_file(library).binary()
+      if resolved.length() < 4 || resolved[:4] != b"\x7fELF" { fail("ASan preload must be an ELF library") }
+    }
     environment["NAPI_MBT_TEST_NODE_PRELOAD"] = library
   }
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")

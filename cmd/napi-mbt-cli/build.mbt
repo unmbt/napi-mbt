@@ -89,7 +89,15 @@ async fn build(
     "MOONBIT_NEW_NATIVE": "0",
     "MOONBIT_ALLOCATOR": "system",
   }
-  if conf.builder == "clang" || conf.builder == "gcc" {
+  if !windows() {
+    guard toolchain.report
+      is { "compiler": { "path": String(compiler), .. }, .. } else {
+      fail("Missing compiler diagnostic")
+    }
+    let driver = prepare_posix_compiler(workspace, compiler)
+    // Moon's runtime compilation ignores package cc as well as package flags.
+    env["MOON_CC"] = driver
+  } else if conf.builder == "clang" {
     guard toolchain.report
       is { "compiler": { "path": String(compiler), .. }, .. } else {
       fail("Missing compiler diagnostic")

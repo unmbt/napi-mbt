@@ -248,6 +248,38 @@ fn append_native_flag(
 }
 
 ///|
+fn dependency_pic_overlay(text : String) -> String raise {
+  let tokens = package_tokens(text)
+  guard package_call(tokens, "options") is Some(options) &&
+    package_field(tokens, options, "native-stub") is Some(_) else {
+    return text
+  }
+  let mut text = text
+  if package_call(tokens, "link") is None {
+    match package_field(tokens, options, "link") {
+      None => text = package_set(text, options, "link", "{\"native\": {}}")
+      Some((link, _)) =>
+        if package_field(tokens, link, "native") is None {
+          text = package_set(text, link, "native", "{}")
+        }
+    }
+  }
+  if package_value(text, native_block(text), "stub-cc-flags") is Some(raw) {
+    guard @json.parse(raw) is String(flags) else {
+      fail("stub-cc-flags must be a string")
+    }
+    if flags
+      .split(" ")
+      .any(flag => ["-fno-pic", "-fno-PIC"].contains(flag.to_owned())) {
+      fail(
+        "Native dependency disables position-independent code required by an addon",
+      )
+    }
+  }
+  append_native_flag(text, "stub-cc-flags", "-fPIC")
+}
+
+///|
 fn build_package_overlay(
   text : String,
   exports : Array[String],
@@ -299,6 +331,9 @@ fn build_package_overlay(
         fail("\{key} must be a string")
       }
       for token in flags.split(" ") {
+        if !is_windows && ["-fno-pic", "-fno-PIC"].contains(token.to_owned()) {
+          fail("\{key} disables position-independent code required by an addon")
+        }
         if token.contains("NAPI_VERSION=") &&
           !token.has_suffix("NAPI_VERSION=\{napi_version}") {
           fail("\{key} conflicts with napiVersion \{napi_version}: \{token}")

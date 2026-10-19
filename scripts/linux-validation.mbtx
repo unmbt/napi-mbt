@@ -21,7 +21,7 @@ async fn copy(source : String, destination : String) -> Unit {
 ///|
 async fn main {
   let distro = @env.args().get(1).unwrap_or("FedoraLinux-43")
-  let toolchain = "/tmp/napi-mbt-toolchain-0.10.15"
+  let toolchain = "/var/tmp/napi-mbt-toolchain-0.10.15"
   ignore(checked(distro, ["mkdir", "-p", toolchain]))
   let (exists, _, _) = @process.collect_output("wsl.exe", ["-d", distro, "--", "test", "-x", toolchain + "/bin/moon"])
   if exists != 0 {
@@ -37,16 +37,31 @@ async fn main {
   let windows_copy = @fs.tmpdir(prefix="napi-mbt-linux-copy-")
   defer @fs.rmdir(windows_copy, recursive=true)
   copy(".", windows_copy + "/project")
-  let source = checked(distro, ["wslpath", "-u", (windows_copy + "/project").replace_all(old="\\", new="/")]).trim().to_owned()
-  let linux_root = checked(distro, ["mktemp", "-d", "/tmp/napi-mbt-linux-validation-XXXXXX"]).trim().to_owned()
-  if !linux_root.has_prefix("/tmp/napi-mbt-linux-validation-") { fail("Invalid validation directory") }
-  defer ignore(checked(distro, ["rm", "-rf", "--", linux_root]))
-  ignore(checked(distro, ["cp", "-R", source + "/.", linux_root]))
+  let archive = windows_copy + "/project.tar"
+  let (tar_code, _, tar_error) = @process.collect_output("tar", ["-cf", archive, "-C", windows_copy + "/project", "."])
+  if tar_code != 0 { fail(tar_error.text()) }
+  let source = checked(distro, ["wslpath", "-u", archive.replace_all(old="\\", new="/")]).trim().to_owned()
+  let linux_root = match @env.args().get(2) {
+    Some(existing) => checked(distro, ["realpath", "-e", existing]).trim().to_owned()
+    None => checked(distro, ["mktemp", "-d", "/var/tmp/napi-mbt-linux-validation-XXXXXX"]).trim().to_owned()
+  }
+  if !linux_root.has_prefix("/var/tmp/napi-mbt-linux-validation-") || linux_root.split("/").count() != 4 { fail("Invalid validation directory") }
+  let succeeded = Ref(false)
+  defer {
+    if succeeded.val {
+      ignore(checked(distro, ["rm", "-rf", "--", linux_root]))
+    } else {
+      eprintln("Linux validation workspace retained: " + linux_root)
+    }
+  }
+  ignore(checked(distro, ["tar", "-xf", source, "-C", linux_root]))
   let environment = ["env", "MOON_HOME=" + toolchain, "PATH=" + toolchain + "/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin", "MOONBIT_NEW_NATIVE=0", "MOONBIT_ALLOCATOR=system"]
-  for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "build", "--target", "native", "--release", "cmd/napi-mbt-cli"]] {
+  for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "run", "scripts/toolchain-check.mbtx"], ["-C", linux_root, "build", "--target", "native", "cmd/napi-mbt-cli"]] {
     println(checked(distro, environment + [toolchain + "/bin/moon"] + args))
   }
-  for script in ["async-exports-test.mbtx", "sanitizer-test.mbtx"] {
-    println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + [toolchain + "/bin/moon", "run", "scripts/" + script, "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]))
+  for script in ["build-isolation-test.mbtx", "async-exports-test.mbtx", "sanitizer-test.mbtx"] {
+    println("Linux fixture: " + script)
+    println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + [toolchain + "/bin/moon", "run", "scripts/" + script, "_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]))
   }
+  succeeded.val = true
 }

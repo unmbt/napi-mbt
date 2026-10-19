@@ -125,8 +125,8 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
     if find_command("ninja") is Some(_) {
       args.append(["-G", "Ninja"])
     }
-    if builder == "gcc" || builder == "clang" {
-      args.push("-DCMAKE_C_COMPILER=" + require_command(builder))
+    if configured_native_compiler(dir, builder) is Some(compiler) {
+      args.push("-DCMAKE_C_COMPILER=" + compiler)
     }
   }
   // This workspace is disposable. No project output or configuration is touched
