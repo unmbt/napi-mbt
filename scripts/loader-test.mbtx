@@ -15,6 +15,12 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   let dir = temp + "/project 空格"
   checked(binary, ["init", dir, "--name", "loader-fixture"])
+  let source = StringBuilder()
+  source.write_string(@fs.read_file(dir + "/lib.mbt").text())
+  for i, name in ["failure", "addon", "path", "fs", "require", "createRequire", "fileURLToPath", "dirname", "target", "requiredNapi"] {
+    source.write_string("\n///|\n#export_name(\"\{name}\")\npub fn collision_\{i}() -> Int { 42 }\n")
+  }
+  @fs.write_file(dir + "/lib.mbt", source.to_string())
   checked(binary, ["build", dir, "--release"])
   let target = @fs.readdir(dir + "/artifacts")[0]
   for (mode, cjs, esm) in [("dual", true, true), ("esm", false, true), ("cjs", true, false)] {
@@ -29,7 +35,7 @@ async fn main {
     @fs.mkdir(consumer + "/node_modules", recursive=true)
     @fs.symlink(target=project, consumer + "/node_modules/loader-fixture")
     let source = "import { mbt_add } from 'loader-fixture';\nconst value: number = mbt_add(1, 2);\n// @ts-expect-error wrong argument type\nmbt_add('one', 2);\n// @ts-expect-error missing argument\nmbt_add(1);\n"
-    let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--skipLibCheck", "--module", "NodeNext", "--moduleResolution", "NodeNext"]
+    let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--module", "NodeNext", "--moduleResolution", "NodeNext"]
     if cjs {
       @fs.write_file(consumer + "/check.cts", source)
       args.push(consumer + "/check.cts")
@@ -40,7 +46,7 @@ async fn main {
     }
     checked("node", args)
     if esm {
-      checked("node", ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--skipLibCheck", "--module", "ESNext", "--moduleResolution", "Bundler", consumer + "/check.mts"])
+      checked("node", ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--module", "ESNext", "--moduleResolution", "Bundler", consumer + "/check.mts"])
     }
     @fs.remove(consumer + "/node_modules/loader-fixture")
   }

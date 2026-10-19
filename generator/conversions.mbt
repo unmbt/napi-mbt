@@ -1,0 +1,268 @@
+///|
+fn conversion_name(
+  value : ValueType,
+  types : Array[ValueType],
+  read : Bool,
+) -> String {
+  for i, t in types {
+    if t.runtime_name() == value.runtime_name() {
+      return "napi_mbt_" +
+        (if read { "read_" } else { "write_" }) +
+        i.to_string()
+    }
+  }
+  abort("Validated conversion type missing")
+}
+
+///|
+fn conversion_types(
+  exports : Array[ParsedExport],
+  definitions : Array[TypeDefinition],
+  read : Bool,
+) -> Array[ValueType] {
+  let types : Array[ValueType] = []
+  fn collect(value : ValueType) -> Unit {
+    if types.any(t => t.runtime_name() == value.runtime_name()) {
+      return
+    }
+    types.push(value)
+    match value {
+      OptionType(inner) | ArrayType(inner) => collect(inner)
+      NamedType(name) =>
+        for def in definitions {
+          if def.name == name {
+            match def.shape {
+              StructShape(fields) =>
+                for field in fields {
+                  collect(field.value_type)
+                }
+              EnumShape(variants) =>
+                for v in variants {
+                  for p in v.parameters {
+                    collect(p.value_type)
+                  }
+                }
+            }
+          }
+        }
+      _ => ()
+    }
+  }
+  for item in exports {
+    if read {
+      for p in item.parameters {
+        collect(p.value_type)
+      }
+    } else {
+      collect(item.return_type)
+    }
+  }
+  types
+}
+
+///|
+fn conversions(
+  types : Array[ValueType],
+  definitions : Array[TypeDefinition],
+  read : Bool,
+) -> String {
+  let out = StringBuilder()
+  for value in types {
+    let name = conversion_name(value, types, read)
+    let mbt = value.moonbit()
+    if read {
+      out.write_string(
+        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt} raise {\n",
+      )
+    } else {
+      out.write_string(
+        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : \{mbt},\n  _depth : Int32,\n) -> NapiValue raise {\n",
+      )
+    }
+    fn convert(t : ValueType, expression : String) -> String {
+      conversion_name(t, types, read) +
+      "(env, " +
+      expression +
+      (if read { ", _path)" } else { ", _depth + 1)" })
+    }
+    fn enter() -> Unit {
+      out.write_string(
+        if read {
+          "  napi_enter_value(env, value, _path)\n  defer ignore(_path.pop())\n"
+        } else {
+          "  napi_check_depth(_depth)\n"
+        },
+      )
+    }
+    match value {
+      OptionType(inner) =>
+        if read {
+          out.write_string(
+            "  if napi_is_nullish(env, value) { None } else { Some(" +
+            convert(inner, "value") +
+            ") }\n",
+          )
+        } else {
+          out.write_string(
+            "  match value { None => napi_null(env); Some(inner) => " +
+            convert(inner, "inner") +
+            " }\n",
+          )
+        }
+      ArrayType(inner) => {
+        enter()
+        if read {
+          out.write_string(
+            "  let length = napi_array_length(env, value)\n  Array::makei(length, i => " +
+            convert(inner, "napi_array_get(env, value, i)") +
+            ")\n",
+          )
+        } else {
+          out.write_string(
+            "  let result = napi_array_new(env, value.length())\n  for i, element in value { napi_array_set(env, result, i, " +
+            convert(inner, "element") +
+            ") }\n  result\n",
+          )
+        }
+      }
+      NamedType(name) =>
+        for def in definitions {
+          if def.name != name {
+            continue
+          }
+          enter()
+          match def.shape {
+            StructShape(fields) =>
+              if read {
+                out.write_string("  napi_require_object(env, value)\n")
+                out.write_string("  {\n")
+                for field in fields {
+                  let required = !(field.value_type is OptionType(_))
+                  let expression = "napi_field_get(env, value, " +
+                    Json(field.name).stringify() +
+                    ", \{required})"
+                  out.write_string(
+                    "    \{field.name}: " +
+                    convert(field.value_type, expression) +
+                    ",\n",
+                  )
+                }
+                out.write_string("  }\n")
+              } else {
+                out.write_string("  let result = napi_object_new(env)\n")
+                for field in fields {
+                  out.write_string(
+                    "  napi_field_set(env, result, " +
+                    Json(field.name).stringify() +
+                    ", " +
+                    convert(field.value_type, "value." + field.name) +
+                    ")\n",
+                  )
+                }
+                out.write_string("  result\n")
+              }
+            EnumShape(variants) => {
+              let plain = variants.all(v => v.parameters.is_empty())
+              if read {
+                let tag = if plain {
+                  "value"
+                } else {
+                  "napi_field_get(env, value, \"tag\", true)"
+                }
+                out.write_string("  let tag = get_String(env, " + tag + ")\n")
+                if !plain {
+                  out.write_string(
+                    "  let args = napi_field_get(env, value, \"args\", true)\n  let count = napi_array_length(env, args)\n",
+                  )
+                }
+                out.write_string("  match tag {\n")
+                for v in variants {
+                  out.write_string(
+                    "    " + Json(v.name).stringify() + " => {\n",
+                  )
+                  if !plain {
+                    out.write_string(
+                      "      if count != \{v.parameters.length()} { raise napi_failure(1, TypeError, \"ERR_NAPI_ENUM_ARGS\", \"Wrong enum payload arity\") }\n",
+                    )
+                  }
+                  let args = []
+                  for i, p in v.parameters {
+                    args.push(
+                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
+                      convert(p.value_type, "napi_array_get(env, args, \{i})"),
+                    )
+                  }
+                  out.write_string(
+                    "      \{v.name}" +
+                    (if args.is_empty() {
+                      ""
+                    } else {
+                      "(" + args.join(", ") + ")"
+                    }) +
+                    "\n    }\n",
+                  )
+                }
+                out.write_string(
+                  "    _ => raise napi_failure(1, TypeError, \"ERR_NAPI_ENUM_TAG\", \"Unknown \{name} tag: \" + tag)\n  }\n",
+                )
+              } else {
+                out.write_string("  match value {\n")
+                for v in variants {
+                  let args = []
+                  for i, p in v.parameters {
+                    args.push(
+                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
+                      "p\{i}",
+                    )
+                  }
+                  out.write_string(
+                    "    \{v.name}" +
+                    (if args.is_empty() {
+                      ""
+                    } else {
+                      "(" + args.join(", ") + ")"
+                    }) +
+                    " => {\n",
+                  )
+                  if plain {
+                    out.write_string(
+                      "      set_String(env, " +
+                      Json(v.name).stringify() +
+                      ")\n",
+                    )
+                  } else {
+                    out.write_string(
+                      "      let result = napi_object_new(env)\n      napi_field_set(env, result, \"tag\", set_String(env, " +
+                      Json(v.name).stringify() +
+                      "))\n      let args = napi_array_new(env, \{v.parameters.length()})\n",
+                    )
+                    for i, p in v.parameters {
+                      out.write_string(
+                        "      napi_array_set(env, args, \{i}, " +
+                        convert(p.value_type, "p\{i}") +
+                        ")\n",
+                      )
+                    }
+                    out.write_string(
+                      "      napi_field_set(env, result, \"args\", args)\n      result\n",
+                    )
+                  }
+                  out.write_string("    }\n")
+                }
+                out.write_string("  }\n")
+              }
+            }
+          }
+        }
+      _ =>
+        out.write_string(
+          "  " +
+          (if read { "get_" } else { "set_" }) +
+          value.runtime_name() +
+          "(env, value)\n",
+        )
+    }
+    out.write_string("}\n")
+  }
+  out.to_string()
+}

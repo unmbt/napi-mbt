@@ -67,11 +67,13 @@ fn loaders(
     $|}
     $|
   let cjs = body + "module.exports = addon;\n"
-  let esm = "import { createRequire } from 'module';\nimport { fileURLToPath } from 'url';\nimport { dirname } from 'path';\nconst require = createRequire(import.meta.url);\nconst __dirname = dirname(fileURLToPath(import.meta.url));\n" +
+  let esm = "import { createRequire as $napiRequire } from 'module';\nimport { fileURLToPath as $napiFileURL } from 'url';\nimport { dirname as $napiDirname } from 'path';\nconst $napiAddon = (() => {\nconst require = $napiRequire(import.meta.url);\nconst __dirname = $napiDirname($napiFileURL(import.meta.url));\n" +
     body +
-    "export default addon;\n" +
+    "return addon;\n})();\nexport default $napiAddon;\n" +
     exports
-    .map(item => "export const \{item.export_name} = addon.\{item.export_name};")
+    .map(item => {
+      "export const \{item.export_name} = $napiAddon.\{item.export_name};"
+    })
     .join("\n") +
     "\n"
   (cjs, esm)

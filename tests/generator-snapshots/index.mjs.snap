@@ -1,8 +1,9 @@
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { createRequire as $napiRequire } from 'module';
+import { fileURLToPath as $napiFileURL } from 'url';
+import { dirname as $napiDirname } from 'path';
+const $napiAddon = (() => {
+const require = $napiRequire(import.meta.url);
+const __dirname = $napiDirname($napiFileURL(import.meta.url));
 const path = require('path');
 const fs = require('fs');
 const requiredNapi = 7;
@@ -60,6 +61,8 @@ if (fs.existsSync(local)) {
   try { addon = require(packageName); }
   catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
 }
-export default addon;
-export const noop = addon.noop;
-export const public_name = addon.public_name;
+return addon;
+})();
+export default $napiAddon;
+export const noop = $napiAddon.noop;
+export const public_name = $napiAddon.public_name;

@@ -49,7 +49,7 @@ fn result_from_status(
       )
     }
     let kind = match status {
-      1 | 2 | 3 | 4 | 5 | 6 | 7 => TypeError
+      1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 17 | 18 | 19 | 20 => TypeError
       _ => Error
     }
     let code = if kind is TypeError {

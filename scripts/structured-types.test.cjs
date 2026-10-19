@@ -1,0 +1,51 @@
+const assert = require('assert');
+const path = require('path');
+const addon = require(path.resolve(process.argv[2] || '.napi-mbt/structured-smoke/napi_mbt.node'));
+for (const value of [0n, -(2n ** 63n), 2n ** 63n - 1n]) assert.strictEqual(addon.echo_i64(value), value);
+for (const value of [0n, 2n ** 64n - 1n]) assert.strictEqual(addon.echo_u64(value), value);
+for (const [name, values] of [['echo_i64', [2n ** 63n, -(2n ** 63n) - 1n]], ['echo_u64', [-1n, 2n ** 64n]]]) {
+  for (const value of values) assert.throws(() => addon[name](value), e => e instanceof RangeError && e.code === 'ERR_NAPI_BIGINT_RANGE');
+  assert.throws(() => addon[name](1), TypeError);
+}
+assert.strictEqual(addon.nested(), null);
+assert.strictEqual(addon.nested(undefined), null);
+assert.strictEqual(addon.nested(null), null);
+assert.strictEqual(addon.nested(42), 42);
+assert.deepStrictEqual(addon.optional(null, 2), [null, 2, null]);
+assert.deepStrictEqual(addon.optional(undefined, 2, 3), [null, 2, 3]);
+assert.throws(() => addon.optional(null), e => e.code === 'ERR_NAPI_ARGUMENTS');
+assert.deepStrictEqual(addon.arrays([null, undefined, [], [1, 2]]), [null, null, [], [1, 2]]);
+assert.throws(() => addon.arrays({ length: 0 }), TypeError);
+const person = JSON.parse('{"name":"Moon\\u0000月","rows":[],"address":{"city":"🌙"},"__proto__":42}');
+person.rows = [[1n, null, undefined], [], [2n]];
+person.extra = 'ignored';
+const expected = { ...person, age: null, rows: [[1n, null, null], [], [2n]] };
+delete expected.extra;
+assert.deepStrictEqual(addon.person(person), expected);
+assert.strictEqual(Object.getPrototypeOf(addon.person(person)), Object.prototype);
+assert.throws(() => addon.person({ ...person, address: {} }), e => e.code === 'ERR_NAPI_FIELD');
+assert.throws(() => addon.person(Object.create(person)), e => e.code === 'ERR_NAPI_FIELD');
+const original = new Error('getter failed');
+assert.throws(() => addon.person({ ...person, get name() { throw original; } }), e => e === original);
+for (const value of ['Red', 'Blue']) assert.strictEqual(addon.color(value), value);
+assert.throws(() => addon.color('Green'), e => e.code === 'ERR_NAPI_ENUM_TAG');
+for (const value of [{ tag: 'Empty', args: [] }, { tag: 'Point', args: [1, 2] }, { tag: 'Label', args: ['text'] }, { tag: 'Chain', args: [[{ tag: 'Point', args: [1, 2] }]] }]) assert.deepStrictEqual(addon.shape(value), value);
+assert.throws(() => addon.shape({ tag: 'Point', args: [1] }), e => e.code === 'ERR_NAPI_ENUM_ARGS');
+assert.throws(() => addon.shape({ tag: 'Empty', args: [1] }), e => e.code === 'ERR_NAPI_ENUM_ARGS');
+const link = { value: 1 }; link.next = link;
+const effectCount = addon.effects();
+assert.throws(() => addon.link(link), e => e.code === 'ERR_NAPI_CYCLE');
+assert.strictEqual(addon.effects(), effectCount);
+const shape = { tag: 'Chain', args: [] }; shape.args.push([shape]);
+assert.throws(() => addon.shape(shape), e => e.code === 'ERR_NAPI_CYCLE');
+assert.strictEqual(addon.effects(), effectCount);
+assert.throws(() => addon.person({ ...person, rows: [[1n, 4]] }), TypeError);
+assert.strictEqual(addon.effects(), effectCount);
+const shared = { tag: 'Point', args: [1, 2] };
+assert.deepStrictEqual(addon.shape({ tag: 'Chain', args: [[shared, shared]] }), { tag: 'Chain', args: [[shared, shared]] });
+assert.deepStrictEqual(addon.link({ value: 1 }), { value: 1, next: null });
+for (let i = 0; i < 10000; i++) {
+  assert.deepStrictEqual(addon.person(person), expected);
+  assert.throws(() => addon.link(link), e => e.code === 'ERR_NAPI_CYCLE');
+}
+console.log('Structured types, bigint ranges, cycles and repeated allocation tests passed');

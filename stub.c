@@ -220,3 +220,59 @@ MOONBIT_FFI_EXPORT int moonbit_ptr_load8(const unsigned char* ptr, int offset) {
 MOONBIT_FFI_EXPORT void moonbit_ptr_store8(unsigned char* ptr, int offset, int val) {
     ptr[offset] = val;
 }
+
+MOONBIT_FFI_EXPORT int moonbit_napi_value_kind(napi_env env, napi_value value, int *result) {
+    napi_valuetype kind;
+    napi_status status = napi_typeof(env, value, &kind);
+    if (status == napi_ok) *result = (int)kind;
+    return (int)status;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_value_same(napi_env env, napi_value a, napi_value b, int *result) {
+    bool same = false;
+    napi_status status = napi_strict_equals(env, a, b, &same);
+    if (status == napi_ok) *result = same ? 1 : 0;
+    return (int)status;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_array_length(napi_env env, napi_value value, int *result) {
+    bool array = false;
+    napi_status status = napi_is_array(env, value, &array);
+    if (status != napi_ok) return (int)status;
+    if (!array) return (int)napi_array_expected;
+    uint32_t length = 0;
+    status = napi_get_array_length(env, value, &length);
+    if (status != napi_ok) return (int)status;
+    if (length > INT_MAX) return 1002;
+    *result = (int)length;
+    return (int)napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_array_new(napi_env env, int length, napi_value *result) {
+    if (length < 0) return (int)napi_invalid_arg;
+    return (int)napi_create_array_with_length(env, (size_t)length, result);
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_field_get(napi_env env, napi_value value, const char *name, int required, napi_value *result) {
+    napi_valuetype kind;
+    napi_status status = napi_typeof(env, value, &kind);
+    if (status != napi_ok) return (int)status;
+    if (kind != napi_object) return (int)napi_object_expected;
+    napi_value key;
+    status = napi_create_string_utf8(env, name, NAPI_AUTO_LENGTH, &key);
+    if (status != napi_ok) return (int)status;
+    bool present = false;
+    status = napi_has_own_property(env, value, key, &present);
+    if (status != napi_ok) return (int)status;
+    if (!present) return required ? 1003 : (int)napi_get_undefined(env, result);
+    return (int)napi_get_property(env, value, key, result);
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_field_set(napi_env env, napi_value value, const char *name, napi_value field) {
+    // Define a data property so a field named __proto__ cannot invoke a setter.
+    napi_property_descriptor descriptor = {0};
+    descriptor.utf8name = name;
+    descriptor.value = field;
+    descriptor.attributes = (napi_property_attributes)(napi_writable | napi_enumerable | napi_configurable);
+    return (int)napi_define_properties(env, value, 1, &descriptor);
+}

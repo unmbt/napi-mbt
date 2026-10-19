@@ -5,9 +5,10 @@ async fn main {
   let args = @env.args()
   let asan = args.contains("--asan")
   let environment : Map[String, String] = Map([])
-  let node_args = ["scripts/runtime-boundary.test.cjs"]
+  let structured = args.contains("--structured")
+  let node_args = [if structured { "scripts/structured-types.test.cjs" } else { "scripts/runtime-boundary.test.cjs" }]
   if asan {
-    node_args.push(".napi-mbt/boundary-asan/napi_mbt.node")
+    node_args.push(if structured { ".napi-mbt/structured-asan/napi_mbt.node" } else { ".napi-mbt/boundary-asan/napi_mbt.node" })
     environment["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"
     if args.get(2) is Some(directory) {
       environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
@@ -15,4 +16,13 @@ async fn main {
   }
   let status = @async.with_timeout(60000, () => @process.run("node", node_args, extra_env=environment))
   if status != 0 { fail("Runtime tests failed with exit status \{status}") }
+  if structured && !asan {
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      let files = if mode == "NodeNext" { ["scripts/structured-types.test.mts", "scripts/structured-types.test.cts"] } else { ["scripts/structured-types.test.mts"] }
+      let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution]
+      args.append(files)
+      let status = @async.with_timeout(60000, () => @process.run("node", args))
+      if status != 0 { fail("Structured TypeScript consumer failed") }
+    }
+  }
 }

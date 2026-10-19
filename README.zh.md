@@ -143,6 +143,9 @@ console.log(addon.mbt_add(2, 3)); // 输出: 5
 
 loader 优先使用存在的本地构件；本地构件损坏时保留原始 `cause` 并报错。平台包的版本、目标和 N-API 元数据必须与根包一致。诊断包含目标、尝试路径和 N-API 版本，不支持的 OS/CPU/libc 会明确报错。`prepublish` 要求所有指定平台的构件齐全，也可用 `--target` 单独准备一个平台。
 
+bigint、嵌套 Option/Array、struct、enum 表示及 TypeScript 规则见
+[导出值类型](docs/zh/types.md)。
+
 ### 发包
 
 版本发布使用仓库中的 `bump.config.json`，会在版本提交前执行 `moon check`。完成各目标平台构建后，按平台包、根包的顺序准备并发布；CLI 单独通过 Mooncakes 和 GitHub Releases 分发：

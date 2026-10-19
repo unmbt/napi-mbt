@@ -4,7 +4,9 @@ package "unmbt/napi-mbt/generator"
 // Values
 pub fn parse_source(String, String) -> ParsedSource raise
 
-pub fn render(Array[ParsedExport], String, Int, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
+pub fn parse_sources(Array[(String, String)]) -> ParsedSource raise
+
+pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
 
 // Errors
 
@@ -28,18 +30,42 @@ pub fn ParsedExport::manifest(Self) -> Json
 pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
   features : Array[String]
+  types : Array[TypeDefinition]
+}
+
+pub(all) struct TypeDefinition {
+  name : String
+  shape : TypeShape
+  filename : String
+  line : Int
+}
+pub fn TypeDefinition::manifest(Self) -> Json
+
+pub(all) enum TypeShape {
+  StructShape(Array[Parameter])
+  EnumShape(Array[Variant])
 }
 
 pub(all) enum ValueType {
   IntType
+  Int64Type
+  UInt64Type
   DoubleType
   BoolType
   StringType
   BytesType
   BufferViewType
   UnitType
+  OptionType(ValueType)
+  ArrayType(ValueType)
+  NamedType(String)
 }
 pub fn ValueType::runtime_name(Self) -> String
+
+pub(all) struct Variant {
+  name : String
+  parameters : Array[Parameter]
+}
 
 // Type aliases
 

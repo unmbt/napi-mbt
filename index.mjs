@@ -1,8 +1,9 @@
-import { createRequire } from 'module';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-const require = createRequire(import.meta.url);
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { createRequire as $napiRequire } from 'module';
+import { fileURLToPath as $napiFileURL } from 'url';
+import { dirname as $napiDirname } from 'path';
+const $napiAddon = (() => {
+const require = $napiRequire(import.meta.url);
+const __dirname = $napiDirname($napiFileURL(import.meta.url));
 const path = require('path');
 const fs = require('fs');
 const requiredNapi = 7;
@@ -60,10 +61,12 @@ if (fs.existsSync(local)) {
   try { addon = require(packageName); }
   catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
 }
-export default addon;
-export const add = addon.add;
-export const check_bool = addon.check_bool;
-export const check_double = addon.check_double;
-export const concat = addon.concat;
-export const mutate_buffer = addon.mutate_buffer;
-export const roundtrip_bytes = addon.roundtrip_bytes;
+return addon;
+})();
+export default $napiAddon;
+export const add = $napiAddon.add;
+export const check_bool = $napiAddon.check_bool;
+export const check_double = $napiAddon.check_double;
+export const concat = $napiAddon.concat;
+export const mutate_buffer = $napiAddon.mutate_buffer;
+export const roundtrip_bytes = $napiAddon.roundtrip_bytes;

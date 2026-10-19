@@ -1,13 +1,15 @@
 ///|
 /// Render every artifact from the validated type IR before doing any file I/O.
 pub fn render(
-  exports : Array[ParsedExport],
+  source : ParsedSource,
   package_name : String,
   napi_version : Int32,
   package_version~ : String,
   cjs~ : Bool = true,
   esm~ : Bool = true,
 ) -> Array[(String, String)] raise {
+  validate_ir(source, napi_version)
+  let exports = source.exports
   if !cjs && !esm {
     fail("At least one module mode must be enabled")
   }
@@ -23,15 +25,15 @@ pub fn render(
   let (cjs_loader, esm_loader) = loaders(
     exports, package_name, package_version, napi_version,
   )
-  let types = declarations(exports)
+  let types = declarations(exports, source.types)
   let esm_types = types +
-    "\ndeclare const addon: {\n" +
+    "\ndeclare const $napiAddon: {\n" +
     exports
     .map(e => "  " + e.export_name + ": typeof " + e.export_name + ";")
     .join("\n") +
-    "\n};\nexport default addon;\n"
+    "\n};\nexport default $napiAddon;\n"
   let outputs = [
-    ("napi_exports.mbt", adapters(exports)),
+    ("napi_exports.mbt", adapters(exports, source.types)),
     ("napi_glue.c", c_glue(exports)),
     ("index.d.ts", if cjs { types } else { esm_types }),
   ]

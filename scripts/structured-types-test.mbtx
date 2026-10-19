@@ -1,0 +1,102 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let (code, out, err) = @process.collect_output(binary, args)
+    if code != 0 { fail(out.text() + err.text()) }
+  })
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-structured-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "structured-fixture"])
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
+  let definitions =
+    #|///|
+    #|pub(all) struct Address { city : String }
+    #|///|
+    #|pub(all) struct Person {
+    #|  name : String
+    #|  age : Int?
+    #|  rows : Array[Array[Int64?]]
+    #|  address : Address
+    #|  __proto__ : Int
+    #|}
+    #|///|
+    #|pub(all) enum Shape {
+    #|  Empty
+    #|  Point(Int, Int)
+    #|  Label(text~ : String)
+    #|  Chain(Array[Shape])
+    #|}
+    #|///|
+    #|pub(all) enum Color { Red; Blue }
+    #|///|
+    #|pub(all) struct Link { value : Int; next : Link? }
+    #|
+  @fs.write_file(dir + "/definitions.mbt", definitions)
+  let source =
+    #|///|
+    #|let effects : Ref[Int] = Ref(0)
+    #|///|
+    #|#export_name("effects")
+    #|pub fn effect_count() -> Int { effects.val }
+    #|///|
+    #|#export_name("echo_i64")
+    #|pub fn signed(value : Int64) -> Int64 { effects.val += 1; value }
+    #|///|
+    #|#export_name("echo_u64")
+    #|pub fn unsigned(value : UInt64) -> UInt64 { effects.val += 1; value }
+    #|///|
+    #|#export_name("person")
+    #|pub fn person(value : Person) -> Person { effects.val += 1; value }
+    #|///|
+    #|#export_name("shape")
+    #|pub fn shape(value : Shape) -> Shape { effects.val += 1; value }
+    #|///|
+    #|#export_name("color")
+    #|pub fn color(value : Color) -> Color { effects.val += 1; value }
+    #|///|
+    #|#export_name("link")
+    #|pub fn link(value : Link) -> Link { effects.val += 1; value }
+    #|///|
+    #|#export_name("optional")
+    #|pub fn optional(a : Int?, b : Int, c : Int?) -> Array[Int?] { [a, Some(b), c] }
+    #|///|
+    #|#export_name("nested")
+    #|pub fn nested(value : Int??) -> Int?? { value }
+    #|///|
+    #|#export_name("arrays")
+    #|pub fn arrays(value : Array[Option[Array[Int]]]) -> Array[Option[Array[Int]]] { effects.val += 1; value }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_file(dir + "/moon.pkg", pkg)
+  }
+  checked(binary, ["build", dir, "--release"])
+  let (code, out, err) = @process.collect_output("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], cwd=dir)
+  if code != 0 { fail(out.text() + err.text()) }
+  let snapshots = root + "/tests/structured-snapshots"
+  let update = @env.args().contains("--update")
+  if update && !@fs.exists(snapshots) { @fs.mkdir(snapshots, recursive=true) }
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.d.cts", "index.d.mts", "index.cjs", "index.mjs", "napi_manifest.json", "package.json", "napi-mbt.schema.json"] {
+    let text = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
+    if update { @fs.write_file(snapshots + "/" + name + ".snap", text) }
+    assert_eq(text, @fs.read_file(snapshots + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+  }
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = root + "/.napi-mbt/" + (if asan { "structured-asan" } else { "structured-smoke" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  for name in ["index.d.ts", "index.d.cts", "index.d.mts", "package.json"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  println("Built structured-type fixture")
+}

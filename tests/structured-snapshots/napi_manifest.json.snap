@@ -1,0 +1,264 @@
+{
+  "runtimeTemplateVersion": "3",
+  "napiVersion": 7,
+  "requiredNapiVersion": 7,
+  "features": [
+    "bigint"
+  ],
+  "targets": [],
+  "cjs": true,
+  "esm": true,
+  "builder": "auto",
+  "exports": [
+    {
+      "sourceName": "arrays",
+      "exportName": "arrays",
+      "params": [
+        {
+          "name": "value",
+          "type": "Array[Option[Array[Int]]]"
+        }
+      ],
+      "ret": "Array[Option[Array[Int]]]",
+      "throws": false,
+      "line": 31,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "color",
+      "exportName": "color",
+      "params": [
+        {
+          "name": "value",
+          "type": "Color"
+        }
+      ],
+      "ret": "Color",
+      "throws": false,
+      "line": 19,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "signed",
+      "exportName": "echo_i64",
+      "params": [
+        {
+          "name": "value",
+          "type": "Int64"
+        }
+      ],
+      "ret": "Int64",
+      "throws": false,
+      "line": 7,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "unsigned",
+      "exportName": "echo_u64",
+      "params": [
+        {
+          "name": "value",
+          "type": "UInt64"
+        }
+      ],
+      "ret": "UInt64",
+      "throws": false,
+      "line": 10,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "effect_count",
+      "exportName": "effects",
+      "params": [],
+      "ret": "Int",
+      "throws": false,
+      "line": 4,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "link",
+      "exportName": "link",
+      "params": [
+        {
+          "name": "value",
+          "type": "Link"
+        }
+      ],
+      "ret": "Link",
+      "throws": false,
+      "line": 22,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "nested",
+      "exportName": "nested",
+      "params": [
+        {
+          "name": "value",
+          "type": "Option[Option[Int]]"
+        }
+      ],
+      "ret": "Option[Option[Int]]",
+      "throws": false,
+      "line": 28,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "optional",
+      "exportName": "optional",
+      "params": [
+        {
+          "name": "a",
+          "type": "Option[Int]"
+        },
+        {
+          "name": "b",
+          "type": "Int"
+        },
+        {
+          "name": "c",
+          "type": "Option[Int]"
+        }
+      ],
+      "ret": "Array[Option[Int]]",
+      "throws": false,
+      "line": 25,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "person",
+      "exportName": "person",
+      "params": [
+        {
+          "name": "value",
+          "type": "Person"
+        }
+      ],
+      "ret": "Person",
+      "throws": false,
+      "line": 13,
+      "filename": "lib.mbt"
+    },
+    {
+      "sourceName": "shape",
+      "exportName": "shape",
+      "params": [
+        {
+          "name": "value",
+          "type": "Shape"
+        }
+      ],
+      "ret": "Shape",
+      "throws": false,
+      "line": 16,
+      "filename": "lib.mbt"
+    }
+  ],
+  "types": [
+    {
+      "name": "Person",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "name",
+          "type": "String"
+        },
+        {
+          "name": "age",
+          "type": "Option[Int]"
+        },
+        {
+          "name": "rows",
+          "type": "Array[Array[Option[Int64]]]"
+        },
+        {
+          "name": "address",
+          "type": "Address"
+        },
+        {
+          "name": "__proto__",
+          "type": "Int"
+        }
+      ]
+    },
+    {
+      "name": "Address",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "city",
+          "type": "String"
+        }
+      ]
+    },
+    {
+      "name": "Shape",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "Empty",
+          "parameters": []
+        },
+        {
+          "name": "Point",
+          "parameters": [
+            {
+              "name": "",
+              "type": "Int"
+            },
+            {
+              "name": "",
+              "type": "Int"
+            }
+          ]
+        },
+        {
+          "name": "Label",
+          "parameters": [
+            {
+              "name": "text",
+              "type": "String"
+            }
+          ]
+        },
+        {
+          "name": "Chain",
+          "parameters": [
+            {
+              "name": "",
+              "type": "Array[Shape]"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Color",
+      "kind": "enum",
+      "variants": [
+        {
+          "name": "Red",
+          "parameters": []
+        },
+        {
+          "name": "Blue",
+          "parameters": []
+        }
+      ]
+    },
+    {
+      "name": "Link",
+      "kind": "struct",
+      "fields": [
+        {
+          "name": "value",
+          "type": "Int"
+        },
+        {
+          "name": "next",
+          "type": "Option[Link]"
+        }
+      ]
+    }
+  ]
+}

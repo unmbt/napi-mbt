@@ -142,6 +142,9 @@ Configuration is checked against the contract in `napi-mbt.schema.json`: unknown
 
 Loaders prefer an existing local artifact. A broken local artifact fails with its original error as `cause`, without silently loading another binary. Platform packages must match the root version, target and N-API metadata. Diagnostics include the target, attempted paths and N-API versions; unsupported OS/CPU/libc combinations are rejected explicitly. `prepublish` requires every requested artifact; use `--target` to prepare one platform.
 
+See [exported value types](docs/types.md) for bigint, nested Option/Array,
+structs, enum representations and their generated TypeScript contracts.
+
 ### Release and publish
 
 Version releases use the repository's `bump.config.json`; it runs `moon check` before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:

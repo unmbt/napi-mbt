@@ -7,7 +7,7 @@ export function concat(a: string, b: string): string;
 export function mutate_buffer(view: Buffer): void;
 export function roundtrip_bytes(b: Buffer): Buffer;
 
-declare const addon: {
+declare const $napiAddon: {
   add: typeof add;
   check_bool: typeof check_bool;
   check_double: typeof check_double;
@@ -15,4 +15,4 @@ declare const addon: {
   mutate_buffer: typeof mutate_buffer;
   roundtrip_bytes: typeof roundtrip_bytes;
 };
-export default addon;
+export default $napiAddon;

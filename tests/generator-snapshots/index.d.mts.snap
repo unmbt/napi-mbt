@@ -3,8 +3,8 @@
 export function noop(): void;
 export function public_name(a: number, text: string, flag: boolean, d: number, data: Buffer, view: Buffer): string;
 
-declare const addon: {
+declare const $napiAddon: {
   noop: typeof noop;
   public_name: typeof public_name;
 };
-export default addon;
+export default $napiAddon;

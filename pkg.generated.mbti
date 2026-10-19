@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "2"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "3"
 
 pub fn add(Int, Int) -> Int
 
@@ -20,13 +20,25 @@ pub fn get_Double(NapiEnv, NapiValue) -> Double raise NapiError
 
 pub fn get_Int(NapiEnv, NapiValue) -> Int raise NapiError
 
+pub fn get_Int64(NapiEnv, NapiValue) -> Int64 raise NapiError
+
 pub fn get_NapiBufferView(NapiEnv, NapiValue) -> NapiBufferView raise NapiError
 
 pub fn get_String(NapiEnv, NapiValue) -> String raise NapiError
 
+pub fn get_UInt64(NapiEnv, NapiValue) -> UInt64 raise NapiError
+
 pub fn moonbit_release_handle(Int) -> Unit
 
 pub fn mutate_buffer(NapiBufferView) -> Unit raise NapiError
+
+pub fn napi_array_get(NapiEnv, NapiValue, Int) -> NapiValue raise NapiError
+
+pub fn napi_array_length(NapiEnv, NapiValue) -> Int raise NapiError
+
+pub fn napi_array_new(NapiEnv, Int) -> NapiValue raise NapiError
+
+pub fn napi_array_set(NapiEnv, NapiValue, Int, NapiValue) -> Unit raise NapiError
 
 pub fn napi_bigint_from_int64(NapiEnv, Int64) -> NapiValue raise NapiError
 
@@ -35,6 +47,16 @@ pub fn napi_bigint_from_uint64(NapiEnv, UInt64) -> NapiValue raise NapiError
 pub fn napi_bigint_to_int64(NapiEnv, NapiValue) -> (Int64, Bool) raise NapiError
 
 pub fn napi_bigint_to_uint64(NapiEnv, NapiValue) -> (UInt64, Bool) raise NapiError
+
+pub fn napi_check_depth(Int) -> Unit raise NapiError
+
+pub fn napi_enter_value(NapiEnv, NapiValue, Array[NapiValue]) -> Unit raise NapiError
+
+pub fn napi_field_get(NapiEnv, NapiValue, String, Bool) -> NapiValue raise NapiError
+
+pub fn napi_field_set(NapiEnv, NapiValue, String, NapiValue) -> Unit raise NapiError
+
+pub fn napi_is_nullish(NapiEnv, NapiValue) -> Bool raise NapiError
 
 pub fn napi_mbt_adapter_add(NapiEnv, NapiValue, NapiValue) -> NapiValue
 
@@ -48,6 +70,10 @@ pub fn napi_mbt_adapter_mutate_buffer(NapiEnv, NapiValue) -> NapiValue
 
 pub fn napi_mbt_adapter_roundtrip_bytes(NapiEnv, NapiValue) -> NapiValue
 
+pub fn napi_null(NapiEnv) -> NapiValue raise NapiError
+
+pub fn napi_object_new(NapiEnv) -> NapiValue raise NapiError
+
 pub fn napi_promise_is(NapiEnv, NapiValue) -> Bool raise NapiError
 
 pub fn napi_promise_new(NapiEnv) -> NapiPromise raise NapiError
@@ -55,6 +81,8 @@ pub fn napi_promise_new(NapiEnv) -> NapiPromise raise NapiError
 pub fn napi_promise_reject(NapiEnv, NapiPromise, NapiValue) -> Unit raise NapiError
 
 pub fn napi_promise_resolve(NapiEnv, NapiPromise, NapiValue) -> Unit raise NapiError
+
+pub fn napi_require_object(NapiEnv, NapiValue) -> Unit raise NapiError
 
 pub fn napi_threadsafe_function_acquire(NapiThreadsafeFunction) -> NapiTsfnStatus raise NapiError
 
@@ -80,7 +108,11 @@ pub fn set_Double(NapiEnv, Double) -> NapiValue raise NapiError
 
 pub fn set_Int(NapiEnv, Int) -> NapiValue raise NapiError
 
+pub fn set_Int64(NapiEnv, Int64) -> NapiValue raise NapiError
+
 pub fn set_String(NapiEnv, String) -> NapiValue raise NapiError
+
+pub fn set_UInt64(NapiEnv, UInt64) -> NapiValue raise NapiError
 
 pub fn set_Unit(NapiEnv, Unit) -> NapiValue raise NapiError
 

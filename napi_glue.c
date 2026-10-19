@@ -22,6 +22,10 @@ static napi_value napi_mbt_callback_add(napi_env env, napi_callback_info info) {
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 2) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 2; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_add(env, argv[0], argv[1]);
 }
 
@@ -31,6 +35,10 @@ static napi_value napi_mbt_callback_check_bool(napi_env env, napi_callback_info 
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 1; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_check_bool(env, argv[0]);
 }
 
@@ -40,6 +48,10 @@ static napi_value napi_mbt_callback_check_double(napi_env env, napi_callback_inf
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 1; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_check_double(env, argv[0]);
 }
 
@@ -49,6 +61,10 @@ static napi_value napi_mbt_callback_concat(napi_env env, napi_callback_info info
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 2) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 2; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_concat(env, argv[0], argv[1]);
 }
 
@@ -58,6 +74,10 @@ static napi_value napi_mbt_callback_mutate_buffer(napi_env env, napi_callback_in
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 1; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_mutate_buffer(env, argv[0]);
 }
 
@@ -67,6 +87,10 @@ static napi_value napi_mbt_callback_roundtrip_bytes(napi_env env, napi_callback_
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
   if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
   if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
+  for (size_t i = argc; i < 1; ++i) {
+    status = napi_get_undefined(env, &argv[i]);
+    if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Filling optional arguments");
+  }
   return napi_mbt_adapter_roundtrip_bytes(env, argv[0]);
 }
 

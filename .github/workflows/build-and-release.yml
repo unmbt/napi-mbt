@@ -84,6 +84,9 @@ jobs:
       - name: Check loader modes and TypeScript consumers
         run: moon run scripts/loader-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
 
+      - name: Check structured values and TypeScript consumers
+        run: moon run scripts/test-runtime.mbtx --structured
+
       - name: Prepare Artifact
         shell: bash
         run: |

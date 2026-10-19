@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "2",
+  "runtimeTemplateVersion": "3",
   "napiVersion": 7,
   "requiredNapiVersion": 7,
   "features": [
@@ -53,5 +53,6 @@
       "line": 2,
       "filename": "lib.mbt"
     }
-  ]
+  ],
+  "types": []
 }

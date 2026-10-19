@@ -19,6 +19,7 @@ pub(all) struct ParsedExport {
 pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
   features : Array[String]
+  types : Array[TypeDefinition]
 }
 
 ///|
@@ -80,6 +81,11 @@ fn parse_function(
   }
   let attr = attrs[0]
   let location = "\{filename}:\{attr.line()}"
+  if !child(node, "visibility")
+    .map(v => v.tokens().contains("pub"))
+    .unwrap_or(false) {
+    fail("\{location}: #export_name requires a public function")
+  }
   let text = attr.tokens().join("")
   guard text.find("(") is Some(begin) && text.has_suffix(")") else {
     fail("\{location}: malformed #export_name")
@@ -189,18 +195,40 @@ fn visit(
 ///|
 /// Parse complete MoonBit syntax, then validate the supported exported signatures.
 pub fn parse_source(source : String, filename : String) -> ParsedSource raise {
-  let tree = @syntax.parse(source.replace_all(old="\r\n", new="\n"))
-  if tree.has_error() {
-    fail("\{filename}:\{syntax_error_line(tree)}: MoonBit syntax error")
-  }
+  parse_sources([(filename, source)])
+}
+
+///|
+/// Resolve all exported types across the package before rendering any output.
+pub fn parse_sources(sources : Array[(String, String)]) -> ParsedSource raise {
   let exports = []
   let features = []
-  visit(tree, filename, exports, features)
-  if exports.any(item => {
-      item.parameters.any(p => p.value_type is (BufferViewType | BytesType)) ||
-      item.return_type is BytesType
-    }) {
-    features.push("buffer")
+  let declarations : Map[String, (@syntax.Node, String)] = Map([])
+  for (filename, source) in sources {
+    let tree = @syntax.parse(source.replace_all(old="\r\n", new="\n"))
+    if tree.has_error() {
+      fail("\{filename}:\{syntax_error_line(tree)}: MoonBit syntax error")
+    }
+    for node in tree.children() {
+      if node.kind() == "struct_definition" || node.kind() == "enum_definition" {
+        if child(node, "identifier") is Some(name) {
+          let name = name.text()
+          if declarations.contains(name) {
+            fail("\{filename}:\{node.line()}: duplicate type \{name}")
+          }
+          declarations[name] = (node, filename)
+        }
+      }
+    }
+    visit(tree, filename, exports, features)
   }
-  { exports, features, }
+  let types : Array[TypeDefinition] = []
+  for item in exports {
+    let location = "\{item.filename}:\{item.line}"
+    for p in item.parameters {
+      resolve_type(p.value_type, declarations, types, features, location)
+    }
+    resolve_type(item.return_type, declarations, types, features, location)
+  }
+  { exports, features, types, }
 }

@@ -7,13 +7,19 @@ struct Generated {
 ///|
 async fn generate(dir : String, check : Bool) -> Generated {
   let conf = config(dir)
+  let runtime = @fs.read_file(dir + "/napi_runtime_version.mbt").text()
+  guard runtime.find("=") is Some(equal) &&
+    @json.parse(runtime[equal + 1:].trim().to_owned()) ==
+    Json(@assets.runtime_version()) else {
+    fail("Runtime template version does not match this generator")
+  }
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
-    "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt",
+    "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt",
   ]
-  let exports = []
   let features = conf.features.copy()
   let seen : Map[String, String] = Map([])
+  let sources = []
   for file in @fs.readdir(dir, sort=true) {
     if !file.has_suffix(".mbt") ||
       file.has_suffix("_test.mbt") ||
@@ -21,24 +27,22 @@ async fn generate(dir : String, check : Bool) -> Generated {
       excluded.contains(file) {
       continue
     }
-    let source = @generator.parse_source(
-      @fs.read_file(dir + "/" + file).text(),
-      file,
-    )
-    for feature in source.features {
-      if !features.contains(feature) {
-        features.push(feature)
-      }
+    sources.push((file, @fs.read_file(dir + "/" + file).text()))
+  }
+  let source = @generator.parse_sources(sources)
+  let exports = source.exports
+  for feature in source.features {
+    if !features.contains(feature) {
+      features.push(feature)
     }
-    for item in source.exports {
-      if seen.contains(item.export_name) {
-        fail(
-          "\{file}:\{item.line}: duplicate export name \{item.export_name} (first in \{seen[item.export_name]})",
-        )
-      }
-      seen[item.export_name] = file
-      exports.push(item)
+  }
+  for item in source.exports {
+    if seen.contains(item.export_name) {
+      fail(
+        "\{item.filename}:\{item.line}: duplicate export name \{item.export_name} (first in \{seen[item.export_name]})",
+      )
     }
+    seen[item.export_name] = item.filename
   }
   features.sort()
   for feature in features {
@@ -52,7 +56,7 @@ async fn generate(dir : String, check : Bool) -> Generated {
   exports.sort_by((a, b) => lexical_compare(a.export_name, b.export_name))
   let pkg = read_object(dir + "/package.json")
   let outputs = @generator.render(
-    exports,
+    source,
     str(pkg, "name", "napi-mbt-package"),
     conf.napi_version,
     package_version=str(pkg, "version", "0.1.0"),
@@ -69,6 +73,7 @@ async fn generate(dir : String, check : Bool) -> Generated {
     "esm": conf.esm,
     "builder": conf.builder,
     "exports": exports.map(e => e.manifest()),
+    "types": source.types.map(t => t.manifest()),
   }
   outputs.push(("napi_manifest.json", manifest.stringify(indent=2) + "\n"))
   outputs.push(
