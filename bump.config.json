@@ -1,4 +1,4 @@
 {
-  "execute": "moon check",
+  "execute": "moon run scripts/prepare-release.mbtx",
   "all": true
 }

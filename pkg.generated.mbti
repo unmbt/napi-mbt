@@ -4,7 +4,7 @@ package "unmbt/napi-mbt"
 // Values
 pub const NAPI_MBT_RUNTIME_VERSION : String = "7"
 
-pub fn add(Int, Int) -> Int
+pub fn add(Int32, Int32) -> Int32
 
 pub fn check_bool(Bool) -> Bool
 
@@ -18,7 +18,7 @@ pub fn get_Bytes(NapiEnv, NapiValue) -> Bytes raise NapiError
 
 pub fn get_Double(NapiEnv, NapiValue) -> Double raise NapiError
 
-pub fn get_Int(NapiEnv, NapiValue) -> Int raise NapiError
+pub fn get_Int(NapiEnv, NapiValue) -> Int32 raise NapiError
 
 pub fn get_Int64(NapiEnv, NapiValue) -> Int64 raise NapiError
 
@@ -30,13 +30,13 @@ pub fn get_UInt64(NapiEnv, NapiValue) -> UInt64 raise NapiError
 
 pub fn mutate_buffer(NapiBufferView) -> Unit raise NapiError
 
-pub fn napi_array_get(NapiEnv, NapiValue, Int) -> NapiValue raise NapiError
+pub fn napi_array_get(NapiEnv, NapiValue, Int32) -> NapiValue raise NapiError
 
-pub fn napi_array_length(NapiEnv, NapiValue) -> Int raise NapiError
+pub fn napi_array_length(NapiEnv, NapiValue) -> Int32 raise NapiError
 
-pub fn napi_array_new(NapiEnv, Int) -> NapiValue raise NapiError
+pub fn napi_array_new(NapiEnv, Int32) -> NapiValue raise NapiError
 
-pub fn napi_array_set(NapiEnv, NapiValue, Int, NapiValue) -> Unit raise NapiError
+pub fn napi_array_set(NapiEnv, NapiValue, Int32, NapiValue) -> Unit raise NapiError
 
 pub fn napi_bigint_from_int64(NapiEnv, Int64) -> NapiValue raise NapiError
 
@@ -46,11 +46,11 @@ pub fn napi_bigint_to_int64(NapiEnv, NapiValue) -> (Int64, Bool) raise NapiError
 
 pub fn napi_bigint_to_uint64(NapiEnv, NapiValue) -> (UInt64, Bool) raise NapiError
 
-pub fn napi_check_depth(Int) -> Unit raise NapiError
+pub fn napi_check_depth(Int32) -> Unit raise NapiError
 
-pub fn napi_class_dispose(NapiEnv, NapiValue, Int) -> Unit raise NapiError
+pub fn napi_class_dispose(NapiEnv, NapiValue, Int32) -> Unit raise NapiError
 
-pub fn napi_class_handle(NapiEnv, NapiValue, Int) -> UnmanagedBuffer raise NapiError
+pub fn napi_class_handle(NapiEnv, NapiValue, Int32) -> UnmanagedBuffer raise NapiError
 
 pub fn napi_closure_new(NapiEnv, (NapiEnv, NapiArguments) -> NapiValue) -> NapiValue raise NapiError
 
@@ -94,7 +94,7 @@ pub fn napi_threadsafe_function_acquire(NapiThreadsafeFunction) -> NapiTsfnStatu
 
 pub fn napi_threadsafe_function_call(NapiThreadsafeFunction, UnmanagedBuffer, NapiTsfnCallMode) -> NapiTsfnStatus raise NapiError
 
-pub fn napi_threadsafe_function_create(NapiEnv, NapiValue, NapiValue, NapiValue, Int, Int, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer) -> NapiThreadsafeFunction raise NapiError
+pub fn napi_threadsafe_function_create(NapiEnv, NapiValue, NapiValue, NapiValue, Int32, Int32, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer, UnmanagedBuffer) -> NapiThreadsafeFunction raise NapiError
 
 pub fn napi_threadsafe_function_release(NapiThreadsafeFunction, NapiTsfnReleaseMode) -> NapiTsfnStatus raise NapiError
 
@@ -106,7 +106,7 @@ pub fn set_Bytes(NapiEnv, Bytes) -> NapiValue raise NapiError
 
 pub fn set_Double(NapiEnv, Double) -> NapiValue raise NapiError
 
-pub fn set_Int(NapiEnv, Int) -> NapiValue raise NapiError
+pub fn set_Int(NapiEnv, Int32) -> NapiValue raise NapiError
 
 pub fn set_Int64(NapiEnv, Int64) -> NapiValue raise NapiError
 
@@ -119,14 +119,14 @@ pub fn set_Unit(NapiEnv, Unit) -> NapiValue raise NapiError
 // Errors
 pub(all) suberror NapiError {
   JavaScriptException(NapiReference)
-  ApiError(status~ : Int, kind~ : NapiErrorKind, code~ : String, context~ : String)
+  ApiError(status~ : Int32, kind~ : NapiErrorKind, code~ : String, context~ : String)
 }
 
 // Types and methods
 #external
 pub type NapiArguments
-pub fn NapiArguments::get(Self, NapiEnv, Int) -> NapiValue raise NapiError
-pub fn NapiArguments::require(Self, Int) -> Unit raise NapiError
+pub fn NapiArguments::get(Self, NapiEnv, Int32) -> NapiValue raise NapiError
+pub fn NapiArguments::require(Self, Int32) -> Unit raise NapiError
 
 pub struct NapiBufferView {
   env : NapiEnv
@@ -134,9 +134,9 @@ pub struct NapiBufferView {
   mut is_alive : Bool
 }
 pub fn NapiBufferView::invalidate(Self) -> Unit
-pub fn NapiBufferView::length(Self) -> Int raise NapiError
-pub fn NapiBufferView::load8(Self, Int) -> Int raise NapiError
-pub fn NapiBufferView::store8(Self, Int, Int) -> Unit raise NapiError
+pub fn NapiBufferView::length(Self) -> Int32 raise NapiError
+pub fn NapiBufferView::load8(Self, Int32) -> Int32 raise NapiError
+pub fn NapiBufferView::store8(Self, Int32, Int32) -> Unit raise NapiError
 
 pub type NapiCallback
 pub fn NapiCallback::call(Self, NapiValue) -> NapiValue raise NapiError

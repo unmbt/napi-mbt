@@ -49,6 +49,12 @@ ASan 覆盖 parser 与 addon；Linux 额外启用 leak detection。
 `prepublish` 拒绝缺失、架构错误、非动态库构件和过期声明/生成物，保留用户包元数据，
 并附带第三方许可证。生成的 `npm/`、`artifacts/`、`licenses/` 不入库。
 
+在仓库根目录使用 `moon-bump` 发版。配置中的 `prepare-release.mbtx` 会先根据
+`moon.mod` 同步 npm 清单和锁文件版本，再严格检查项目（同时重新生成 CLI 版本），
+并在提交、打 tag 前执行发布检查。`all: true` 会将这些生成的改动一起提交。
+手动修改版本后，可运行 `moon run scripts/prepare-release.mbtx` 修复并验证。
+CI 仍执行不带 `--write` 的 `release-check.mbtx`，版本不一致时会失败。
+
 源码清单包含开发依赖，不包含尚未发布的平台包。`prepublish` 为分发添加平台依赖，
 根目录分发测试结束后恢复源码清单。`source-install-test.mbtx` 在仅含清单的全新临时
 目录中执行 `npm ci`，并验证缺少条目的 lockfile 会被门禁拒绝。
@@ -67,7 +73,7 @@ moon run scripts/mooncake-package-test.mbtx
 
 Mooncake 门禁使用 `moon package`，检查 ZIP 清单，在临时目录解包并执行严格检查，
 不依赖 registry 登录或版本是否已发布。`moon publish --dry-run` 还会访问 registry
-检查版本可用性；当前 0.1.1 已存在时返回 409，不代表解包后的源码检查失败。
+检查版本可用性；版本已存在时返回 409，不代表解包后的源码检查失败。
 
 CI 固定 Moon/core 和 CMake，保留三个发布平台，测试 Node 22/24/26 与最低版本，
 通过后才生成 release 归档；新 MoonBit 兼容性独立测试。

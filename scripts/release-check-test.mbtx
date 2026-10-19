@@ -1,0 +1,153 @@
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn run(
+  args : Array[String],
+  cwd : String,
+  tag? : String,
+) -> (Int32, String) {
+  let env = { "GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "master" }
+  if tag is Some(value) {
+    env["GITHUB_REF_TYPE"] = "tag"
+    env["GITHUB_REF_NAME"] = value
+  }
+  let (code, out, err) = @async.with_timeout(120000, () => {
+    @process.collect_output("moon", args, cwd~, extra_env=env)
+  })
+  (code, out.text() + err.text())
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-release-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.mkdir(temp + "/scripts")
+  @fs.mkdir(temp + "/cmd")
+  for name in ["prepare-release.mbtx", "release-check.mbtx", "gen_version.mbtx"] {
+    @fs.write_file(
+      temp + "/scripts/" + name,
+      @fs.read_file(root + "/scripts/" + name),
+    )
+  }
+  // Exercise the command that moon-bump actually invokes, including CLI version
+  // generation. No Git commit, tag, remote push or registry publication occurs.
+  guard @json.parse(@fs.read_file(root + "/bump.config.json").text())
+    is { "execute": String(execute), "all": True, .. } else {
+    fail("Release config must execute preparation and include its changes")
+  }
+  let command = [ for arg in execute.split(" ") => arg.to_owned() ]
+  guard command is ["moon", .. args] else {
+    fail("Expected a MoonBit release hook")
+  }
+  let hook = args.to_owned()
+  let check = ["run", "scripts/release-check.mbtx"]
+  let package_text =
+    #|pkgtype(kind: "executable")
+    #|rule(name: "version", command: "moon run scripts/gen_version.mbtx $input $output")
+    #|dev_build(rule: "version", input: "../moon.mod", output: "version.mbt")
+  @fs.write_file(temp + "/cmd/moon.pkg", package_text)
+  @fs.write_file(temp + "/cmd/main.mbt", "fn main { println(VERSION) }\n")
+  let dependencies : Json = { "fixture-tool": "0.1.1" }
+  let entry : Json = {
+    "version": "0.1.1",
+    "resolved": "https://registry.npmjs.org/fixture-tool/-/fixture-tool-0.1.1.tgz",
+    "integrity": "unchanged",
+  }
+  let manifest : Json = {
+    "name": "release-fixture",
+    "version": "0.1.1",
+    "description": "Keep 0.1.1 in prose",
+    "devDependencies": dependencies,
+  }
+  @fs.write_file(temp + "/package.json", manifest.stringify(indent=2) + "\n")
+  let lock : Json = {
+    "name": "release-fixture",
+    "version": "0.1.1",
+    "lockfileVersion": 3,
+    "packages": {
+      "": {
+        "name": "release-fixture",
+        "version": "0.1.1",
+        "devDependencies": dependencies,
+      },
+      "node_modules/fixture-tool": entry,
+    },
+  }
+  @fs.write_file(temp + "/package-lock.json", lock.stringify(indent=2) + "\n")
+  for version in ["0.2.0", "0.3.0-rc.1"] {
+    // Reproduce moon-bump's file update before its execute hook.
+    @fs.write_file(
+      temp + "/moon.mod",
+      "name = \"test/release\"\nversion = \"\{version}\"\npreferred_target = \"native\"\n",
+    )
+    let before = @fs.read_file(temp + "/package.json").text()
+    let (code, output) = run(check, temp)
+    assert_true(
+      code != 0 && output.contains("moon.mod/package.json version mismatch"),
+      msg=output,
+    )
+    assert_eq(@fs.read_file(temp + "/package.json").text(), before)
+    let (code, output) = run(hook, temp)
+    assert_eq(code, 0, msg=output)
+    guard @json.parse(@fs.read_file(temp + "/package.json").text())
+      is Object(manifest) else {
+      fail("Invalid manifest")
+    }
+    guard @json.parse(@fs.read_file(temp + "/package-lock.json").text())
+      is Object(lock) &&
+      lock.get("packages") is Some(Object(packages)) else {
+      fail("Invalid lock")
+    }
+    guard packages.get("") is Some(Object(root_package)) else {
+      fail("Missing root")
+    }
+    assert_eq(manifest.get("version"), Some(Json(version)))
+    assert_eq(lock.get("version"), Some(Json(version)))
+    assert_eq(root_package.get("version"), Some(Json(version)))
+    assert_eq(manifest.get("description"), Some(Json("Keep 0.1.1 in prose")))
+    assert_eq(manifest.get("devDependencies"), Some(dependencies))
+    assert_eq(packages.get("node_modules/fixture-tool"), Some(entry))
+    assert_true(
+      @fs.read_file(temp + "/cmd/version.mbt")
+      .text()
+      .contains("const VERSION : String = \"\{version}\""),
+    )
+    let (code, output) = run(check, temp, tag="v" + version)
+    assert_eq(code, 0, msg=output)
+  }
+  let manifest = @fs.read_file(temp + "/package.json").text()
+  let lockfile = @fs.read_file(temp + "/package-lock.json").text()
+  let (code, output) = run(hook, temp)
+  assert_eq(code, 0, msg=output)
+  assert_eq(@fs.read_file(temp + "/package.json").text(), manifest)
+  assert_eq(@fs.read_file(temp + "/package-lock.json").text(), lockfile)
+  let (code, output) = run(check, temp, tag="v0.1.1")
+  assert_true(
+    code != 0 && output.contains("Release tag must match package version"),
+    msg=output,
+  )
+  guard @json.parse(lockfile) is Object(lock) &&
+    lock.get("packages") is Some(Object(packages)) else {
+    fail("Invalid lock")
+  }
+  packages.remove("node_modules/fixture-tool")
+  @fs.write_file(
+    temp + "/package-lock.json",
+    Json(lock).stringify(indent=2) + "\n",
+  )
+  let (code, output) = run(hook, temp)
+  assert_true(
+    code != 0 && output.contains("Missing lockfile package: fixture-tool"),
+    msg=output,
+  )
+  println(
+    "Release synchronization, dependency preservation, CLI version, tag and lockfile regression tests passed",
+  )
+}

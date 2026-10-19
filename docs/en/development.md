@@ -60,6 +60,14 @@ non-library or stale artifacts/declarations. It preserves user package metadata
 and includes bundled licenses. Generated `npm/`, `artifacts/` and `licenses/`
 are not source-controlled.
 
+Release with `moon-bump` from the repository root. Its configured
+`prepare-release.mbtx` hook synchronizes the npm manifest and lockfile versions
+from `moon.mod`, strictly checks the project (regenerating the CLI version), and
+runs the release checks before committing and tagging. `all: true` includes
+these generated changes in the release commit. To repair or validate a manually
+changed version, run `moon run scripts/prepare-release.mbtx`. CI runs
+`release-check.mbtx` without `--write`, so an inconsistent release still fails.
+
 The checkout manifest contains development dependencies, without unpublished
 platform packages. `prepublish` adds the platform dependencies for distribution;
 the root distribution test restores the checkout manifest afterward.
@@ -83,7 +91,7 @@ receipts; always build the checkout being packaged.
 The Mooncake gate packs the module, rejects accidental dependencies/binaries in
 the archive, extracts it, and strictly checks the extracted sources. It uses no
 registry publication. `moon publish --dry-run` additionally contacts the registry
-and rejects a version that already exists (including the current 0.1.1); use it
+and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
 CI pins Moon/core and CMake, builds the three release platforms, runs the Node
