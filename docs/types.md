@@ -9,7 +9,7 @@ with a source filename and line; no type falls back to Buffer.
 | Int / Int32 | number | Finite integer in the signed 32-bit range |
 | Double | number | IEEE values, including NaN and infinities |
 | Int64 / UInt64 | bigint | N-API 6; overflow throws RangeError with `ERR_NAPI_BIGINT_RANGE` |
-| String | string | Embedded NUL and Unicode strings |
+| String | string | Exact UTF-16 code units, including NUL and lone surrogates |
 | Bytes | Buffer | Owned copy; N-API 7 for backing-store checks |
 | NapiBufferView | Buffer | Direct synchronous borrowed parameter; invalid after the call |
 | Option[T] / T? | T or null | Missing, undefined and null become None; None returns null |

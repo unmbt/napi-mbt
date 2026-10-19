@@ -140,43 +140,16 @@ pub fn set_Bool(env : NapiEnv, val : Bool) -> NapiValue raise NapiError {
 
 ///|
 pub fn get_String(env : NapiEnv, val : NapiValue) -> String raise NapiError {
-  let len = Ref(0)
-  let status = napi_get_value_string_utf8_length(
-    env,
-    val,
-    moonbit_dummy_unmanaged_buffer(),
-    0,
-    len,
-  )
-  result_from_status(env, status, b"Failed to get string length")
-
-  let buf = Bytes::make(len.val + 1, b'\x00')
-  let status2 = napi_get_value_string_utf8(env, val, buf, len.val + 1, len)
-  result_from_status(env, status2, b"Failed to read string")
-
-  let arr = Array::make(len.val, b'\x00')
-  for i = 0; i < len.val; i = i + 1 {
-    arr[i] = buf[i]
-  }
-
-  // Use utf8.decode for proper string construction
-  let res = @utf8.decode(Bytes::from_array(arr)) catch {
-    _ =>
-      raise napi_failure(
-        9,
-        Error,
-        "ERR_NAPI_STRING",
-        "Failed to decode UTF-8 string",
-      )
-  }
-  res
+  let status = Ref(0)
+  let result = napi_read_string(env, val, status)
+  result_from_status(env, status.val, b"Reading UTF-16 String")
+  result
 }
 
 ///|
 pub fn set_String(env : NapiEnv, val : String) -> NapiValue raise NapiError {
-  let res_bytes = @utf8.encode(val)
   let res = Ref(moonbit_dummy_napi_value())
-  let status = napi_create_string_utf8(env, res_bytes, res_bytes.length(), res)
+  let status = napi_write_string(env, val, res)
   result_from_status(env, status, b"Failed to create String")
   res.val
 }
@@ -188,11 +161,7 @@ pub fn get_Bytes(env : NapiEnv, val : NapiValue) -> Bytes raise NapiError {
   let status = napi_get_buffer_info(env, val, unmanaged, len)
   result_from_status(env, status, b"Invalid argument, expected Buffer")
 
-  let arr = Array::make(len.val, b'\x00')
-  for i = 0; i < len.val; i = i + 1 {
-    arr[i] = unmanaged.val.load8(i).to_byte()
-  }
-  Bytes::from_array(arr)
+  napi_copy_bytes(unmanaged.val, len.val)
 }
 
 ///|

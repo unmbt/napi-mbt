@@ -1,0 +1,129 @@
+{
+  "label": "baseline",
+  "runtime": {
+    "node": "v26.4.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     ",
+    "results": [
+      {
+        "name": "call/add",
+        "iterations": 200000,
+        "unit": "ns/op",
+        "samples": [
+          552.5405,
+          610.5675,
+          550,
+          543.8055,
+          552.322
+        ],
+        "median": 552.322
+      },
+      {
+        "name": "string/ascii",
+        "iterations": 5000,
+        "unit": "ns/op",
+        "samples": [
+          27969.72,
+          30474.52,
+          32645.82,
+          28383.88,
+          25510.84
+        ],
+        "median": 28383.88
+      },
+      {
+        "name": "string/unicode",
+        "iterations": 5000,
+        "unit": "ns/op",
+        "samples": [
+          73123.16,
+          69621.86,
+          71079.9,
+          70120.06,
+          107630.76
+        ],
+        "median": 71079.9
+      },
+      {
+        "name": "buffer/0",
+        "iterations": 30000,
+        "unit": "ns/op",
+        "samples": [
+          3064.4366666666665,
+          5241.37,
+          4534.7,
+          3611.63,
+          2056.32
+        ],
+        "median": 3611.63
+      },
+      {
+        "name": "buffer/64",
+        "iterations": 30000,
+        "unit": "ns/op",
+        "samples": [
+          3453.37,
+          4824.34,
+          3396.97,
+          3383.92,
+          2833.2533333333336
+        ],
+        "median": 3396.97
+      },
+      {
+        "name": "buffer/4096",
+        "iterations": 4096,
+        "unit": "ns/op",
+        "samples": [
+          47196.044921875,
+          55440.4541015625,
+          46786.962890625,
+          45213.3544921875,
+          45580.2978515625
+        ],
+        "median": 46786.962890625
+      },
+      {
+        "name": "buffer/65536",
+        "iterations": 256,
+        "unit": "ns/op",
+        "samples": [
+          840298.4375,
+          730603.125,
+          661460.546875,
+          953673.828125,
+          976303.125
+        ],
+        "median": 840298.4375
+      },
+      {
+        "name": "buffer/1048576",
+        "iterations": 32,
+        "unit": "ns/op",
+        "samples": [
+          11273262.5,
+          10405509.375,
+          10479528.125,
+          11587031.25,
+          10226753.125
+        ],
+        "median": 10479528.125
+      },
+      {
+        "name": "async/timer-0-batch-100",
+        "iterations": 1000,
+        "unit": "ns/op",
+        "samples": [
+          88946.8,
+          136945.3,
+          19056.4,
+          45917.7,
+          14130.9
+        ],
+        "median": 45917.7
+      }
+    ]
+  },
+  "builds": []
+}

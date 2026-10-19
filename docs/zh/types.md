@@ -8,7 +8,7 @@
 | Int / Int32 | number | 有限、无小数、32 位有符号范围内 |
 | Double | number | IEEE 语义，包括 NaN 和无穷 |
 | Int64 / UInt64 | bigint | 需要 N-API 6；越界抛 RangeError，code 为 `ERR_NAPI_BIGINT_RANGE` |
-| String | string | 支持内嵌 NUL 和 Unicode 字符串 |
+| String | string | 精确保留 UTF-16 code units，包括 NUL 和孤立 surrogate |
 | Bytes | Buffer | 拥有数据副本；backing store 检查需要 N-API 7 |
 | NapiBufferView | Buffer | 同步调用的直接借用参数，调用结束后失效 |
 | Option[T] / T? | T 或 null | missing、undefined、null 输入均为 None；None 输出 null |

@@ -97,6 +97,9 @@ async fn main {
     #|#export_name("bytes")
     #|pub fn bytes(value : Bytes) -> Bytes { value }
     #|///|
+    #|#export_name("string")
+    #|pub fn string(value : String) -> String { effects.val += 1; value }
+    #|///|
     #|#export_name("tsfn_statuses")
     #|pub fn tsfn_statuses() -> Bool raise {
     #|  tsfn_status(0, "test") is Accepted && tsfn_status(15, "test") is QueueFull && tsfn_status(16, "test") is Closing

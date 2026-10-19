@@ -1,0 +1,146 @@
+{
+  "label": "optimized",
+  "runtime": {
+    "node": "v26.4.0",
+    "platform": "win32",
+    "arch": "x64",
+    "cpu": "AMD Ryzen 7 8845HS w/ Radeon 780M Graphics     ",
+    "results": [
+      {
+        "name": "call/add",
+        "iterations": 200000,
+        "unit": "ns/op",
+        "samples": [
+          543.5755,
+          559.6585,
+          490.807,
+          529.0885,
+          603.9765
+        ],
+        "median": 543.5755
+      },
+      {
+        "name": "string/ascii",
+        "iterations": 5000,
+        "unit": "ns/op",
+        "samples": [
+          1909.1,
+          1823.52,
+          1779.44,
+          1896.52,
+          1938.58
+        ],
+        "median": 1896.52
+      },
+      {
+        "name": "string/unicode",
+        "iterations": 5000,
+        "unit": "ns/op",
+        "samples": [
+          2105.82,
+          1725.94,
+          1496.42,
+          1988.8,
+          1802.3
+        ],
+        "median": 1802.3
+      },
+      {
+        "name": "buffer/0",
+        "iterations": 30000,
+        "unit": "ns/op",
+        "samples": [
+          1669.1533333333334,
+          1677.2,
+          1721.6633333333334,
+          1722.5166666666667,
+          1692.3133333333333
+        ],
+        "median": 1692.3133333333333
+      },
+      {
+        "name": "buffer/64",
+        "iterations": 30000,
+        "unit": "ns/op",
+        "samples": [
+          1930.6566666666668,
+          1779.99,
+          1715.7133333333334,
+          1968.2366666666667,
+          1866.28
+        ],
+        "median": 1866.28
+      },
+      {
+        "name": "buffer/4096",
+        "iterations": 4096,
+        "unit": "ns/op",
+        "samples": [
+          3768.9208984375,
+          4126.2451171875,
+          4457.6904296875,
+          3961.0595703125,
+          4805.5908203125
+        ],
+        "median": 4126.2451171875
+      },
+      {
+        "name": "buffer/65536",
+        "iterations": 256,
+        "unit": "ns/op",
+        "samples": [
+          70723.4375,
+          75275,
+          61870.703125,
+          72169.140625,
+          72075
+        ],
+        "median": 72075
+      },
+      {
+        "name": "buffer/1048576",
+        "iterations": 32,
+        "unit": "ns/op",
+        "samples": [
+          1307021.875,
+          1151003.125,
+          1167171.875,
+          1157271.875,
+          1243678.125
+        ],
+        "median": 1167171.875
+      },
+      {
+        "name": "async/timer-0-batch-100",
+        "iterations": 1000,
+        "unit": "ns/op",
+        "samples": [
+          102559.8,
+          110333.6,
+          122758,
+          91042.1,
+          125005.5
+        ],
+        "median": 110333.6
+      }
+    ]
+  },
+  "builds": [
+    {
+      "phase": "cold-project",
+      "milliseconds": 29884
+    },
+    {
+      "phase": "warm-project",
+      "milliseconds": 29573
+    },
+    {
+      "phase": "warm-project",
+      "milliseconds": 30526
+    },
+    {
+      "phase": "warm-project",
+      "milliseconds": 30087
+    }
+  ]
+}

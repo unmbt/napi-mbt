@@ -48,33 +48,23 @@ extern "c" fn napi_get_undefined(
 ) -> Int32 = "napi_get_undefined"
 
 ///|
-#borrow(buf, result)
-extern "c" fn napi_get_value_string_utf8(
+#borrow(status)
+extern "c" fn napi_read_string(
   env : NapiEnv,
   value : NapiValue,
-  buf : Bytes,
-  bufsize : Int32,
-  result : Ref[Int32],
-) -> Int32 = "moonbit_napi_get_value_string_utf8"
-
-///|
-#borrow(result)
-extern "c" fn napi_get_value_string_utf8_length(
-  env : NapiEnv,
-  value : NapiValue,
-  buf : UnmanagedBuffer,
-  bufsize : Int32,
-  result : Ref[Int32],
-) -> Int32 = "moonbit_napi_get_value_string_utf8_length"
+  status : Ref[Int32],
+) -> String = "moonbit_napi_read_string"
 
 ///|
 #borrow(str, result)
-extern "c" fn napi_create_string_utf8(
+extern "c" fn napi_write_string(
   env : NapiEnv,
-  str : Bytes,
-  length : Int32,
+  str : String,
   result : Ref[NapiValue],
-) -> Int32 = "napi_create_string_utf8"
+) -> Int32 = "moonbit_napi_write_string"
+
+///|
+extern "c" fn napi_copy_bytes(data : UnmanagedBuffer, length : Int32) -> Bytes = "moonbit_napi_copy_bytes"
 
 ///|
 #borrow(data, length)

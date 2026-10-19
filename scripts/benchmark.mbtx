@@ -1,0 +1,44 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> String {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(binary, args))
+  if code != 0 { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn main {
+  let label = @env.args().get(1).unwrap_or("current")
+  guard !label.is_empty() && label.iter().all(c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') else { fail("Use an alphanumeric benchmark label") }
+  let directory = ".napi-mbt/benchmarks/" + label
+  @fs.mkdir(directory, recursive=true, allow_exist=true)
+  if @env.args().contains("--record") {
+    @fs.mkdir("docs/benchmarks", recursive=true, allow_exist=true)
+    @fs.write_file("docs/benchmarks/" + label + ".json", @fs.read_file(directory + "/results.json"))
+    return
+  }
+  if @env.args().contains("--capture") {
+    let target = @fs.readdir("artifacts")[0]
+    @fs.write_file(directory + "/sync.node", @fs.read_file("artifacts/" + target + "/napi_mbt.node"))
+    @fs.write_file(directory + "/async.node", @fs.read_file(".napi-mbt/async-exports/napi_mbt.node"))
+    println("Captured benchmark binaries: " + directory)
+    return
+  }
+  let runtime = @json.parse(checked("node", ["--expose-gc", "scripts/benchmark.test.cjs", directory + "/sync.node", directory + "/async.node"]))
+  let builds : Array[Json] = []
+  if @env.args().contains("--build") {
+    let binary = @fs.realpath("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
+    let temp = @fs.tmpdir(prefix="napi-mbt-benchmark-")
+    defer @fs.rmdir(temp, recursive=true)
+    ignore(checked(binary, ["init", temp + "/fixture", "--name", "benchmark-fixture"]))
+    for index in 0..<4 {
+      let start = @env.now()
+      ignore(checked(binary, ["build", temp + "/fixture", "--release"]))
+      builds.push({ "phase": if index == 0 { "cold-project" } else { "warm-project" }, "milliseconds": (@env.now() - start).to_double() })
+    }
+  }
+  let report : Json = { "label": label, "runtime": runtime, "builds": builds }
+  @fs.write_file(directory + "/results.json", report.stringify(indent=2) + "\n")
+  println(report.stringify(indent=2))
+}

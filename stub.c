@@ -168,20 +168,40 @@ int moonbit_napi_release_threadsafe_function(napi_threadsafe_function func, int 
 }
 
 MOONBIT_FFI_EXPORT
-int moonbit_napi_get_value_string_utf8_length(napi_env env, napi_value value, void* buf, int bufsize, int* result) {
+moonbit_string_t moonbit_napi_read_string(napi_env env, napi_value value, int32_t *status_out) {
     size_t length = 0;
-    napi_status status = napi_get_value_string_utf8(env, value, (char*)buf, (size_t)bufsize, &length);
-    if (length >= INT_MAX) return 1002;
-    if (result) *result = (int)length;
-    return (int)status;
+    napi_status status = napi_get_value_string_utf16(env, value, NULL, 0, &length);
+    *status_out = (int32_t)status;
+    if (status != napi_ok) return moonbit_make_string(0, 0);
+    if (length > INT_MAX) {
+        *status_out = 1002;
+        return moonbit_make_string(0, 0);
+    }
+    // MoonBit allocates a trailing UTF-16 zero beyond the logical length.
+    // Node writes directly into this exclusively owned, not-yet-published value.
+    moonbit_string_t result = moonbit_make_string_raw((int32_t)length);
+    size_t written = 0;
+    status = napi_get_value_string_utf16(env, value, (char16_t *)result, length + 1, &written);
+    if (status != napi_ok || written != length) {
+        moonbit_decref(result);
+        *status_out = status == napi_ok ? (int32_t)napi_generic_failure : (int32_t)status;
+        return moonbit_make_string(0, 0);
+    }
+    return result;
 }
 
 MOONBIT_FFI_EXPORT
-int moonbit_napi_get_value_string_utf8(napi_env env, napi_value value, void* buf, int bufsize, int* result) {
-    size_t length = 0;
-    napi_status status = napi_get_value_string_utf8(env, value, (char*)buf, (size_t)bufsize, &length);
-    if (result) *result = (int)length;
-    return (int)status;
+int moonbit_napi_write_string(napi_env env, moonbit_string_t value, napi_value *result) {
+    // Borrowed for this call. Node copies the code units, including lone surrogates.
+    return (int)napi_create_string_utf16(env, (const char16_t *)value, (size_t)Moonbit_array_length(value), result);
+}
+
+MOONBIT_FFI_EXPORT
+moonbit_bytes_t moonbit_napi_copy_bytes(const void *data, int32_t length) {
+    moonbit_bytes_t result = moonbit_make_bytes_raw(length);
+    // Empty Buffers can have a null backing pointer; do not pass it to memcpy.
+    if (length) memcpy(result, data, (size_t)length);
+    return result;
 }
 
 MOONBIT_FFI_EXPORT

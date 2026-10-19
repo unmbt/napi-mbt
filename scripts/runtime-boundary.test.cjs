@@ -39,6 +39,25 @@ fails(() => addon.saved_load(), Error, 'ERR_NAPI_BUFFER_EXPIRED');
 fails(() => addon.load(Buffer.alloc(1), -1), RangeError, 'ERR_NAPI_BUFFER_BOUNDS');
 fails(() => addon.load(Buffer.alloc(0), 0), RangeError, 'ERR_NAPI_BUFFER_BOUNDS');
 assert.deepEqual(addon.bytes(Buffer.alloc(0)), Buffer.alloc(0));
+for (const value of ['', '\0', 'a\0b', '中文😀', '\ud800', '\udfff', '\ud800\0\udfff', '\udfff\ud800', 'x'.repeat(65536)]) {
+  assert.equal(addon.string(value), value);
+}
+// Every UTF-16 code unit, including all unpaired surrogates, in bounded chunks.
+for (let start = 0; start < 65536; start += 256) {
+  const text = String.fromCharCode(...Array.from({ length: 256 }, (_, index) => start + index));
+  assert.equal(addon.string(text), text);
+}
+for (const value of [1, null, undefined, {}, Buffer.alloc(0)]) {
+  const before = addon.effect_count();
+  fails(() => addon.string(value), TypeError, 'ERR_NAPI_TYPE');
+  assert.equal(addon.effect_count(), before);
+}
+for (const size of [0, 1, 64, 4096, 65536, 1048576]) {
+  const input = Buffer.alloc(size + 4, 173).subarray(2, size + 2);
+  const output = addon.bytes(input);
+  assert.deepEqual(output, input);
+  if (size) { output[0] = 4; assert.equal(input[0], 173); }
+}
 assert.deepEqual(addon.bytes(Buffer.from([1, 2, 3, 4]).subarray(1, 3)), Buffer.from([2, 3]));
 const backing = new ArrayBuffer(8);
 const detached = Buffer.from(backing);

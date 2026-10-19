@@ -15,7 +15,7 @@ async fn main {
       environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
     }
   }
-  let status = @async.with_timeout(60000, () => @process.run("node", node_args, extra_env=environment))
+  let status = @async.with_timeout(if asan { 180000 } else { 60000 }, () => @process.run("node", node_args, extra_env=environment))
   if status != 0 { fail("Runtime tests failed with exit status \{status}") }
   if structured && !asan {
     for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
