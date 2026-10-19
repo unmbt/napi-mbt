@@ -7,18 +7,32 @@ pub fn napi_mbt_adapter_add(
   a0 : NapiValue,
   a1 : NapiValue,
 ) -> NapiValue {
-  let p0 = get_Int(env, a0)
-  let p1 = get_Int(env, a1)
-  let result : Int32 = add(p0, p1)
-  set_Int(env, result)
+  try {
+    let p0 = get_Int(env, a0)
+    let p1 = get_Int(env, a1)
+    let result : Int32 = add(p0, p1)
+    set_Int(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }
 
 ///|
 #export_name("napi_mbt_adapter_check_bool")
 pub fn napi_mbt_adapter_check_bool(env : NapiEnv, a0 : NapiValue) -> NapiValue {
-  let p0 = get_Bool(env, a0)
-  let result : Bool = check_bool(p0)
-  set_Bool(env, result)
+  try {
+    let p0 = get_Bool(env, a0)
+    let result : Bool = check_bool(p0)
+    set_Bool(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }
 
 ///|
@@ -27,9 +41,16 @@ pub fn napi_mbt_adapter_check_double(
   env : NapiEnv,
   a0 : NapiValue,
 ) -> NapiValue {
-  let p0 = get_Double(env, a0)
-  let result : Double = check_double(p0)
-  set_Double(env, result)
+  try {
+    let p0 = get_Double(env, a0)
+    let result : Double = check_double(p0)
+    set_Double(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }
 
 ///|
@@ -39,10 +60,17 @@ pub fn napi_mbt_adapter_concat(
   a0 : NapiValue,
   a1 : NapiValue,
 ) -> NapiValue {
-  let p0 = get_String(env, a0)
-  let p1 = get_String(env, a1)
-  let result : String = concat(p0, p1)
-  set_String(env, result)
+  try {
+    let p0 = get_String(env, a0)
+    let p1 = get_String(env, a1)
+    let result : String = concat(p0, p1)
+    set_String(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }
 
 ///|
@@ -51,10 +79,17 @@ pub fn napi_mbt_adapter_mutate_buffer(
   env : NapiEnv,
   a0 : NapiValue,
 ) -> NapiValue {
-  let p0 = get_NapiBufferView(env, a0)
-  let result : Unit = mutate_buffer(p0)
-  p0.invalidate()
-  set_Unit(env, result)
+  try {
+    let p0 = get_NapiBufferView(env, a0)
+    defer p0.invalidate()
+    let result : Unit = mutate_buffer(p0)
+    set_Unit(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }
 
 ///|
@@ -63,7 +98,14 @@ pub fn napi_mbt_adapter_roundtrip_bytes(
   env : NapiEnv,
   a0 : NapiValue,
 ) -> NapiValue {
-  let p0 = get_Bytes(env, a0)
-  let result : Bytes = roundtrip_bytes(p0)
-  set_Bytes(env, result)
+  try {
+    let p0 = get_Bytes(env, a0)
+    let result : Bytes = roundtrip_bytes(p0)
+    set_Bytes(env, result)
+  } catch {
+    error => {
+      throw_napi_error(env, error)
+      moonbit_dummy_napi_value()
+    }
+  }
 }

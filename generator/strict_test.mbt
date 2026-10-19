@@ -57,12 +57,11 @@ test "strict emitter invalidates borrowed buffer after call on success and error
   )
   assert_true(parsed.exports[0].throws)
   let output = @generator.adapters(parsed.exports)
-  assert_true(output.contains("touch(p0) catch"))
-  assert_true(output.contains("p0.invalidate()"))
-  assert_true(output.contains("return moonbit_dummy_napi_value()"))
-  let call = output.find("touch(p0) catch").unwrap()
-  assert_true(output.find("p0.invalidate()").unwrap() > call)
-  assert_true(@generator.c_glue(parsed.exports).contains("napi_is_buffer"))
+  assert_true(output.contains("defer p0.invalidate()"))
+  assert_true(output.contains("throw_napi_error(env, error)"))
+  let call = output.find("touch(p0)").unwrap()
+  assert_true(output.find("defer p0.invalidate()").unwrap() < call)
+  assert_true(@generator.c_glue(parsed.exports).contains("ERR_NAPI_REGISTER"))
 }
 
 ///|

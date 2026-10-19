@@ -4,6 +4,11 @@
 #include <stdint.h>
 
 extern void moonbit_init(void);
+extern int napi_mbt_throw_status(napi_env, int, int, const char *, const char *);
+static napi_value napi_mbt_error(napi_env env, napi_status status, int kind, const char *code, const char *context) {
+  (void)napi_mbt_throw_status(env, status, kind, code, context);
+  return NULL;
+}
 extern napi_value napi_mbt_adapter_add(napi_env env, napi_value, napi_value);
 extern napi_value napi_mbt_adapter_check_bool(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_check_double(napi_env env, napi_value);
@@ -15,12 +20,8 @@ static napi_value napi_mbt_callback_add(napi_env env, napi_callback_info info) {
   size_t argc = 2;
   napi_value argv[2];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 2) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  napi_valuetype type_0;
-  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Int"); return NULL; }
-  napi_valuetype type_1;
-  if (napi_typeof(env, argv[1], &type_1) != napi_ok || type_1 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Int"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 2) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_add(env, argv[0], argv[1]);
 }
 
@@ -28,10 +29,8 @@ static napi_value napi_mbt_callback_check_bool(napi_env env, napi_callback_info 
   size_t argc = 1;
   napi_value argv[1];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  napi_valuetype type_0;
-  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_boolean) { napi_throw_type_error(env, NULL, "Invalid argument, expected Bool"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_check_bool(env, argv[0]);
 }
 
@@ -39,10 +38,8 @@ static napi_value napi_mbt_callback_check_double(napi_env env, napi_callback_inf
   size_t argc = 1;
   napi_value argv[1];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  napi_valuetype type_0;
-  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_number) { napi_throw_type_error(env, NULL, "Invalid argument, expected Double"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_check_double(env, argv[0]);
 }
 
@@ -50,12 +47,8 @@ static napi_value napi_mbt_callback_concat(napi_env env, napi_callback_info info
   size_t argc = 2;
   napi_value argv[2];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 2) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  napi_valuetype type_0;
-  if (napi_typeof(env, argv[0], &type_0) != napi_ok || type_0 != napi_string) { napi_throw_type_error(env, NULL, "Invalid argument, expected String"); return NULL; }
-  napi_valuetype type_1;
-  if (napi_typeof(env, argv[1], &type_1) != napi_ok || type_1 != napi_string) { napi_throw_type_error(env, NULL, "Invalid argument, expected String"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 2) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_concat(env, argv[0], argv[1]);
 }
 
@@ -63,10 +56,8 @@ static napi_value napi_mbt_callback_mutate_buffer(napi_env env, napi_callback_in
   size_t argc = 1;
   napi_value argv[1];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  bool buffer_0 = false;
-  if (napi_is_buffer(env, argv[0], &buffer_0) != napi_ok || !buffer_0) { napi_throw_type_error(env, NULL, "Invalid argument, expected Buffer"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_mutate_buffer(env, argv[0]);
 }
 
@@ -74,10 +65,8 @@ static napi_value napi_mbt_callback_roundtrip_bytes(napi_env env, napi_callback_
   size_t argc = 1;
   napi_value argv[1];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
-  if (status != napi_ok) return NULL;
-  if (argc < 1) { napi_throw_error(env, NULL, "Missing argument"); return NULL; }
-  bool buffer_0 = false;
-  if (napi_is_buffer(env, argv[0], &buffer_0) != napi_ok || !buffer_0) { napi_throw_type_error(env, NULL, "Invalid argument, expected Buffer"); return NULL; }
+  if (status != napi_ok) return napi_mbt_error(env, status, 0, "ERR_NAPI_CALLBACK", "Reading callback arguments");
+  if (argc < 1) return napi_mbt_error(env, napi_invalid_arg, 1, "ERR_NAPI_ARGUMENTS", "Missing argument");
   return napi_mbt_adapter_roundtrip_bytes(env, argv[0]);
 }
 
@@ -90,22 +79,34 @@ static napi_value napi_mbt_callback_roundtrip_bytes(napi_env env, napi_callback_
 NAPI_MBT_EXPORT napi_value napi_register_module_v1(napi_env env, napi_value exports) {
   moonbit_init();
   napi_value fn_add;
-  napi_create_function(env, "add", NAPI_AUTO_LENGTH, napi_mbt_callback_add, NULL, &fn_add);
-  napi_set_named_property(env, exports, "add", fn_add);
+  napi_status status_add = napi_create_function(env, "add", NAPI_AUTO_LENGTH, napi_mbt_callback_add, NULL, &fn_add);
+  if (status_add != napi_ok) return napi_mbt_error(env, status_add, 0, "ERR_NAPI_REGISTER", "Creating export add");
+  status_add = napi_set_named_property(env, exports, "add", fn_add);
+  if (status_add != napi_ok) return napi_mbt_error(env, status_add, 0, "ERR_NAPI_REGISTER", "Setting export add");
   napi_value fn_check_bool;
-  napi_create_function(env, "check_bool", NAPI_AUTO_LENGTH, napi_mbt_callback_check_bool, NULL, &fn_check_bool);
-  napi_set_named_property(env, exports, "check_bool", fn_check_bool);
+  napi_status status_check_bool = napi_create_function(env, "check_bool", NAPI_AUTO_LENGTH, napi_mbt_callback_check_bool, NULL, &fn_check_bool);
+  if (status_check_bool != napi_ok) return napi_mbt_error(env, status_check_bool, 0, "ERR_NAPI_REGISTER", "Creating export check_bool");
+  status_check_bool = napi_set_named_property(env, exports, "check_bool", fn_check_bool);
+  if (status_check_bool != napi_ok) return napi_mbt_error(env, status_check_bool, 0, "ERR_NAPI_REGISTER", "Setting export check_bool");
   napi_value fn_check_double;
-  napi_create_function(env, "check_double", NAPI_AUTO_LENGTH, napi_mbt_callback_check_double, NULL, &fn_check_double);
-  napi_set_named_property(env, exports, "check_double", fn_check_double);
+  napi_status status_check_double = napi_create_function(env, "check_double", NAPI_AUTO_LENGTH, napi_mbt_callback_check_double, NULL, &fn_check_double);
+  if (status_check_double != napi_ok) return napi_mbt_error(env, status_check_double, 0, "ERR_NAPI_REGISTER", "Creating export check_double");
+  status_check_double = napi_set_named_property(env, exports, "check_double", fn_check_double);
+  if (status_check_double != napi_ok) return napi_mbt_error(env, status_check_double, 0, "ERR_NAPI_REGISTER", "Setting export check_double");
   napi_value fn_concat;
-  napi_create_function(env, "concat", NAPI_AUTO_LENGTH, napi_mbt_callback_concat, NULL, &fn_concat);
-  napi_set_named_property(env, exports, "concat", fn_concat);
+  napi_status status_concat = napi_create_function(env, "concat", NAPI_AUTO_LENGTH, napi_mbt_callback_concat, NULL, &fn_concat);
+  if (status_concat != napi_ok) return napi_mbt_error(env, status_concat, 0, "ERR_NAPI_REGISTER", "Creating export concat");
+  status_concat = napi_set_named_property(env, exports, "concat", fn_concat);
+  if (status_concat != napi_ok) return napi_mbt_error(env, status_concat, 0, "ERR_NAPI_REGISTER", "Setting export concat");
   napi_value fn_mutate_buffer;
-  napi_create_function(env, "mutate_buffer", NAPI_AUTO_LENGTH, napi_mbt_callback_mutate_buffer, NULL, &fn_mutate_buffer);
-  napi_set_named_property(env, exports, "mutate_buffer", fn_mutate_buffer);
+  napi_status status_mutate_buffer = napi_create_function(env, "mutate_buffer", NAPI_AUTO_LENGTH, napi_mbt_callback_mutate_buffer, NULL, &fn_mutate_buffer);
+  if (status_mutate_buffer != napi_ok) return napi_mbt_error(env, status_mutate_buffer, 0, "ERR_NAPI_REGISTER", "Creating export mutate_buffer");
+  status_mutate_buffer = napi_set_named_property(env, exports, "mutate_buffer", fn_mutate_buffer);
+  if (status_mutate_buffer != napi_ok) return napi_mbt_error(env, status_mutate_buffer, 0, "ERR_NAPI_REGISTER", "Setting export mutate_buffer");
   napi_value fn_roundtrip_bytes;
-  napi_create_function(env, "roundtrip_bytes", NAPI_AUTO_LENGTH, napi_mbt_callback_roundtrip_bytes, NULL, &fn_roundtrip_bytes);
-  napi_set_named_property(env, exports, "roundtrip_bytes", fn_roundtrip_bytes);
+  napi_status status_roundtrip_bytes = napi_create_function(env, "roundtrip_bytes", NAPI_AUTO_LENGTH, napi_mbt_callback_roundtrip_bytes, NULL, &fn_roundtrip_bytes);
+  if (status_roundtrip_bytes != napi_ok) return napi_mbt_error(env, status_roundtrip_bytes, 0, "ERR_NAPI_REGISTER", "Creating export roundtrip_bytes");
+  status_roundtrip_bytes = napi_set_named_property(env, exports, "roundtrip_bytes", fn_roundtrip_bytes);
+  if (status_roundtrip_bytes != napi_ok) return napi_mbt_error(env, status_roundtrip_bytes, 0, "ERR_NAPI_REGISTER", "Setting export roundtrip_bytes");
   return exports;
 }

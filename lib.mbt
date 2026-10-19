@@ -1,27 +1,56 @@
 ///|
+let active_buffer_views : Ref[Int32] = Ref(0)
+
+///|
 pub struct NapiBufferView {
-  buf : UnmanagedBuffer
-  len : Int32
+  env : NapiEnv
+  value : NapiValue
   mut is_alive : Bool
 }
 
 ///|
-pub fn NapiBufferView::length(self : NapiBufferView) -> Int32 {
+fn NapiBufferView::validate(
+  self : NapiBufferView,
+) -> (UnmanagedBuffer, Int32) raise NapiError {
   if !self.is_alive {
-    abort("Buffer view is no longer valid") // This should be a panic or error, but we'll use panic for now, generator wrapper handles typed error if possible.
+    raise napi_failure(
+      1,
+      Error,
+      "ERR_NAPI_BUFFER_EXPIRED",
+      "Buffer view is no longer valid",
+    )
   }
-  self.len
+  let data = Ref(moonbit_dummy_unmanaged_buffer())
+  let len = Ref(0)
+  let status = napi_get_buffer_info(self.env, self.value, data, len)
+  result_from_status(
+    self.env,
+    status,
+    b"Buffer backing store is detached or invalid",
+  )
+  (data.val, len.val)
 }
 
 ///|
-pub fn NapiBufferView::load8(self : NapiBufferView, offset : Int32) -> Int32 {
-  if !self.is_alive {
-    abort("Buffer view is no longer valid")
+pub fn NapiBufferView::length(self : NapiBufferView) -> Int32 raise NapiError {
+  self.validate().1
+}
+
+///|
+pub fn NapiBufferView::load8(
+  self : NapiBufferView,
+  offset : Int32,
+) -> Int32 raise NapiError {
+  let (buf, len) = self.validate()
+  if offset < 0 || offset >= len {
+    raise napi_failure(
+      1,
+      RangeError,
+      "ERR_NAPI_BUFFER_BOUNDS",
+      "Buffer view out of bounds",
+    )
   }
-  if offset < 0 || offset >= self.len {
-    abort("Buffer view out of bounds")
-  }
-  self.buf.load8(offset)
+  buf.load8(offset)
 }
 
 ///|
@@ -29,42 +58,48 @@ pub fn NapiBufferView::store8(
   self : NapiBufferView,
   offset : Int32,
   val : Int32,
-) -> Unit {
-  if !self.is_alive {
-    abort("Buffer view is no longer valid")
+) -> Unit raise NapiError {
+  let (buf, len) = self.validate()
+  if offset < 0 || offset >= len {
+    raise napi_failure(
+      1,
+      RangeError,
+      "ERR_NAPI_BUFFER_BOUNDS",
+      "Buffer view out of bounds",
+    )
   }
-  if offset < 0 || offset >= self.len {
-    abort("Buffer view out of bounds")
-  }
-  self.buf.store8(offset, val)
+  buf.store8(offset, val)
 }
 
 ///|
 /// Invalidates a borrowed Buffer view after the callback returns.
 pub fn NapiBufferView::invalidate(self : NapiBufferView) -> Unit {
-  self.is_alive = false
-}
-
-///|
-fn result_from_status(env : NapiEnv, status : Int32, msg : Bytes) -> Unit {
-  if status != 0 {
-    let _ = napi_throw_error(env, b"", msg)
-    ()
+  if self.is_alive {
+    self.is_alive = false
+    active_buffer_views.val -= 1
   }
 }
 
-// 供生成的包装函数调用的转换器
-
 ///|
-pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int32 {
-  let res = Ref(0)
-  let status = napi_get_value_int32(env, val, res)
+pub fn get_Int(env : NapiEnv, val : NapiValue) -> Int32 raise NapiError {
+  let res = Ref(0.0)
+  let status = napi_get_value_double(env, val, res)
   result_from_status(env, status, b"Invalid argument, expected Int")
-  res.val
+  let value = res.val
+  if !(value >= -2147483648.0 && value <= 2147483647.0) ||
+    value != value.to_int().to_double() {
+    raise napi_failure(
+      1,
+      RangeError,
+      "ERR_NAPI_INT_RANGE",
+      "Int requires a finite integral number in [-2147483648, 2147483647]",
+    )
+  }
+  value.to_int()
 }
 
 ///|
-pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue {
+pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue raise NapiError {
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_create_int32(env, val, res)
   result_from_status(env, status, b"Failed to create Int")
@@ -72,7 +107,7 @@ pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue {
 }
 
 ///|
-pub fn get_Double(env : NapiEnv, val : NapiValue) -> Double {
+pub fn get_Double(env : NapiEnv, val : NapiValue) -> Double raise NapiError {
   let res = Ref(0.0)
   let status = napi_get_value_double(env, val, res)
   result_from_status(env, status, b"Invalid argument, expected Double")
@@ -80,7 +115,7 @@ pub fn get_Double(env : NapiEnv, val : NapiValue) -> Double {
 }
 
 ///|
-pub fn set_Double(env : NapiEnv, val : Double) -> NapiValue {
+pub fn set_Double(env : NapiEnv, val : Double) -> NapiValue raise NapiError {
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_create_double(env, val, res)
   result_from_status(env, status, b"Failed to create Double")
@@ -88,7 +123,7 @@ pub fn set_Double(env : NapiEnv, val : Double) -> NapiValue {
 }
 
 ///|
-pub fn get_Bool(env : NapiEnv, val : NapiValue) -> Bool {
+pub fn get_Bool(env : NapiEnv, val : NapiValue) -> Bool raise NapiError {
   let res = Ref(false)
   let status = napi_get_value_bool(env, val, res)
   result_from_status(env, status, b"Invalid argument, expected Bool")
@@ -96,7 +131,7 @@ pub fn get_Bool(env : NapiEnv, val : NapiValue) -> Bool {
 }
 
 ///|
-pub fn set_Bool(env : NapiEnv, val : Bool) -> NapiValue {
+pub fn set_Bool(env : NapiEnv, val : Bool) -> NapiValue raise NapiError {
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_get_boolean(env, val, res)
   result_from_status(env, status, b"Failed to create Bool")
@@ -104,7 +139,7 @@ pub fn set_Bool(env : NapiEnv, val : Bool) -> NapiValue {
 }
 
 ///|
-pub fn get_String(env : NapiEnv, val : NapiValue) -> String {
+pub fn get_String(env : NapiEnv, val : NapiValue) -> String raise NapiError {
   let len = Ref(0)
   let status = napi_get_value_string_utf8_length(
     env,
@@ -126,16 +161,19 @@ pub fn get_String(env : NapiEnv, val : NapiValue) -> String {
 
   // Use utf8.decode for proper string construction
   let res = @utf8.decode(Bytes::from_array(arr)) catch {
-    _ => {
-      let _ = napi_throw_error(env, b"", b"Failed to decode UTF-8 string")
-      ""
-    }
+    _ =>
+      raise napi_failure(
+        9,
+        Error,
+        "ERR_NAPI_STRING",
+        "Failed to decode UTF-8 string",
+      )
   }
   res
 }
 
 ///|
-pub fn set_String(env : NapiEnv, val : String) -> NapiValue {
+pub fn set_String(env : NapiEnv, val : String) -> NapiValue raise NapiError {
   let res_bytes = @utf8.encode(val)
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_create_string_utf8(env, res_bytes, res_bytes.length(), res)
@@ -144,11 +182,11 @@ pub fn set_String(env : NapiEnv, val : String) -> NapiValue {
 }
 
 ///|
-pub fn get_Bytes(env : NapiEnv, val : NapiValue) -> Bytes {
+pub fn get_Bytes(env : NapiEnv, val : NapiValue) -> Bytes raise NapiError {
   let len = Ref(0)
   let unmanaged = Ref(moonbit_dummy_unmanaged_buffer())
   let status = napi_get_buffer_info(env, val, unmanaged, len)
-  result_from_status(env, status, b"Failed to get buffer")
+  result_from_status(env, status, b"Invalid argument, expected Buffer")
 
   let arr = Array::make(len.val, b'\x00')
   for i = 0; i < len.val; i = i + 1 {
@@ -158,12 +196,7 @@ pub fn get_Bytes(env : NapiEnv, val : NapiValue) -> Bytes {
 }
 
 ///|
-pub fn set_Bytes(env : NapiEnv, val : Bytes) -> NapiValue {
-  // Currently MoonBit doesn't expose malloc natively to FFI.
-  // Actually we need to pass a C-allocated buffer if we want external buffer.
-  // For now we'll just create a string if we can't allocate.
-  // wait, Node N-API provides `napi_create_buffer_copy` which allocates!
-  // Let's add napi_create_buffer_copy to bindings.
+pub fn set_Bytes(env : NapiEnv, val : Bytes) -> NapiValue raise NapiError {
   let res = Ref(moonbit_dummy_napi_value())
   let data = Ref(moonbit_dummy_unmanaged_buffer())
   let status = napi_create_buffer_copy(env, val.length(), val, data, res)
@@ -172,16 +205,20 @@ pub fn set_Bytes(env : NapiEnv, val : Bytes) -> NapiValue {
 }
 
 ///|
-pub fn get_NapiBufferView(env : NapiEnv, val : NapiValue) -> NapiBufferView {
+pub fn get_NapiBufferView(
+  env : NapiEnv,
+  val : NapiValue,
+) -> NapiBufferView raise NapiError {
   let len = Ref(0)
   let unmanaged = Ref(moonbit_dummy_unmanaged_buffer())
   let status = napi_get_buffer_info(env, val, unmanaged, len)
-  result_from_status(env, status, b"Failed to get buffer")
-  { buf: unmanaged.val, len: len.val, is_alive: true, }
+  result_from_status(env, status, b"Invalid argument, expected Buffer")
+  active_buffer_views.val += 1
+  { env, value: val, is_alive: true, }
 }
 
 ///|
-pub fn set_Unit(env : NapiEnv, _val : Unit) -> NapiValue {
+pub fn set_Unit(env : NapiEnv, _val : Unit) -> NapiValue raise NapiError {
   let res = Ref(moonbit_dummy_napi_value())
   let status = napi_get_undefined(env, res)
   result_from_status(env, status, b"Failed to create undefined")
@@ -202,7 +239,7 @@ pub fn concat(a : String, b : String) -> String {
 
 ///|
 #export_name("mutate_buffer")
-pub fn mutate_buffer(view : NapiBufferView) -> Unit {
+pub fn mutate_buffer(view : NapiBufferView) -> Unit raise NapiError {
   if view.length() > 0 {
     let old = view.load8(0)
     view.store8(0, old + 1)

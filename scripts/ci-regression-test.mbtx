@@ -6,4 +6,6 @@ async fn main {
   if status != 0 { fail("Native CLI regression tests failed") }
   let status = @process.run("moon", ["run", "scripts/build-isolation-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
   if status != 0 { fail("Isolated native build regression tests failed") }
+  let status = @process.run("moon", ["run", "scripts/runtime-boundary-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  if status != 0 { fail("Runtime boundary fixture build failed") }
 }

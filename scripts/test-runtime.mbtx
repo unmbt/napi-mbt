@@ -1,0 +1,18 @@
+import { "moonbitlang/async", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn main {
+  let args = @env.args()
+  let asan = args.contains("--asan")
+  let environment : Map[String, String] = Map([])
+  let node_args = ["scripts/runtime-boundary.test.cjs"]
+  if asan {
+    node_args.push(".napi-mbt/boundary-asan/napi_mbt.node")
+    environment["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"
+    if args.get(2) is Some(directory) {
+      environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
+    }
+  }
+  let status = @async.with_timeout(60000, () => @process.run("node", node_args, extra_env=environment))
+  if status != 0 { fail("Runtime tests failed with exit status \{status}") }
+}

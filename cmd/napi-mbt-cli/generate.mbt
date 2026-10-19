@@ -13,7 +13,7 @@ async fn generate(
   let conf = config(dir, override_generator)
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
-    "napi_types.mbt", "napi_runtime.mbt",
+    "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt",
   ]
   let exports = []
   let features = conf.features.copy()

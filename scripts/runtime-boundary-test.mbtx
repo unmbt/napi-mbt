@@ -1,0 +1,128 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String], cwd : String) -> Unit {
+  let (status, out, err) = @process.collect_output(binary, args, cwd~)
+  if status != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-boundary-")
+  defer @fs.rmdir(temp, recursive=true)
+  let project = temp + "/fixture"
+  checked(binary, ["init", project, "--name", "boundary-fixture"], root)
+  @fs.write_file(project + "/napi-mbt.json", "{\"napiVersion\":7}")
+  let mut pkg = @fs.read_file(project + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"faults.c\"")
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    pkg = pkg.replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+  }
+  @fs.write_file(project + "/moon.pkg", pkg)
+  // Inject faults at actual FFI operations without adding test branches to the
+  // product runtime. The adapter must preserve the exact original JS exception.
+  let bindings = @fs.read_file(project + "/napi_bindings.mbt").text()
+    .replace_all(old="= \"napi_get_value_double\"", new="= \"fixture_get_double\"")
+    .replace_all(old="= \"napi_create_int32\"", new="= \"fixture_create_int32\"")
+  @fs.write_file(project + "/napi_bindings.mbt", bindings)
+  let faults =
+    #|#include <node_api.h>
+    #|#include <moonbit.h>
+    #|MOONBIT_FFI_EXPORT int fixture_get_double(napi_env env, napi_value value, double *out) {
+    #|  napi_status status = napi_get_value_double(env, value, out);
+    #|  if (status != napi_ok) return status;
+    #|  if (*out == 777) {
+    #|    napi_value global, original;
+    #|    status = napi_get_global(env, &global);
+    #|    if (status != napi_ok) return status;
+    #|    status = napi_get_named_property(env, global, "boundaryOriginal", &original);
+    #|    if (status != napi_ok) return status;
+    #|    status = napi_throw(env, original);
+    #|    if (status != napi_ok) return status;
+    #|    return napi_pending_exception;
+    #|  }
+    #|  return *out == 888 ? napi_generic_failure : napi_ok;
+    #|}
+    #|MOONBIT_FFI_EXPORT int fixture_create_int32(napi_env env, int value, napi_value *out) {
+    #|  return value == 999 ? napi_generic_failure : napi_create_int32(env, value, out);
+    #|}
+    #|
+  @fs.write_file(project + "/faults.c", faults)
+  let source =
+    #|///|
+    #|let effects : Ref[Int] = Ref(0)
+    #|///|
+    #|let saved_view : Ref[NapiBufferView?] = Ref(None)
+    #|///|
+    #|#export_name("effect_count")
+    #|pub fn effect_count() -> Int { effects.val }
+    #|///|
+    #|#export_name("view_count")
+    #|pub fn view_count() -> Int { active_buffer_views.val }
+    #|///|
+    #|#export_name("identity")
+    #|pub fn identity(value : Int) -> Int { effects.val += 1; value }
+    #|///|
+    #|#export_name("borrow")
+    #|pub fn borrow(buf : NapiBufferView, value : Int) -> Int {
+    #|  effects.val += 1
+    #|  saved_view.val = Some(buf)
+    #|  value
+    #|}
+    #|///|
+    #|#export_name("two_borrows")
+    #|pub fn two_borrows(a : NapiBufferView, b : NapiBufferView, value : Int) -> Int raise {
+    #|  effects.val += 1
+    #|  a.length() + b.length() + value
+    #|}
+    #|///|
+    #|#export_name("throw_borrow")
+    #|pub fn throw_borrow(buf : NapiBufferView) -> Unit raise {
+    #|  saved_view.val = Some(buf)
+    #|  fail("business failure")
+    #|}
+    #|///|
+    #|#export_name("saved_load")
+    #|pub fn saved_load() -> Int raise { saved_view.val.unwrap().load8(0) }
+    #|///|
+    #|#export_name("load")
+    #|pub fn load(buf : NapiBufferView, index : Int) -> Int raise { buf.load8(index) }
+    #|///|
+    #|#export_name("echo_double")
+    #|pub fn double(value : Double) -> Double { value }
+    #|///|
+    #|#export_name("bytes")
+    #|pub fn bytes(value : Bytes) -> Bytes { value }
+    #|///|
+    #|#export_name("tsfn_statuses")
+    #|pub fn tsfn_statuses() -> Bool raise {
+    #|  tsfn_status(0, "test") is Accepted && tsfn_status(15, "test") is QueueFull && tsfn_status(16, "test") is Closing
+    #|}
+    #|///|
+    #|#export_name("tsfn_failure")
+    #|pub fn tsfn_failure() -> Unit raise { ignore(tsfn_status(1, "invalid")) }
+    #|
+  @fs.write_file(project + "/lib.mbt", source)
+  checked(binary, ["build", project, "--release"], root)
+  let targets = @fs.readdir(project + "/artifacts")
+  let output = root + "/.napi-mbt/" + (if asan { "boundary-asan" } else { "boundary-smoke" })
+  if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
+  let register_fault =
+    #|#include <node_api.h>
+    #|napi_status fixture_create_function(napi_env env, const char *name, size_t length, napi_callback cb, void *data, napi_value *result) {
+    #|  (void)env; (void)name; (void)length; (void)cb; (void)data; (void)result;
+    #|  return napi_generic_failure;
+    #|}
+    #|
+  @fs.write_file(project + "/register_fault.c", register_fault)
+  let pkg = pkg.replace_all(old="\"faults.c\"", new="\"faults.c\", \"register_fault.c\"")
+    .replace_all(old="\"stub-cc-flags\": \"", new="\"stub-cc-flags\": \"-Dnapi_create_function=fixture_create_function ")
+  @fs.write_file(project + "/moon.pkg", pkg)
+  checked(binary, ["build", project, "--release"], root)
+  @fs.write_file(output + "/registration-failure.node", @fs.read_file(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
+  println("Built runtime error-boundary fixture")
+}

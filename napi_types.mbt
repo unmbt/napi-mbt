@@ -28,4 +28,24 @@ pub type NapiThreadsafeFunction
 pub struct NapiPromise {
   promise : NapiValue
   deferred : NapiDeferred
+  mut settled : Bool
+}
+
+///|
+pub(all) enum NapiTsfnStatus {
+  Accepted
+  QueueFull
+  Closing
+}
+
+///|
+pub(all) enum NapiTsfnCallMode {
+  Nonblocking
+  Blocking
+}
+
+///|
+pub(all) enum NapiTsfnReleaseMode {
+  Release
+  Abort
 }

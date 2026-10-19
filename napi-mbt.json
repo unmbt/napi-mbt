@@ -1,5 +1,5 @@
 {
-  "napiVersion": 1,
+  "napiVersion": 7,
   "generator": "auto",
   "builder": "auto",
   "targets": [

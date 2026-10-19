@@ -2,6 +2,40 @@
 #include <moonbit.h>
 #include <string.h>
 #include <stdint.h>
+#include <limits.h>
+
+/* Shared exception boundary for C callbacks and MoonBit adapters. Never replace
+ * a JS exception already pending on the environment. Every operation is checked. */
+int napi_mbt_throw_status(napi_env env, int status, int kind, const char *code, const char *message) {
+    bool pending = false;
+    napi_status s = napi_is_exception_pending(env, &pending);
+    if (s != napi_ok || pending) return (int)s;
+    napi_value js_code, js_message, error, js_status;
+    s = napi_create_string_utf8(env, code, NAPI_AUTO_LENGTH, &js_code);
+    if (s != napi_ok) goto fallback;
+    s = napi_create_string_utf8(env, message, NAPI_AUTO_LENGTH, &js_message);
+    if (s != napi_ok) goto fallback;
+    s = kind == 1 ? napi_create_type_error(env, js_code, js_message, &error)
+      : kind == 2 ? napi_create_range_error(env, js_code, js_message, &error)
+      : napi_create_error(env, js_code, js_message, &error);
+    if (s != napi_ok) goto fallback;
+    s = napi_create_int32(env, status, &js_status);
+    if (s != napi_ok) goto fallback;
+    s = napi_set_named_property(env, error, "status", js_status);
+    if (s != napi_ok) goto fallback;
+    s = napi_set_named_property(env, error, "context", js_message);
+    if (s != napi_ok) goto fallback;
+    return (int)napi_throw(env, error);
+fallback:
+    /* Even diagnostics can fail. Preserve any exception that caused that
+     * failure; otherwise make one final attempt through the simpler API. */
+    if (napi_is_exception_pending(env, &pending) != napi_ok || pending) return (int)s;
+    return (int)napi_throw_error(env, code, message);
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_throw(napi_env env, int status, int kind, const char *code, const char *message) {
+    return napi_mbt_throw_status(env, status, kind, code, message);
+}
 
 #if NAPI_VERSION < 4
 typedef void* napi_threadsafe_function;
@@ -135,6 +169,7 @@ MOONBIT_FFI_EXPORT
 int moonbit_napi_get_value_string_utf8_length(napi_env env, napi_value value, void* buf, int bufsize, int* result) {
     size_t length = 0;
     napi_status status = napi_get_value_string_utf8(env, value, (char*)buf, (size_t)bufsize, &length);
+    if (length >= INT_MAX) return 1002;
     if (result) *result = (int)length;
     return (int)status;
 }
@@ -149,8 +184,27 @@ int moonbit_napi_get_value_string_utf8(napi_env env, napi_value value, void* buf
 
 MOONBIT_FFI_EXPORT
 int moonbit_napi_get_buffer_info(napi_env env, napi_value value, void** data, int* length) {
+    bool buffer = false;
+    napi_status status = napi_is_buffer(env, value, &buffer);
+    if (status != napi_ok) return (int)status;
+    if (!buffer) return (int)napi_invalid_arg;
+#if NAPI_VERSION >= 7
+    napi_typedarray_type type;
+    size_t elements, offset;
+    void *typed_data;
+    napi_value backing;
+    status = napi_get_typedarray_info(env, value, &type, &elements, &typed_data, &backing, &offset);
+    if (status != napi_ok) return (int)status;
+    bool detached = false;
+    status = napi_is_detached_arraybuffer(env, backing, &detached);
+    if (status != napi_ok) return (int)status;
+    if (detached) return 1001;
+#else
+    return (int)napi_generic_failure;
+#endif
     size_t size = 0;
-    napi_status status = napi_get_buffer_info(env, value, data, &size);
+    status = napi_get_buffer_info(env, value, data, &size);
+    if (size > INT_MAX) return 1002;
     if (length) *length = (int)size;
     return (int)status;
 }

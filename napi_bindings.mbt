@@ -2,14 +2,6 @@
 
 ///|
 #borrow(result)
-extern "c" fn napi_get_value_int32(
-  env : NapiEnv,
-  value : NapiValue,
-  result : Ref[Int32],
-) -> Int32 = "napi_get_value_int32"
-
-///|
-#borrow(result)
 extern "c" fn napi_create_int32(
   env : NapiEnv,
   value : Int32,
@@ -105,14 +97,6 @@ extern "c" fn UnmanagedBuffer::store8(
   offset : Int32,
   val : Int32,
 ) = "moonbit_ptr_store8"
-
-///|
-#borrow(code, msg)
-extern "c" fn napi_throw_error(
-  env : NapiEnv,
-  code : Bytes,
-  msg : Bytes,
-) -> Int32 = "napi_throw_error"
 
 ///|
 #borrow(data, result, result_data)

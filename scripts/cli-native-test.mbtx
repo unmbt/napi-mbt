@@ -111,7 +111,7 @@ async fn main {
     rejected(executable, ["generate", dir], temp, env)
     @fs.remove(dir + "/duplicate.mbt")
     rejected(executable, ["generate", dir, "--generator=node"], temp, env)
-    let config = @fs.read_file(dir + "/napi-mbt.json").text()
+    let config = @fs.read_file(dir + "/napi-mbt.json").text().replace_all(old="\"napiVersion\": 1", new="\"napiVersion\": 7")
     @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":1,\"features\":[\"bigint\"]}")
     rejected(executable, ["generate", dir], temp, env)
     @fs.write_file(dir + "/napi-mbt.json", config)
@@ -124,7 +124,7 @@ async fn main {
       #|pub fn failure() -> Unit raise { fail("native fixture failure") }
       #|///|
       #|#export_name("touch")
-      #|pub fn touch(buf : NapiBufferView) -> Unit { buf.store8(0, buf.load8(0) + 1) }
+      #|pub fn touch(buf : NapiBufferView) -> Unit raise { buf.store8(0, buf.load8(0) + 1) }
       #|///|
       #|let saved : Ref[NapiBufferView?] = Ref(None)
       #|///|

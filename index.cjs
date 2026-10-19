@@ -1,5 +1,5 @@
 const path = require('path');
-const requiredNapi = 1;
+const requiredNapi = 7;
 const actualNapi = Number(process.versions && process.versions.napi || 0);
 if (actualNapi < requiredNapi) throw new Error('This native module requires N-API ' + requiredNapi + ', found ' + actualNapi);
 let target = process.platform + '-' + process.arch;

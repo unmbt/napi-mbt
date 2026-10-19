@@ -68,6 +68,18 @@ Promise 和 BigInt 已通过 feature registry 提供封装；对象（Object）�
 
 ## 4. 健壮的错误阻断机制
 
+参数转换、MoonBit 函数和返回值转换共用一个错误边界。`NapiError::ApiError`
+携带状态、错误类别、稳定 code 和上下文。adapter 统一抛出带 `code`、`status`
+及 `context` 的 `Error`、`TypeError` 或 `RangeError`，并保留已经 pending 的
+JS 异常。转换失败后不会继续执行业务函数。
+
+`Int`/`Int32` 拒绝小数、NaN、无穷值及超出 32 位有符号整数范围的数值
+（`ERR_NAPI_INT_RANGE`）；`Double` 保留 IEEE 数值语义。Buffer 导出要求
+N-API 7，以准确检测 backing store 分离。借用 view 通过 `defer` 在后续转换
+或业务失败时同样失效，越界和失效访问会抛错，不会终止进程。TSFN 操作返回
+`Accepted`、`QueueFull` 或 `Closing`；其他失败抛出 `NapiError`，调用和释放
+模式均使用枚举。
+
 如果 JS 调用方传入了类型不符的参数，系统不会像常规 C 代码一样导致进程崩溃 (Segfault)。
 自动生成的转换代码含有前置防御边界：假设你需要一个 `Int` 却接收到了 `"hello"` 字符串，代码会立刻执行失败，调用 `napi_throw_error()` 直接中止当前方法调用，并优雅地抛出一个合法的 JavaScript `TypeError`。
 

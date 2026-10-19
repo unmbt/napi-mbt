@@ -202,5 +202,13 @@ pub fn parse_source(source : String, filename : String) -> ParsedSource raise {
   let exports = []
   let features = []
   visit(tree, filename, exports, features)
+  if exports.any(item => {
+      item.parameters.any(p => {
+        p.type_name == "NapiBufferView" || p.type_name == "Bytes"
+      }) ||
+      item.return_type == "Bytes"
+    }) {
+    features.push("buffer")
+  }
   { exports, features, }
 }

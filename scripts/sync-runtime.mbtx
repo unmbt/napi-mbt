@@ -1,0 +1,19 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn main {
+  let path = "internal/assets/data/resources.json"
+  guard @json.parse(@fs.read_file(path).text()) is Object(files) else { fail("Invalid resources") }
+  let check = @env.args().contains("--check")
+  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "stub.c", "lib.mbt"] {
+    let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
+    let (target, source) = if name == "lib.mbt" {
+      guard source.find("///|\n#export_name") is Some(end) else { fail("Missing sample boundary") }
+      ("napi_runtime.mbt", source[:end].to_owned())
+    } else { (name, source) }
+    let key = "template/" + target
+    if check && files.get(key) != Some(Json(source)) { fail("Runtime template is stale: \{key}") }
+    files[key] = Json(source)
+  }
+  if !check { @fs.write_file(path, Json(files).stringify(indent=2) + "\n") }
+}

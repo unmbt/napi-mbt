@@ -70,6 +70,20 @@ Promise and BigInt helpers are available through the feature registry. Object an
 
 ## 4. Error Handling
 
+Argument conversion, the MoonBit function and return conversion share a single
+error boundary. `NapiError::ApiError` carries a status, error kind, stable code
+and context. The adapter throws an `Error`, `TypeError` or `RangeError` with
+`code`, `status` and `context`, preserving an existing pending JavaScript
+exception. A conversion failure never continues into the function body.
+
+`Int`/`Int32` rejects fractions, NaN, infinities and values outside the signed
+32-bit range (`ERR_NAPI_INT_RANGE`). `Double` preserves IEEE values. Buffer
+exports require N-API 7 to detect detached backing stores. Borrowed views are
+invalidated with `defer` even when a later conversion or the function fails;
+out-of-range and expired access raise errors instead of aborting the process.
+TSFN operations return `Accepted`, `QueueFull` or `Closing`; unexpected statuses
+raise `NapiError`. Call and release modes are typed enums.
+
 Errors originating from user input types are handled automatically by the generated wrapper.
 If you pass a string to a function expecting an `Int`, the generated bindings will catch it and invoke `napi_throw_error()`, terminating the function safely and emitting a standard JavaScript `TypeError`.
 

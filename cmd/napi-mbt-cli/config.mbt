@@ -99,6 +99,7 @@ fn feature_version(name : String) -> Int32 raise {
     "promise" => 1
     "threadsafe_function" => 4
     "bigint" => 6
+    "buffer" => 7
     _ => fail("Unknown N-API feature: \{name}")
   }
 }

@@ -1,7 +1,9 @@
 {
-  "napiVersion": 1,
-  "requiredNapiVersion": 1,
-  "features": [],
+  "napiVersion": 7,
+  "requiredNapiVersion": 7,
+  "features": [
+    "buffer"
+  ],
   "targets": [
     "win32-x64-msvc",
     "darwin-arm64",
@@ -25,7 +27,7 @@
       ],
       "ret": "Int",
       "throws": false,
-      "line": 192,
+      "line": 229,
       "filename": "lib.mbt"
     },
     {
@@ -39,7 +41,7 @@
       ],
       "ret": "Bool",
       "throws": false,
-      "line": 219,
+      "line": 256,
       "filename": "lib.mbt"
     },
     {
@@ -53,7 +55,7 @@
       ],
       "ret": "Double",
       "throws": false,
-      "line": 225,
+      "line": 262,
       "filename": "lib.mbt"
     },
     {
@@ -71,7 +73,7 @@
       ],
       "ret": "String",
       "throws": false,
-      "line": 198,
+      "line": 235,
       "filename": "lib.mbt"
     },
     {
@@ -84,8 +86,8 @@
         }
       ],
       "ret": "Unit",
-      "throws": false,
-      "line": 204,
+      "throws": true,
+      "line": 241,
       "filename": "lib.mbt"
     },
     {
@@ -99,7 +101,7 @@
       ],
       "ret": "Bytes",
       "throws": false,
-      "line": 213,
+      "line": 250,
       "filename": "lib.mbt"
     }
   ]
