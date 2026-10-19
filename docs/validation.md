@@ -97,3 +97,33 @@ without registry access.
 The separate `moon publish --dry-run` reached a successful extracted-source
 check, then returned registry 409 because version 0.1.1 already exists. Nothing
 was published.
+
+## Clean-host CI repair
+
+[Run 39220229169](https://github.com/unmbt/napi-mbt/actions/runs/39220229169)
+exposed failures hidden by local generated files and host differences. The source
+npm manifest no longer depends on unpublished platform packages; `prepublish`
+still adds distribution dependencies, and the root distribution test restores
+the source manifest. Clean temporary-directory installation and rejection of a
+missing lockfile entry both passed. Root npm pack/dry-run, clean consumer install
+and extracted Mooncake checks also passed after this change.
+
+Unit CI now explicitly selects the CLI, generator, parser and assets packages:
+all 45 tests passed on Windows and isolated Fedora WSL. The root addon requires
+Node and remains covered by actual Node consumers; it is not linked as a
+standalone unit-test executable with missing Node headers or non-PIC runtime
+objects. Windows ASan selects the DLL directory of the default MSVC toolset,
+rather than prepending every installed toolset in filesystem order. The complete
+Windows parser/addon ASan run passed locally.
+
+Fedora WSL passed the complete parser/addon sanitizer run with both Node 22.22.1
+and the CI-pinned Node 26.4.0. The latter independently reproduced two host leaks
+without an addon: 24 bytes in OpenSSL startup and 32 bytes per evaluated worker
+script in the ContextifyScript cppgc wrapper. Only those exact allocation sites
+are suppressed. A bare worker baseline passes, and a separate deliberate
+37-byte leak still fails under the same settings. Parser (20 tests), conversion,
+class/callback, Promise/cancellation, I/O and worker teardown tests all passed.
+
+Strict checks, interface/format checks, generation checks and workflow actionlint
+passed. The repaired workflows have not yet been rerun on GitHub; hosted Windows
+toolset selection and macOS execution still need that confirmation.

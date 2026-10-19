@@ -1,0 +1,8 @@
+# Node 26.4.0's bundled OpenSSL leaks 24 bytes during process initialization,
+# before any addon is loaded (ossl_load_builtin_compressions -> context_init).
+# Keep this scoped to that allocation site, never CRYPTO_malloc or all of Node.
+# lsan-host-check verifies a bare Node process and an unrelated deliberate leak.
+leak:ossl_load_builtin_compressions
+# Node 26.4.0 also retains one 32-byte cppgc wrapper per evaluated script,
+# reproducible with a bare `new Worker('0', { eval: true })` and no addon.
+leak:node::CppgcMixin::Wrap<node::contextify::ContextifyScript>

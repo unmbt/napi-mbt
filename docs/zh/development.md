@@ -20,8 +20,8 @@ Class finalizer、dispose 和环境关闭使用统一资源管理。Node 驱动�
 moon info --target native
 moon fmt
 moon check --target native --warn-list +73 --deny-warn
-moon test --target native
 moon build --target native --release cmd/napi-mbt-cli
+moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
 moon run --target native --release cmd/napi-mbt-cli -- build --release
 npm ci --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
@@ -35,11 +35,23 @@ Unicode、分离 Buffer、用户配置和原生依赖；子进程测试带超时
 ASan 覆盖 parser 与 addon；Linux 额外启用 leak detection。
 [验证记录](../validation.md)区分本机结果与仅配置的 CI job。
 
+单元测试明确选择 CLI、生成器、parser 和 assets 包。根目录 foreign library 依赖 Node
+宿主，运行时由真实 addon 消费者测试，不作为独立的 MoonBit 测试程序链接，也不依赖
+此前本机构建残留的头文件或 import library。ASan 使用 VS 默认 C++ 工具集对应
+的运行库。Linux 仅抑制 Node 26.4.0 的两个宿主分配点：OpenSSL 启动时的
+`ossl_load_builtin_compressions`，以及 eval worker 脚本的 `ContextifyScript` cppgc
+包装对象。两者均可在不加载 addon 时复现。空 Node worker 和故意泄漏的独立探针
+验证泄漏检测仍然有效；不使用整库抑制规则。
+
 ## 打包门禁
 
 `moon.mod`、package.json、lockfile、平台依赖版本必须一致；release tag 也会核对。
 `prepublish` 拒绝缺失、架构错误、非动态库构件和过期声明/生成物，保留用户包元数据，
 并附带第三方许可证。生成的 `npm/`、`artifacts/`、`licenses/` 不入库。
+
+源码清单包含开发依赖，不包含尚未发布的平台包。`prepublish` 为分发添加平台依赖，
+根目录分发测试结束后恢复源码清单。`source-install-test.mbtx` 在仅含清单的全新临时
+目录中执行 `npm ci`，并验证缺少条目的 lockfile 会被门禁拒绝。
 
 ```sh
 moon run scripts/release-check.mbtx

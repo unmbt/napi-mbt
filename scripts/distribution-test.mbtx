@@ -32,6 +32,10 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   let root_package = @env.args().contains("--root")
   let dir = if root_package { root } else { temp + "/package with spaces" }
+  // Release metadata belongs to the packed artifact; keep checkout installs
+  // independent of platform packages that have not been published yet.
+  let original_package = if root_package { Some(@fs.read_file(dir + "/package.json").binary()) } else { None }
+  defer { if original_package is Some(data) { @fs.write_file(dir + "/package.json", data) } }
   if !root_package {
     ignore(checked(binary, ["init", dir, "--name", "distribution-fixture"]))
     ignore(checked(binary, ["build", dir, "--release"]))

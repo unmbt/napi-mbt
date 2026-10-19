@@ -45,11 +45,6 @@
     "test": "node --test scripts/test.js",
     "publish:dry-run": "moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root"
   },
-  "optionalDependencies": {
-    "napi-mbt-win32-x64-msvc": "0.1.1",
-    "napi-mbt-darwin-arm64": "0.1.1",
-    "napi-mbt-linux-x64-gnu": "0.1.1"
-  },
   "engines": {
     "node": ">=12.20.0 <13 || >=14.13.1"
   }

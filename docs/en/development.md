@@ -24,8 +24,8 @@ perform only C waiting/I/O. See [async architecture](../async-adapter.md).
 moon info --target native
 moon fmt
 moon check --target native --warn-list +73 --deny-warn
-moon test --target native
 moon build --target native --release cmd/napi-mbt-cli
+moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
 moon run --target native --release cmd/napi-mbt-cli -- build --release
 npm ci --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
@@ -41,6 +41,17 @@ dependencies. Process tests have timeouts. ASan runs parser and addon scenarios;
 Linux also enables leak detection. [Validation](../validation.md) distinguishes
 local results from configured CI jobs.
 
+Unit tests select the CLI, generator, parser and assets packages explicitly.
+The root foreign library needs the Node host; its tests run through real addon
+consumers rather than a standalone MoonBit test executable. This also avoids
+depending on local headers/import libraries left by previous builds.
+ASan uses the runtime from Visual
+Studio's default C++ toolset. Linux suppresses two Node 26.4.0 host allocations:
+the OpenSSL startup allocation at `ossl_load_builtin_compressions` and the cppgc
+wrapper for `ContextifyScript` when evaluating worker scripts. Both reproduce
+without any addon. A bare-Node worker baseline and an intentional unrelated leak
+verify that leak detection remains active; no whole-library suppression is used.
+
 ## Package gates
 
 Versions in `moon.mod`, `package.json`, lockfile and platform dependencies must
@@ -48,6 +59,12 @@ match; release tags are checked. `prepublish` rejects missing, wrong-architectur
 non-library or stale artifacts/declarations. It preserves user package metadata
 and includes bundled licenses. Generated `npm/`, `artifacts/` and `licenses/`
 are not source-controlled.
+
+The checkout manifest contains development dependencies, without unpublished
+platform packages. `prepublish` adds the platform dependencies for distribution;
+the root distribution test restores the checkout manifest afterward.
+`source-install-test.mbtx` runs `npm ci` in a fresh temporary directory with
+only the manifests and verifies rejection of an incomplete lockfile.
 
 ```sh
 moon run scripts/release-check.mbtx

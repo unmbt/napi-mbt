@@ -55,9 +55,14 @@ async fn main {
     }
   }
   ignore(checked(distro, ["tar", "-xf", source, "-C", linux_root]))
-  let environment = ["env", "MOON_HOME=" + toolchain, "PATH=" + toolchain + "/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin", "MOONBIT_NEW_NATIVE=0", "MOONBIT_ALLOCATOR=system"]
+  let node_path = @env.get_env_var("NAPI_MBT_LINUX_NODE_DIR").map(path => path + ":").unwrap_or("")
+  let environment = ["env", "MOON_HOME=" + toolchain, "PATH=" + toolchain + "/bin:" + node_path + "/usr/local/bin:/usr/bin:/bin:/usr/sbin", "MOONBIT_NEW_NATIVE=0", "MOONBIT_ALLOCATOR=system"]
   for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "run", "scripts/toolchain-check.mbtx"], ["-C", linux_root, "build", "--target", "native", "cmd/napi-mbt-cli"]] {
     println(checked(distro, environment + [toolchain + "/bin/moon"] + args))
+  }
+  println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]))
+  for args in [["test", "--target", "native", "cmd/napi-mbt-cli", "generator", "internal/syntax", "internal/assets"]] {
+    println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + [toolchain + "/bin/moon"] + args))
   }
   for script in ["build-isolation-test.mbtx", "async-exports-test.mbtx", "sanitizer-test.mbtx"] {
     println("Linux fixture: " + script)

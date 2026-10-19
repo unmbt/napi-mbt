@@ -1,0 +1,22 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn main {
+  guard @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) else { fail("Missing ASan preload") }
+  let temp = @fs.tmpdir(prefix="napi-mbt-lsan-check-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.write_file(temp + "/baseline.cjs", "const { Worker } = require('node:worker_threads');\nconst worker = new Worker('0', { eval: true });\nworker.on('error', error => { throw error; });\nworker.on('exit', code => { if (code) process.exitCode = code; else console.log('bare Node/worker ASan baseline'); });\n")
+  let environment = { "LD_PRELOAD": library }
+  let (status, out, err) = @async.with_timeout(30000, () => @process.collect_output("node", [temp + "/baseline.cjs"], extra_env=environment))
+  if status != 0 { fail(out.text() + err.text()) }
+  println(out.text())
+  println(err.text())
+  let source = temp + "/leak.c"
+  let executable = temp + "/leak"
+  @fs.write_file(source, "#include <stdlib.h>\n__attribute__((noinline)) void napi_mbt_leak_probe(void) { volatile char *p = malloc(37); p[0] = 1; }\nint main(void) { napi_mbt_leak_probe(); return 0; }\n")
+  let code = @process.run("cc", ["-g", "-O0", "-fsanitize=address", "-fno-omit-frame-pointer", source, "-o", executable])
+  if code != 0 { fail("Cannot compile LeakSanitizer probe") }
+  let (status, _, err) = @async.with_timeout(30000, () => @process.collect_output(executable, [], extra_env=environment))
+  assert_true(status != 0 && err.text().contains("37 byte(s) leaked") && err.text().contains("napi_mbt_leak_probe"), msg="Leak detection must remain active with host suppression: " + err.text())
+  println("LeakSanitizer still detects unrelated allocations")
+}

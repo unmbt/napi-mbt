@@ -57,7 +57,8 @@ jobs:
       - run: moon run --target native --release cmd/napi-mbt-cli -- doctor --json
       - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
       - run: moon check --target native --warn-list +73 --deny-warn
-      - run: moon test --target native
+      # The root foreign library is exercised by Node consumers, not a standalone test executable.
+      - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/ci-regression-test.mbtx
       - run: moon run scripts/ci-consumers.mbtx
       - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
@@ -180,7 +181,7 @@ jobs:
       - run: moon update
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon check --target native --warn-list +73 --deny-warn
-      - run: moon test --target native
+      - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/async-exports-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
 
   release:

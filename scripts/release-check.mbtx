@@ -2,21 +2,37 @@ import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env", "m
 
 ///|
 async fn main {
-  guard @json.parse(@fs.read_file("package.json").text()) is { "version": String(version), "optionalDependencies": Object(optional), .. } else { fail("Missing package version or platform dependencies") }
+  guard @json.parse(@fs.read_file("package.json").text()) is Object(manifest) else { fail("Invalid package manifest") }
+  guard manifest.get("version") is Some(String(version)) else { fail("Missing package version") }
   let mut module_version : String? = None
   for line in @fs.read_file("moon.mod").text().split("\n") {
     let line = line.trim()
     if line.has_prefix("version = ") { module_version = Some(line[10:].trim().to_owned()) }
   }
   assert_eq(module_version, Some(Json(version).stringify()))
-  for target in ["win32-x64-msvc", "darwin-arm64", "linux-x64-gnu"] { assert_eq(optional.get("napi-mbt-" + target), Some(Json(version))) }
+  // prepublish adds platform dependencies to distribution metadata. They must
+  // not be required for a fresh source checkout to install its dev tools.
+  if manifest.get("optionalDependencies") is Some(Object(optional)) {
+    for target in ["win32-x64-msvc", "darwin-arm64", "linux-x64-gnu"] {
+      if optional.get("napi-mbt-" + target) is Some(value) { assert_eq(value, Json(version)) }
+    }
+  }
   if @env.get_env_var("GITHUB_REF_TYPE") == Some("tag") && @env.get_env_var("GITHUB_REF_NAME") is Some(tag) { assert_eq(tag, "v" + version, msg="Release tag must match package version") }
   let path = "package-lock.json"
   let original = @fs.read_file(path).text()
   let canonical = original.replace_all(old="https://mirrors.tencent.com/npm/", new="https://registry.npmjs.org/")
   if @env.args().contains("--write") { @fs.write_file(path, canonical) } else { assert_eq(original, canonical, msg="Lockfile must use the public npm registry") }
-  guard @json.parse(canonical) is { "version": String(lock_version), "packages": { "": { "version": String(root_version), .. }, .. }, .. } else { fail("Invalid npm lockfile") }
+  guard @json.parse(canonical) is { "version": String(lock_version), "packages": Object(packages), .. } else { fail("Invalid npm lockfile") }
+  guard packages.get("") is Some(Object(root)) && root.get("version") is Some(String(root_version)) else { fail("Missing lockfile root") }
   assert_eq(version, lock_version)
   assert_eq(version, root_version)
+  for field in ["dependencies", "devDependencies", "optionalDependencies"] {
+    assert_eq(manifest.get(field), root.get(field), msg="Manifest/lockfile mismatch: " + field)
+    if root.get(field) is Some(Object(dependencies)) {
+      for name in dependencies.keys() {
+        assert_true(packages.contains("node_modules/" + name), msg="Missing lockfile package: " + name)
+      }
+    }
+  }
   println("Release version and lockfile checks passed")
 }
