@@ -5,11 +5,17 @@ pub fn TypeDefinition::manifest(self : TypeDefinition) -> Json {
   }
   match self.shape {
     StructShape(fields) =>
-      { "name": self.name, "kind": "struct", "fields": fields.map(parameter) }
+      {
+        "name": self.name,
+        "kind": "struct",
+        "documentation": self.documentation,
+        "fields": fields.map(parameter),
+      }
     EnumShape(variants) =>
       {
         "name": self.name,
         "kind": "enum",
+        "documentation": self.documentation,
         "variants": variants.map(v => {
           ({ "name": v.name, "parameters": v.parameters.map(parameter) } : Json)
         }),
@@ -112,7 +118,13 @@ fn definition(
         }),
       )
   }
-  { name, shape, filename, line: node.line(), }
+  {
+    name,
+    shape,
+    filename,
+    line: node.line(),
+    documentation: node.documentation(),
+  }
 }
 
 ///|
@@ -183,6 +195,7 @@ fn declarations_types(types : Array[TypeDefinition]) -> String {
   for def in types {
     for input in [true, false] {
       let name = def.name + (if input { "$Input" } else { "" })
+      out.write_string(jsdoc(def.documentation))
       match def.shape {
         StructShape(fields) => {
           out.write_string("export interface \{name} {\n")

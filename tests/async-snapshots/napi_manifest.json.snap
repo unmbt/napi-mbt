@@ -25,6 +25,13 @@
       "throws": false,
       "line": 14,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -34,7 +41,11 @@
       "ret": "Int",
       "throws": false,
       "line": 11,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     },
     {
       "sourceName": "delay",
@@ -53,6 +64,13 @@
       "throws": false,
       "line": 4,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -62,7 +80,11 @@
       "ret": "Int",
       "throws": false,
       "line": 55,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     },
     {
       "sourceName": "failure",
@@ -72,6 +94,12 @@
       "throws": false,
       "line": 45,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -91,6 +119,13 @@
       "throws": false,
       "line": 21,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -101,6 +136,12 @@
       "throws": false,
       "line": 35,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -116,6 +157,13 @@
       "throws": false,
       "line": 27,
       "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details.",
+        "Failures reject the Promise; cancellation rejects with signal.reason or ABORT_ERR."
+      ],
       "async": true
     },
     {
@@ -125,7 +173,11 @@
       "ret": "Int",
       "throws": false,
       "line": 50,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     }
   ],
   "types": [],

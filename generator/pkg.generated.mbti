@@ -64,7 +64,9 @@ pub(all) struct ParsedExport {
   filename : String
   line : Int
   binding : BindingKind
+  documentation : Array[String]
 }
+pub fn ParsedExport::error_contract(Self) -> Array[String]
 pub fn ParsedExport::manifest(Self) -> Json
 
 pub(all) struct ParsedSource {
@@ -80,6 +82,7 @@ pub(all) struct TypeDefinition {
   shape : TypeShape
   filename : String
   line : Int
+  documentation : Array[String]
 }
 pub fn TypeDefinition::manifest(Self) -> Json
 

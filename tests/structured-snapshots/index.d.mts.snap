@@ -42,15 +42,54 @@ export interface Link {
   next: (Link | null);
 }
 
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function arrays(value: Array<(Array<number> | null | undefined)>): Array<(Array<number> | null)>;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function color(value: Color$Input): Color;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function echo_i64(value: bigint): bigint;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function echo_u64(value: bigint): bigint;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ */
 export function effects(): number;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function link(value: Link$Input): Link;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function nested(value?: ((number | null | undefined) | null | undefined)): ((number | null) | null);
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function optional(a: (number | null | undefined), b: number, c?: (number | null | undefined)): Array<(number | null)>;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function person(value: Person$Input): Person;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function shape(value: Shape$Input): Shape;
 
 declare const $napiAddon: {

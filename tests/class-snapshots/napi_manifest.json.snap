@@ -22,7 +22,12 @@
       "ret": "Int",
       "throws": false,
       "line": 24,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "resources",
@@ -31,7 +36,11 @@
       "ret": "Int",
       "throws": false,
       "line": 29,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     }
   ],
   "types": [],
@@ -51,7 +60,12 @@
         "ret": "Counter",
         "throws": false,
         "line": 4,
-        "filename": "lib.mbt"
+        "filename": "lib.mbt",
+        "documentation": [],
+        "errors": [
+          "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+          "Argument conversion failure prevents business execution."
+        ]
       },
       "members": [
         {
@@ -69,7 +83,13 @@
             "ret": "Counter",
             "throws": false,
             "line": 12,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution.",
+              "Foreign, forged and disposed receivers are rejected before execution."
+            ]
           }
         },
         {
@@ -91,7 +111,13 @@
             "ret": "Int",
             "throws": false,
             "line": 6,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution.",
+              "Foreign, forged and disposed receivers are rejected before execution."
+            ]
           }
         },
         {
@@ -109,7 +135,13 @@
             "ret": "Int",
             "throws": false,
             "line": 8,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution.",
+              "Foreign, forged and disposed receivers are rejected before execution."
+            ]
           }
         },
         {
@@ -131,7 +163,13 @@
             "ret": "Unit",
             "throws": false,
             "line": 10,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution.",
+              "Foreign, forged and disposed receivers are rejected before execution."
+            ]
           }
         },
         {
@@ -149,7 +187,12 @@
             "ret": "Counter",
             "throws": false,
             "line": 14,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution."
+            ]
           }
         }
       ]
@@ -169,7 +212,12 @@
         "ret": "Other",
         "throws": false,
         "line": 20,
-        "filename": "lib.mbt"
+        "filename": "lib.mbt",
+        "documentation": [],
+        "errors": [
+          "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+          "Argument conversion failure prevents business execution."
+        ]
       },
       "members": [
         {
@@ -187,7 +235,13 @@
             "ret": "Int",
             "throws": false,
             "line": 22,
-            "filename": "lib.mbt"
+            "filename": "lib.mbt",
+            "documentation": [],
+            "errors": [
+              "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+              "Argument conversion failure prevents business execution.",
+              "Foreign, forged and disposed receivers are rejected before execution."
+            ]
           }
         }
       ]

@@ -66,7 +66,7 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
     Int64Type | UInt64Type => "bigint"
     BoolType => "boolean"
     StringType => "string"
-    BytesType | BufferViewType => "Buffer"
+    BytesType | BufferViewType => "$NapiBuffer"
     UnitType => "void"
     OptionType(inner) =>
       "(" +
@@ -183,4 +183,5 @@ pub(all) struct TypeDefinition {
   shape : TypeShape
   filename : String
   line : Int32
+  documentation : Array[String]
 }

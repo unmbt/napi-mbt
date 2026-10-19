@@ -2,21 +2,67 @@
 
 export class Counter {
   private readonly $napiType: never;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   */
   constructor(value: number);
+  /** Release this instance. Repeated calls are safe. */
   dispose(): void;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   * @throws Foreign, forged and disposed receivers are rejected before execution.
+   */
   copy(): Counter;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   * @throws Foreign, forged and disposed receivers are rejected before execution.
+   */
   increment(delta: number): number;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   * @throws Foreign, forged and disposed receivers are rejected before execution.
+   */
   get value(): number;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   * @throws Foreign, forged and disposed receivers are rejected before execution.
+   */
   set value(value: number);
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   */
   static twice(value: number): Counter;
 }
 
 export class Other {
   private readonly $napiType: never;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   */
   constructor(value: number);
+  /** Release this instance. Repeated calls are safe. */
   dispose(): void;
+  /**
+   * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+   * @throws Argument conversion failure prevents business execution.
+   * @throws Foreign, forged and disposed receivers are rejected before execution.
+   */
   get value(): number;
 }
 
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ * @throws Argument conversion failure prevents business execution.
+ */
 export function read_counter(value: Counter): number;
+/**
+ * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
+ */
 export function resources(): number;

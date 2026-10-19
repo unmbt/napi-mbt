@@ -104,6 +104,7 @@ fn class_function(
     filename: item.filename,
     line: item.line,
     binding: item.binding,
+    documentation: item.documentation,
   }
 }
 
@@ -262,10 +263,13 @@ fn class_declarations(classes : Array[ParsedClass]) -> String {
   let out = StringBuilder()
   for cls in classes {
     out.write_string(
-      "export class \{cls.name} {\n  private readonly $napiType: never;\n  constructor(\{typescript_parameters(cls.construct.parameters)});\n  dispose(): void;\n",
+      "export class \{cls.name} {\n  private readonly $napiType: never;\n" +
+      export_documentation(cls.construct, indent="  ") +
+      "  constructor(\{typescript_parameters(cls.construct.parameters)});\n  /** Release this instance. Repeated calls are safe. */\n  dispose(): void;\n",
     )
     for entry in cls.members {
       let item = entry.function
+      out.write_string(export_documentation(item, indent="  "))
       match item.binding {
         GetterBinding(_) =>
           out.write_string(

@@ -73,6 +73,24 @@ pub fn Node::line(self : Node) -> Int32 {
 }
 
 ///|
+/// Documentation immediately preceding this syntax node, without block markers.
+pub fn Node::documentation(self : Node) -> Array[String] {
+  let prefix = @utf8.decode_lossy(
+    self.source[:node_info(self.tree, self.raw, 1)],
+  )
+  let lines = prefix.trim_end().split("\n").to_array()
+  let result = []
+  for i = lines.length() - 1; i >= 0; i = i - 1 {
+    let line = lines[i].trim()
+    if !line.has_prefix("///") || line.has_prefix("///|") {
+      break
+    }
+    result.push(line[3:].trim_start().to_owned())
+  }
+  result.rev()
+}
+
+///|
 pub fn Node::has_error(self : Node) -> Bool {
   node_info(self.tree, self.raw, 4) != 0
 }

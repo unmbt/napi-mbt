@@ -13,6 +13,7 @@ pub struct Node {
   source : Bytes
 }
 pub fn Node::children(Self) -> Array[Self]
+pub fn Node::documentation(Self) -> Array[String]
 pub fn Node::has_error(Self) -> Bool
 pub fn Node::is_error(Self) -> Bool
 pub fn Node::kind(Self) -> String

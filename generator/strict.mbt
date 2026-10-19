@@ -15,6 +15,7 @@ pub(all) struct ParsedExport {
   filename : String
   line : Int32
   binding : BindingKind
+  documentation : Array[String]
 }
 
 ///|
@@ -194,6 +195,7 @@ fn parse_signature(
     filename,
     line,
     binding,
+    documentation: node.documentation(),
   }
 }
 

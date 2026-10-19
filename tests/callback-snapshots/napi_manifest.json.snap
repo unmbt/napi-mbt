@@ -26,7 +26,13 @@
       "ret": "Int",
       "throws": true,
       "line": 10,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details."
+      ]
     },
     {
       "sourceName": "clear",
@@ -35,7 +41,11 @@
       "ret": "Unit",
       "throws": false,
       "line": 13,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     },
     {
       "sourceName": "invoke",
@@ -53,7 +63,13 @@
       "ret": "Int",
       "throws": true,
       "line": 4,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details."
+      ]
     },
     {
       "sourceName": "make_adder",
@@ -67,7 +83,12 @@
       "ret": "((Int) -> Int)",
       "throws": false,
       "line": 16,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "map_strings",
@@ -81,7 +102,13 @@
       "ret": "Array[String]",
       "throws": true,
       "line": 25,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details."
+      ]
     },
     {
       "sourceName": "notify",
@@ -95,7 +122,13 @@
       "ret": "Unit",
       "throws": true,
       "line": 22,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details."
+      ]
     },
     {
       "sourceName": "count_kind",
@@ -109,7 +142,12 @@
       "ret": "Int",
       "throws": false,
       "line": 35,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "resources",
@@ -118,7 +156,11 @@
       "ret": "Int",
       "throws": false,
       "line": 30,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     },
     {
       "sourceName": "retain",
@@ -132,7 +174,12 @@
       "ret": "Unit",
       "throws": false,
       "line": 7,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "wrap",
@@ -146,7 +193,12 @@
       "ret": "((Int) -> Int raise)",
       "throws": false,
       "line": 19,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     }
   ],
   "types": [],

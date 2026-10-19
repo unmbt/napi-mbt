@@ -22,7 +22,12 @@
       "ret": "Array[Option[Array[Int]]]",
       "throws": false,
       "line": 31,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "color",
@@ -36,7 +41,12 @@
       "ret": "Color",
       "throws": false,
       "line": 19,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "signed",
@@ -50,7 +60,12 @@
       "ret": "Int64",
       "throws": false,
       "line": 7,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "unsigned",
@@ -64,7 +79,12 @@
       "ret": "UInt64",
       "throws": false,
       "line": 10,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "effect_count",
@@ -73,7 +93,11 @@
       "ret": "Int",
       "throws": false,
       "line": 4,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity."
+      ]
     },
     {
       "sourceName": "link",
@@ -87,7 +111,12 @@
       "ret": "Link",
       "throws": false,
       "line": 22,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "nested",
@@ -101,7 +130,12 @@
       "ret": "Option[Option[Int]]",
       "throws": false,
       "line": 28,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "optional",
@@ -123,7 +157,12 @@
       "ret": "Array[Option[Int]]",
       "throws": false,
       "line": 25,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "person",
@@ -137,7 +176,12 @@
       "ret": "Person",
       "throws": false,
       "line": 13,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "shape",
@@ -151,13 +195,19 @@
       "ret": "Shape",
       "throws": false,
       "line": 16,
-      "filename": "lib.mbt"
+      "filename": "lib.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     }
   ],
   "types": [
     {
       "name": "Person",
       "kind": "struct",
+      "documentation": [],
       "fields": [
         {
           "name": "name",
@@ -184,6 +234,7 @@
     {
       "name": "Address",
       "kind": "struct",
+      "documentation": [],
       "fields": [
         {
           "name": "city",
@@ -194,6 +245,7 @@
     {
       "name": "Shape",
       "kind": "enum",
+      "documentation": [],
       "variants": [
         {
           "name": "Empty",
@@ -235,6 +287,7 @@
     {
       "name": "Color",
       "kind": "enum",
+      "documentation": [],
       "variants": [
         {
           "name": "Red",
@@ -249,6 +302,7 @@
     {
       "name": "Link",
       "kind": "struct",
+      "documentation": [],
       "fields": [
         {
           "name": "value",
