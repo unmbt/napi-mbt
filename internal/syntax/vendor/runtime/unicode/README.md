@@ -2,6 +2,10 @@
 
 This directory contains a small subset of files from the Unicode organization's [ICU repository](https://github.com/unicode-org/icu).
 
+napi-mbt changes sibling includes from `unicode/name.h` to `name.h` so the
+vendored runtime builds without a global include-directory flag on GCC, Clang,
+and MSVC. `scripts/vendor-native.mbtx` reapplies this patch when updating.
+
 ### License
 
 The license for these files is contained in the `LICENSE` file within this directory.

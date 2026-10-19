@@ -5,7 +5,7 @@ const net = require('node:net')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
-const addon = require(isMainThread ? process.argv[2] : workerData.binary)
+const addon = require(path.resolve(isMainThread ? process.argv[2] : workerData.binary))
 let phase = 'start'
 const timeout = setTimeout(() => { console.error('async exports timeout: ' + phase); process.exit(1) }, 30000)
 async function main() {

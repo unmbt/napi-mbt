@@ -126,6 +126,8 @@ async fn main {
     resources["async/" + path] = Json(@fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n"))
   }
   let output = Json(resources).stringify(indent=2) + "\n"
-  if @env.args().contains("--check") { assert_eq(output, @fs.read_file(resources_path).text()) }
+  if @env.args().contains("--check") {
+    if Json(resources) != @json.parse(@fs.read_file(resources_path).text()) { fail("Embedded async adapter is stale; run scripts/sync-async-adapter.mbtx") }
+  }
   else { @fs.write_file(resources_path, output) }
 }

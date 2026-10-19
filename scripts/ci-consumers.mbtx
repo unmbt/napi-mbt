@@ -1,0 +1,24 @@
+import { "moonbitlang/async", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], timeout~ : Int = 300000) -> Unit {
+  let code = @async.with_timeout(timeout, () => @process.run(program, args))
+  if code != 0 { fail(program + " " + args.join(" ") + " failed") }
+}
+
+///|
+async fn main {
+  let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
+  for fixture in ["loader", "class", "callback", "lifecycle", "async-adapter", "async-runtime", "async-exports", "watch", "distribution", "minimum-fixtures"] {
+    let filename = if fixture == "minimum-fixtures" { "scripts/minimum-fixtures.mbtx" } else { "scripts/" + fixture + "-test.mbtx" }
+    checked("moon", ["run", filename, binary], timeout=600000)
+  }
+  checked("moon", ["run", "scripts/test-runtime.mbtx"])
+  checked("moon", ["run", "scripts/test-runtime.mbtx", "--structured"])
+  checked("moon", ["run", "scripts/distribution-test.mbtx", binary, "--root"])
+  for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+    let files = ["scripts/lifecycle.test.mts", "scripts/async-exports.test.mts"]
+    if mode == "NodeNext" { files.push("scripts/lifecycle.test.cts") }
+    checked("node", ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution] + files)
+  }
+}

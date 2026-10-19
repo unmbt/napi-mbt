@@ -1,0 +1,40 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/encoding/utf8" }
+
+///|
+async fn checked(program : String, args : Array[String]) -> String {
+  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args))
+  if code != 0 { fail(program + " " + args.join(" ") + " exited \{code}: " + @utf8.decode_lossy(out.binary()) + @utf8.decode_lossy(err.binary())) }
+  @utf8.decode_lossy(out.binary())
+}
+
+///|
+async fn main {
+  let cache = ".napi-mbt/node-matrix"
+  @fs.mkdir(cache, recursive=true, allow_exist=true)
+  for (version, mode) in [("22.22.1", "modern"), ("24.14.0", "modern"), ("10.16.0", "cjs"), ("12.20.0", "dual"), ("12.22.0", "async")] {
+    let directory = cache + "/" + version
+    @fs.mkdir(directory, recursive=true, allow_exist=true)
+    let executable = directory + "/node.exe"
+    let sums = cache + "/SHA256-" + version + ".txt"
+    if !@fs.exists(executable) && @fs.exists(cache + "/node-" + version + ".exe") {
+      @fs.write_file(executable, @fs.read_file(cache + "/node-" + version + ".exe"))
+    }
+    if !@fs.exists(sums) {
+      ignore(checked("curl.exe", ["-fL", "--retry", "1", "--max-time", "60", "https://nodejs.org/dist/v" + version + "/SHASUMS256.txt", "-o", sums]))
+    }
+    let expected = @fs.read_file(sums).text().split("\n").filter(line => line.has_suffix("  win-x64/node.exe")).to_array()
+    assert_eq(expected.length(), 1)
+    if !@fs.exists(executable) || !checked("certutil.exe", ["-hashfile", executable, "SHA256"]).contains(expected[0][:64].to_owned()) {
+      ignore(checked("curl.exe", ["-fL", "-C", "-", "--retry", "1", "--connect-timeout", "15", "--max-time", "240", "https://nodejs.org/dist/v" + version + "/win-x64/node.exe", "-o", executable + ".download"]))
+      @fs.rename(executable + ".download", executable, replace=true)
+    }
+    assert_true(checked("certutil.exe", ["-hashfile", executable, "SHA256"]).contains(expected[0][:64].to_owned()))
+    println(checked(executable, ["--version"]).trim())
+    if mode == "modern" {
+      for fixture in ["runtime-boundary", "structured-types", "class", "callback", "lifecycle"] {
+        println(checked(executable, ["--expose-gc", "scripts/" + fixture + ".test.cjs"]))
+      }
+      println(checked(executable, ["--expose-gc", "scripts/async-exports.test.cjs", @fs.realpath(".napi-mbt/async-exports/napi_mbt.node")]))
+    } else { println(checked(executable, ["scripts/minimum-node.test.cjs", mode])) }
+  }
+}

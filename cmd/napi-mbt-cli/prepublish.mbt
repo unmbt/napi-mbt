@@ -6,6 +6,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
   if name.is_empty() || version.is_empty() {
     fail("package.json requires name and version")
   }
+  validate_package_version(dir, version)
   let conf = config(dir)
   let artifact_root = local_artifact_root(dir)
   let targets = match target_override {
@@ -21,8 +22,24 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
         "Missing release artifact for \{target}; build every requested target before prepublish",
       )
     }
+    validate_artifact(
+      @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
+      target,
+    )
   }
-  ignore(generate(dir, false))
+  // Release preparation must not hide stale declarations or changed signatures.
+  ignore(generate(dir, true, check_package=false))
+  let assets = @assets.files()
+  mkdirp(dir + "/licenses")
+  let licenses = [
+    ("napi-mbt.txt", "RUNTIME-LICENSE"),
+    ("node-api.txt", "NODE-API-LICENSE"),
+    ("moonbit-async.txt", "async/LICENSE"),
+    ("libuv.txt", "async/LIBUV-LICENSE"),
+  ]
+  for (filename, key) in licenses {
+    write_file(dir + "/licenses/" + filename, assets[key])
+  }
   let optional = match pkg.get("optionalDependencies") {
     Some(value) => object(value)
     None => Map([])
@@ -44,7 +61,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       "os": [parts[0].to_owned()],
       "cpu": [parts[1].to_owned()],
       "main": "napi_mbt.node",
-      "files": ["napi_mbt.node"],
+      "files": ["napi_mbt.node", "licenses"],
       "exports": { ".": "./napi_mbt.node", "./package.json": "./package.json" },
       "engines": { "node": node_engine(conf.napi_version, false) },
       "napiVersion": conf.napi_version,
@@ -54,6 +71,16 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       child["libc"] = ["glibc"]
     }
     mkdirp(path, recursive=true)
+    mkdirp(path + "/licenses")
+    for (filename, key) in licenses {
+      write_file(path + "/licenses/" + filename, assets[key])
+    }
+    if pkg.get("license") is Some(license) {
+      child["license"] = license
+    }
+    if @fs.exists(dir + "/LICENSE") {
+      write_file(path + "/LICENSE", @fs.read_file(dir + "/LICENSE"))
+    }
     let artifact = artifact_root + "/" + target + "/napi_mbt.node"
     write_file(path + "/napi_mbt.node", @fs.read_file(artifact))
     write_json(path + "/package.json", Json(child))

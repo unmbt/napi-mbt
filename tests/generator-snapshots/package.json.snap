@@ -21,6 +21,7 @@
     "test": "node test/smoke.cjs && node test/smoke.mjs"
   },
   "files": [
+    "licenses",
     "index.d.ts",
     "napi_manifest.json",
     "index.cjs",

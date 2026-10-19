@@ -29,7 +29,7 @@ async fn main {
   }
   let env = {
     "MOONBIT_NEW_NATIVE": "0", "MOONBIT_ALLOCATOR": "system",
-    "ASAN_OPTIONS": "detect_leaks=0:fast_unwind_on_malloc=0",
+    "ASAN_OPTIONS": if windows { "detect_leaks=0:fast_unwind_on_malloc=0" } else { "detect_leaks=1:halt_on_error=1:fast_unwind_on_malloc=0" },
   }
   if windows {
     let pf = @env.get_env_var("ProgramFiles(x86)").unwrap_or("C:/Program Files (x86)")

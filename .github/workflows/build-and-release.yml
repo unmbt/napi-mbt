@@ -1,180 +1,199 @@
-name: Build and Release
+name: Build and distribution gates
 
 on:
   push:
-    branches:
-      - master
-    tags:
-      - 'v*'
+    branches: [master]
+    tags: ['v*']
   pull_request:
-    branches:
-      - master
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MOONBIT_VERSION: '0.10.15+943464bfa'
+  CMAKE_VERSION: '4.0.3'
 
 jobs:
   build:
-    name: Build on ${{ matrix.os }}
+    name: Native gates (${{ matrix.os }})
+    timeout-minutes: 90
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
-            artifact_name: napi-mbt-linux-x64-gnu
-            src_dir: linux-x64-gnu
-          # MoonBit currently ships a macOS toolchain only for Apple Silicon.
-          - os: macos-latest
-            artifact_name: napi-mbt-darwin-arm64
-            src_dir: darwin-arm64
-          - os: windows-latest
-            artifact_name: napi-mbt-win32-x64-msvc
-            src_dir: win32-x64-msvc
-
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Setup MoonBit
-        uses: hustcer/setup-moonbit@v1
-
-      - name: Update Registry & Dependencies
-        run: moon update
-
-      - name: Check runtime template consistency
-        run: moon run scripts/sync-runtime.mbtx --check
-
-      - name: Build native CLI
-        run: moon build --target native --release cmd/napi-mbt-cli
-
-      - name: Build Native Module
-        run: moon run --target native --release cmd/napi-mbt-cli -- build --release
-
-      - name: Strict MoonBit check
-        run: moon check --target native --warn-list +73 --deny-warn
-
-      - name: CI regression tests
-        run: moon run scripts/ci-regression-test.mbtx
-
-      - name: MoonBit tests
-        run: moon test --target native
-
-      - name: Parser FFI AddressSanitizer tests
-        # The hosted Windows image's MSVC ASan runtime currently cannot start
-        # MoonBit's generated test executables (0xc0000139). Native parser
-        # coverage is still exercised by the MoonBit test step above.
-        if: runner.os != 'Windows'
-        run: moon run scripts/parser-asan-test.mbtx
-
-      - name: Setup Node for addon load tests
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-
-      - name: Load addons in Node
-        run: node --test scripts/test.js
-
-      - name: Check isolated native dependencies
-        run: node scripts/build-isolation.test.cjs
-
-      - name: Check runtime error boundaries with a process timeout
-        run: moon run scripts/test-runtime.mbtx
-
-      - name: Install TypeScript consumer checker
-        run: npm install --ignore-scripts --omit=optional
-
-      - name: Check loader modes and TypeScript consumers
-        run: moon run scripts/loader-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
-
-      - name: Check structured values and TypeScript consumers
-        run: moon run scripts/test-runtime.mbtx --structured
-
-      - name: Prepare Artifact
-        shell: bash
-        run: |
-          mkdir -p artifacts_export
-          cp artifacts/${{ matrix.src_dir }}/napi_mbt.node artifacts_export/${{ matrix.artifact_name }}.node
-
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: artifacts_export/${{ matrix.artifact_name }}.node
-          retention-days: 7
-
-  release:
-    name: Create GitHub Release
-    needs: [build, cli]
-    if: startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: artifacts
-          merge-multiple: true
-
-      - name: Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            artifacts/*.node
-            artifacts/*.tar.gz
-          generate_release_notes: true
-
-  cli:
-    name: Build MoonBit CLI on ${{ matrix.os }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            asset_name: napi-mbt-linux-amd64
-          # MoonBit currently ships a macOS toolchain only for Apple Silicon.
-          - os: macos-latest
-            asset_name: napi-mbt-macos-arm64
-          - os: windows-latest
-            asset_name: napi-mbt-windows-amd64
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      - name: Setup MoonBit
-        uses: hustcer/setup-moonbit@v1
-      - name: Update Registry & Dependencies
-        run: moon update
-      - name: Build native CLI
-        run: moon build --release --target native cmd/napi-mbt-cli
-      - name: Package standalone native CLI
-        run: moon run scripts/package-cli.mbtx ${{ matrix.asset_name }}
-      - name: Upload CLI artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.asset_name }}
-          path: ${{ matrix.asset_name }}.tar.gz
-
-  publish-mooncakes:
-    name: Publish MoonBit module
-    needs: [build, cli]
-    if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
+          - os: ubuntu-24.04
+            target: linux-x64-gnu
+            asset: napi-mbt-linux-amd64
+          - os: macos-15
+            target: darwin-arm64
+            asset: napi-mbt-macos-arm64
+          - os: windows-2025
+            target: win32-x64-msvc
+            asset: napi-mbt-windows-amd64
     steps:
       - uses: actions/checkout@v4
       - uses: hustcer/setup-moonbit@v1
+        with:
+          version: ${{ env.MOONBIT_VERSION }}
+          core-version: ${{ env.MOONBIT_VERSION }}
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: ${{ env.CMAKE_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.4.0'
+          cache: npm
       - run: moon update
-      - name: Verify module version
-        shell: bash
-        run: |
-          module_version="$(sed -n 's/^version = "\([^"]*\)"/\1/p' moon.mod | head -n 1)"
-          test "v${module_version}" = "${GITHUB_REF_NAME}"
-      - name: Configure Mooncakes credentials
-        env:
-          MOONCAKES_CREDENTIALS: ${{ secrets.MOONCAKES_CREDENTIALS }}
-        run: |
-          test -n "$MOONCAKES_CREDENTIALS"
-          install -d -m 700 "$HOME/.moon"
-          printf '%s' "$MOONCAKES_CREDENTIALS" > "$HOME/.moon/credentials.json"
-          chmod 600 "$HOME/.moon/credentials.json"
-      - run: moon publish
+      - run: npm ci --ignore-scripts
+      - run: moon run scripts/sync-runtime.mbtx --check
+      - run: moon run scripts/sync-async-adapter.mbtx --check
+      - run: moon run scripts/release-check.mbtx
+      - run: moon build --target native --release cmd/napi-mbt-cli
+      - run: moon run --target native --release cmd/napi-mbt-cli -- doctor --json
+      - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
+      - run: moon check --target native --warn-list +73 --deny-warn
+      - run: moon test --target native
+      - run: moon run scripts/ci-regression-test.mbtx
+      - run: moon run scripts/ci-consumers.mbtx
+      - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
+      - run: moon publish --dry-run
+      - run: moon run scripts/ci-artifacts.mbtx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consumers-${{ matrix.target }}
+          path: dist/consumer-fixtures/
+          include-hidden-files: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.target }}
+          path: dist/npm/${{ matrix.target }}/*.tgz
+
+  node:
+    name: Node ${{ matrix.node }} (${{ matrix.target }})
+    needs: build
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24', '26']
+        target: [linux-x64-gnu, darwin-arm64, win32-x64-msvc]
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64-gnu
+          - os: macos-15
+            target: darwin-arm64
+          - os: windows-2025
+            target: win32-x64-msvc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: consumers-${{ matrix.target }}
+          path: .
+      - run: node scripts/test.js
+      - run: node scripts/build-isolation.test.cjs
+      - run: node scripts/runtime-boundary.test.cjs
+      - run: node scripts/structured-types.test.cjs
+      - run: node --expose-gc scripts/class.test.cjs
+      - run: node --expose-gc scripts/callback.test.cjs
+      - run: node scripts/lifecycle.test.cjs
+      - run: node scripts/async-runtime.test.cjs
+      - run: node --expose-gc scripts/async-exports.test.cjs ./.napi-mbt/async-exports/napi_mbt.node
+
+  minimum:
+    name: Minimum Node ${{ matrix.node }} (${{ matrix.mode }})
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: '10.16.0'
+            mode: cjs
+          - node: '12.20.0'
+            mode: dual
+          - node: '12.22.0'
+            mode: async
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: consumers-linux-x64-gnu
+          path: .
+      - run: node scripts/minimum-node.test.cjs ${{ matrix.mode }}
+
+  memory:
+    name: Native memory (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+        with:
+          version: ${{ env.MOONBIT_VERSION }}
+          core-version: ${{ env.MOONBIT_VERSION }}
+      - uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: ${{ env.CMAKE_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26.4.0'
+      - run: moon update
+      - run: moon build --target native --release cmd/napi-mbt-cli
+      - run: moon run scripts/sanitizer-test.mbtx
+
+  compatibility:
+    name: Latest MoonBit compatibility
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+        with:
+          version: latest
+          core-version: latest
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '26'
+      - run: moon update
+      - run: moon build --target native --release cmd/napi-mbt-cli
+      - run: moon check --target native --warn-list +73 --deny-warn
+      - run: moon test --target native
+      - run: moon run scripts/async-exports-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
+
+  release:
+    name: Release archives
+    needs: [build, node, minimum, memory, compatibility]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: napi-mbt-*
+          merge-multiple: true
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.tar.gz
+          generate_release_notes: true

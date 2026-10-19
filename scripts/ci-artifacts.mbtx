@@ -1,0 +1,20 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env" }
+
+///|
+async fn copy(source : String, destination : String) -> Unit {
+  if @fs.kind(source) == Directory {
+    @fs.mkdir(destination, recursive=true, allow_exist=true)
+    for name in @fs.readdir(source) { copy(source + "/" + name, destination + "/" + name) }
+  } else { @fs.write_file(destination, @fs.read_file(source)) }
+}
+
+///|
+async fn main {
+  let destination = @env.args().get(1).unwrap_or("dist/consumer-fixtures")
+  @fs.mkdir(destination + "/.napi-mbt", recursive=true, allow_exist=true)
+  for name in ["native-smoke", "isolation-smoke", "boundary-smoke", "structured-smoke", "class-smoke", "callback-smoke", "lifecycle-smoke", "async-smoke", "async-exports", "minimum-cjs", "minimum-dual", "minimum-async"] {
+    copy(".napi-mbt/" + name, destination + "/.napi-mbt/" + name)
+  }
+  copy("artifacts", destination + "/artifacts")
+  for name in ["index.cjs", "index.mjs"] { copy(name, destination + "/" + name) }
+}

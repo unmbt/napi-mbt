@@ -79,15 +79,19 @@ async fn initialize(
     #|  build:
     #|    strategy:
     #|      matrix:
-    #|        os: [ubuntu-latest, macos-latest, windows-latest]
+    #|        os: [ubuntu-24.04, macos-15, windows-2025]
+    #|        node: ['22', '24', '26']
     #|    runs-on: ${{ matrix.os }}
     #|    steps:
     #|      - uses: actions/checkout@v4
     #|      - uses: hustcer/setup-moonbit@v1
+    #|        with:
+    #|          version: '0.10.15+943464bfa'
+    #|          core-version: '0.10.15+943464bfa'
     #|      - run: moon install unmbt/napi-mbt/cmd/napi-mbt-cli
     #|      - run: napi-mbt-cli build --release
     #|      - uses: actions/setup-node@v4
-    #|        with: { node-version: 20 }
+    #|        with: { node-version: '${{ matrix.node }}' }
     #|      - run: npm test
     #|
   files[".github/workflows/build.yml"] = workflow

@@ -1,0 +1,52 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(distro : String, args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output("wsl.exe", ["-d", distro, "--"] + args)
+  if code != 0 { fail(args.join(" ") + "\n" + out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn copy(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    if [".git", ".codegraph", "_build", ".napi-mbt", "napi-rs", "node_modules", "npm", "artifacts", "dist"].contains(name) || name.has_suffix(".tar.gz") { continue }
+    let src = source + "/" + name
+    if @fs.kind(src) == Directory { copy(src, destination + "/" + name) }
+    else { @fs.write_file(destination + "/" + name, @fs.read_file(src)) }
+  }
+}
+
+///|
+async fn main {
+  let distro = @env.args().get(1).unwrap_or("FedoraLinux-43")
+  let toolchain = "/tmp/napi-mbt-toolchain-0.10.15"
+  ignore(checked(distro, ["mkdir", "-p", toolchain]))
+  let (exists, _, _) = @process.collect_output("wsl.exe", ["-d", distro, "--", "test", "-x", toolchain + "/bin/moon"])
+  if exists != 0 {
+    for (url, filename, destination) in [
+      ("https://cli.moonbitlang.com/binaries/0.10.15%2B943464bfa/moonbit-linux-x86_64.tar.gz", "toolchain.tar.gz", toolchain),
+      ("https://cli.moonbitlang.com/cores/core-0.10.15%2B943464bfa.tar.gz", "core.tar.gz", toolchain + "/lib"),
+    ] {
+      ignore(checked(distro, ["curl", "-fL", "--retry", "2", url, "-o", toolchain + "/" + filename]))
+      ignore(checked(distro, ["tar", "-xzf", toolchain + "/" + filename, "-C", destination]))
+    }
+  }
+  ignore(checked(distro, ["chmod", "-R", "+x", toolchain + "/bin"]))
+  let windows_copy = @fs.tmpdir(prefix="napi-mbt-linux-copy-")
+  defer @fs.rmdir(windows_copy, recursive=true)
+  copy(".", windows_copy + "/project")
+  let source = checked(distro, ["wslpath", "-u", (windows_copy + "/project").replace_all(old="\\", new="/")]).trim().to_owned()
+  let linux_root = checked(distro, ["mktemp", "-d", "/tmp/napi-mbt-linux-validation-XXXXXX"]).trim().to_owned()
+  if !linux_root.has_prefix("/tmp/napi-mbt-linux-validation-") { fail("Invalid validation directory") }
+  defer ignore(checked(distro, ["rm", "-rf", "--", linux_root]))
+  ignore(checked(distro, ["cp", "-R", source + "/.", linux_root]))
+  let environment = ["env", "MOON_HOME=" + toolchain, "PATH=" + toolchain + "/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin", "MOONBIT_NEW_NATIVE=0", "MOONBIT_ALLOCATOR=system"]
+  for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "build", "--target", "native", "--release", "cmd/napi-mbt-cli"]] {
+    println(checked(distro, environment + [toolchain + "/bin/moon"] + args))
+  }
+  for script in ["async-exports-test.mbtx", "sanitizer-test.mbtx"] {
+    println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + [toolchain + "/bin/moon", "run", "scripts/" + script, "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]))
+  }
+}

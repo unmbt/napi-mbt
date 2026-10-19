@@ -7,7 +7,11 @@ struct Generated {
 }
 
 ///|
-async fn generate(dir : String, check : Bool) -> Generated {
+async fn generate(
+  dir : String,
+  check : Bool,
+  check_package~ : Bool = true,
+) -> Generated {
   let conf = config(dir)
   let runtime = @fs.read_file(dir + "/napi_runtime_version.mbt").text()
   guard runtime.find("=") is Some(equal) &&
@@ -93,7 +97,16 @@ async fn generate(dir : String, check : Bool) -> Generated {
   if !conf.esm {
     removals.append(["index.mjs", "index.d.mts"])
   }
-  install_outputs(dir, outputs, check, removals~)
+  install_outputs(
+    dir,
+    if check && !check_package {
+      outputs.filter(output => output.0 != "package.json")
+    } else {
+      outputs
+    },
+    check,
+    removals~,
+  )
   if !check {
     println("Generated \{exports.length()} N-API export(s).")
   }

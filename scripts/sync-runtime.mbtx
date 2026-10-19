@@ -5,6 +5,9 @@ async fn main {
   let path = "internal/assets/data/resources.json"
   guard @json.parse(@fs.read_file(path).text()) is Object(files) else { fail("Invalid resources") }
   let check = @env.args().contains("--check")
+  let license = @fs.read_file("LICENSE").text().replace_all(old="\r\n", new="\n")
+  if check && files.get("RUNTIME-LICENSE") != Some(Json(license)) { fail("Runtime license is stale") }
+  files["RUNTIME-LICENSE"] = Json(license)
   for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
     let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
     let (target, source) = if name == "lib.mbt" {

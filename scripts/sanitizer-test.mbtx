@@ -1,0 +1,36 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn run(args : Array[String], environment : Map[String, String]) -> Unit {
+  let code = @async.with_timeout(300000, () => @process.run("moon", args, extra_env=environment))
+  if code != 0 { fail("Sanitizer failed: " + args.join(" ")) }
+}
+
+///|
+async fn main {
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let environment : Map[String, String] = {
+    "ASAN_OPTIONS": if windows { "detect_leaks=0:halt_on_error=1" } else { "detect_leaks=1:halt_on_error=1" },
+  }
+  if windows {
+    let pf = @env.get_env_var("ProgramFiles(x86)").unwrap_or("C:/Program Files (x86)")
+    let (code, out, err) = @process.collect_output(pf + "/Microsoft Visual Studio/Installer/vswhere.exe", ["-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath", "-utf8"])
+    if code != 0 { fail(err.text()) }
+    let tools = out.text().trim().to_owned() + "/VC/Tools/MSVC"
+    let directories = []
+    for version in @fs.readdir(tools) { directories.push(tools + "/" + version + "/bin/Hostx64/x64") }
+    environment["PATH"] = directories.join(";") + ";" + @env.get_env_var("PATH").unwrap_or("")
+  } else {
+    let (code, out, err) = @process.collect_output("cc", ["-print-file-name=libasan.so"])
+    let library = out.text().trim().to_owned()
+    if code != 0 || !@fs.exists(library) { fail("GCC ASan runtime unavailable: " + err.text()) }
+    environment["NAPI_MBT_TEST_NODE_PRELOAD"] = library
+  }
+  let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
+  run(["run", "scripts/parser-asan-test.mbtx"], environment)
+  for fixture in ["runtime-boundary", "structured-types", "class", "callback", "async-exports"] {
+    run(["run", "scripts/" + fixture + "-test.mbtx", binary, "--asan"], environment)
+    if fixture == "runtime-boundary" { run(["run", "scripts/test-runtime.mbtx", "--asan"], environment) }
+    if fixture == "structured-types" { run(["run", "scripts/test-runtime.mbtx", "--structured", "--asan"], environment) }
+  }
+}

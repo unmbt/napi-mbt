@@ -14,6 +14,9 @@ async fn main {
   @fs.write_file(temp + "/licenses/UNICODE-LICENSE", @fs.read_file("internal/syntax/vendor/runtime/unicode/LICENSE"))
   guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is { "NODE-API-LICENSE": String(license), .. } else { fail("Missing bundled license") }
   @fs.write_file(temp + "/licenses/NODE-API-LICENSE", license)
+  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is { "async/LICENSE": String(async_license), "async/LIBUV-LICENSE": String(uv_license), .. } else { fail("Missing embedded async licenses") }
+  @fs.write_file(temp + "/licenses/MOONBIT-ASYNC-LICENSE", async_license)
+  @fs.write_file(temp + "/licenses/LIBUV-LICENSE", uv_license)
   let status = @process.run("tar", ["-czf", asset + ".tar.gz", "-C", temp, "."])
   if status != 0 { fail("Packaging failed") }
 }

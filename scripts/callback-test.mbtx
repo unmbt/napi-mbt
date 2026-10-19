@@ -3,7 +3,9 @@ import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process
 ///|
 async fn checked(binary : String, args : Array[String], cwd? : StringView) -> Unit {
   @async.with_timeout(120000, () => {
-    let (code, out, err) = @process.collect_output(binary, args, cwd?)
+    let environment : Map[String, String] = Map([])
+    if binary == "node" && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+    let (code, out, err) = @process.collect_output(binary, args, cwd?, extra_env=environment)
     if code != 0 { fail(out.text() + err.text()) }
   })
 }

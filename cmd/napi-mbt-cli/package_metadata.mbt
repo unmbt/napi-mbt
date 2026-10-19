@@ -74,6 +74,9 @@ fn package_metadata(pkg : Map[String, Json], conf : Config) -> Json raise {
   let files = strings(pkg, "files").filter(file => {
     !managed_package_files.contains(file)
   })
+  if !files.contains("licenses") {
+    files.push("licenses")
+  }
   files.append(["index.d.ts", "napi_manifest.json"])
   if conf.cjs {
     files.append(["index.cjs", "index.d.cts"])

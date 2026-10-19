@@ -26,6 +26,10 @@ async fn main {
   }
   let dest = "internal/syntax/vendor"
   copy_tree(runtime + "/lib/src", dest + "/runtime")
+  for name in ["utf8.h", "utf16.h", "umachine.h"] {
+    let path = dest + "/runtime/unicode/" + name
+    @fs.write_file(path, @fs.read_file(path).text().replace_all(old="\"unicode/", new="\""))
+  }
   copy_tree(runtime + "/lib/include/tree_sitter", dest + "/runtime/tree_sitter")
   copy_tree(grammar + "/src", dest + "/grammar")
   @fs.write_file(dest + "/TREE-SITTER-LICENSE", @fs.read_file(runtime + "/LICENSE"))

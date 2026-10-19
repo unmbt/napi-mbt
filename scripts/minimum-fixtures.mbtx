@@ -1,0 +1,42 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @process.collect_output(binary, args)
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn copy_tree(source : String, destination : String) -> Unit {
+  @fs.mkdir(destination, recursive=true)
+  for name in @fs.readdir(source) {
+    if name == "_build" || name == ".git" { continue }
+    if @fs.kind(source + "/" + name) == Directory { copy_tree(source + "/" + name, destination + "/" + name) }
+    else { @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name)) }
+  }
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-minimum-")
+  defer @fs.rmdir(temp, recursive=true)
+  for mode in ["cjs", "dual", "async"] {
+    let dir = temp + "/" + mode
+    checked(binary, ["init", dir, "--name", "minimum-fixture"])
+    @fs.write_file(dir + "/napi-mbt.json", ({ "napiVersion": if mode == "async" { 8 } else { 4 }, "esm": mode != "cjs" } : Json).stringify())
+    if mode == "async" {
+      @fs.write_file(dir + "/moon.mod", "name = \"minimum-fixture\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+      @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
+      @fs.write_file(dir + "/lib.mbt", @fs.read_file(dir + "/lib.mbt").text() + "\n///|\n#export_name(\"delay\")\npub async fn delay(ms : Int, value : String) -> String { @async.sleep(ms); value }\n")
+      copy_tree(".mooncakes/moonbitlang/async", dir + "/.mooncakes/moonbitlang/async")
+    }
+    checked(binary, ["build", dir, "--release"])
+    let out = ".napi-mbt/minimum-" + mode
+    if !@fs.exists(out) { @fs.mkdir(out, recursive=true) }
+    for name in ["index.cjs", "index.mjs", "package.json"] { if @fs.exists(dir + "/" + name) { @fs.write_file(out + "/" + name, @fs.read_file(dir + "/" + name)) } }
+    if @fs.exists(out + "/artifacts") { @fs.rmdir(out + "/artifacts", recursive=true) }
+    copy_tree(dir + "/artifacts", out + "/artifacts")
+    checked("node", ["scripts/minimum-node.test.cjs", mode])
+  }
+}

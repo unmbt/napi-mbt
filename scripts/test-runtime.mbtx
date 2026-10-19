@@ -9,8 +9,9 @@ async fn main {
   let node_args = [if structured { "scripts/structured-types.test.cjs" } else { "scripts/runtime-boundary.test.cjs" }]
   if asan {
     node_args.push(if structured { ".napi-mbt/structured-asan/napi_mbt.node" } else { ".napi-mbt/boundary-asan/napi_mbt.node" })
-    environment["ASAN_OPTIONS"] = "detect_leaks=0:halt_on_error=1"
-    if args.get(2) is Some(directory) {
+    environment["ASAN_OPTIONS"] = @env.get_env_var("ASAN_OPTIONS").unwrap_or("detect_leaks=0:halt_on_error=1")
+    if @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+    if args.get(2) is Some(directory) && !directory.has_prefix("--") {
       environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
     }
   }

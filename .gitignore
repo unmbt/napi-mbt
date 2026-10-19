@@ -11,3 +11,8 @@ artifacts/
 artifacts
 
 .napi-mbt/
+npm/
+*.node
+*.tar.gz
+/napi-rs/
+/licenses/

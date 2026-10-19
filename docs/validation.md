@@ -25,6 +25,18 @@ prepublish from that custom directory, stage timings, and isolated dependency
 regression. Loader CJS/ESM/ESM-only and TS consumer tests also passed. These
 native watch scenarios were executed on Windows only.
 
+Distribution gates: 39 MoonBit tests, strict checks, complete generator and
+structured snapshots, actual fixture and root npm pack/dry-run, offline clean
+installation, CJS/ESM and installed TypeScript consumers passed on Windows.
+Both packages include runtime, Node-API, async and libuv licenses. Corrupt
+binaries, stale declarations and mismatched versions are rejected. Full parser,
+runtime, structured, class, callback and async ASan orchestration passed on
+Windows. Node 22.22.1 additionally passed native runtime/lifecycle/async tests.
+The pinned CI gates cover Node 22/24/26 and minimum Node 10.16/12.20/12.22,
+Linux/Windows sanitizer jobs, and a separate latest-MoonBit compatibility job.
+These configured jobs are not a claim of GitHub execution. Local Linux
+validation is tracked separately; macOS has not been executed locally.
+
 Test orchestration is in `.mbtx` files. Node fixtures exercise built binaries;
 they do not stand in for native CLI tests. No registry publication or remote
 push has been performed. The downloaded `napi-rs/` checkout is reference material.
