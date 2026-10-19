@@ -37,7 +37,7 @@ jobs:
 
       - uses: jwlawson/actions-setup-cmake@v2
         with:
-          cmake-version: '4.0.3'
+          cmake-version: '4.4.4'
 
       - uses: actions/setup-node@v4
         with:
@@ -49,4 +49,4 @@ jobs:
         run: |
             moon version --all
             moon update
-            
+            moon check --target native --warn-list +73 --deny-warn

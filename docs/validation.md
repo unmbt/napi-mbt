@@ -127,3 +127,45 @@ class/callback, Promise/cancellation, I/O and worker teardown tests all passed.
 Strict checks, interface/format checks, generation checks and workflow actionlint
 passed. The repaired workflows have not yet been rerun on GitHub; hosted Windows
 toolset selection and macOS execution still need that confirmation.
+
+## Dependency bootstrap and Visual Studio 2026 CI repair
+
+[Run 39223932105](https://github.com/unmbt/napi-mbt/actions/runs/39223932105)
+confirmed that Linux memory checks and latest-MoonBit compatibility passed.
+Windows parser ASan also passed all 20 tests. The remaining failures were the
+async template check running before project dependencies were downloaded, and
+CMake 4.0.3 lacking the hosted Visual Studio 18 2026 generator.
+
+Strict project checking now precedes template checks, and both workflows pin
+CMake 4.4.4. The new bootstrap regression copies Git sources without project
+caches, checks the missing-dependency diagnostic, then runs strict checking and
+both template checks successfully. The WSL validation copy also excludes
+`.mooncakes` now. Moon/core remain pinned to `0.10.15+943464bfa`.
+
+Official SHA-256 checks passed for the Windows and Linux CMake 4.4.4 downloads.
+The Windows executable lists `Visual Studio 18 2026` in its capabilities. Actual
+compile/link probes passed on Windows with VS 2022 and on Fedora WSL with GCC
+15.2.1. The complete Windows parser/addon ASan suite passed with CMake 4.4.4 and
+Node 26.4.0, including Promise cancellation, I/O and worker teardown.
+
+A fresh Fedora WSL source copy passed all main native gates and the Node 26.4.0
+consumer commands: dependency/template checks, 45 unit tests, no-Node CLI
+installation, snapshots, isolated native inputs, loaders and declarations,
+classes/callbacks, async I/O/cancellation/workers, documented examples, watch
+recovery, npm packing/dry-run/clean installation, Mooncake extraction/checking,
+CLI archive packaging and consumer artifact staging. This complete run used
+the existing CMake 3.31.10 installation.
+
+A fresh Windows source copy passed the same complete main gates and Node 26.4.0
+consumer commands with CMake 4.4.4 and VS 2022.
+
+A separate fresh Fedora WSL source copy built the CLI and passed the entire
+parser/addon ASan/LSan suite with CMake 4.4.4 and Node 26.4.0. This includes the
+bare-host baseline, rejection of the intentional unrelated leak, conversion,
+class/callback and async I/O/cancellation/worker teardown cases.
+
+Strict checks, interface/format checks, documentation checks and workflow
+actionlint passed. There are no public-interface changes.
+
+Hosted VS 2026 and macOS execution of this repair still require a new GitHub run;
+local VS 2022 validation does not establish the hosted VS 2026 result.

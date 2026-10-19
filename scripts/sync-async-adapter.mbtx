@@ -10,6 +10,9 @@ fn checksum(text : String) -> String {
 ///|
 async fn main {
   let root = ".mooncakes/moonbitlang/async"
+  if !@fs.exists(root + "/src/internal/event_loop/stdio.mbt") {
+    fail("Missing project dependency moonbitlang/async; run `moon check --target native` before syncing the adapter (`moon update` only refreshes the registry index)")
+  }
   let resources_path = "internal/assets/data/resources.json"
   guard @json.parse(@fs.read_file(resources_path).text()) is Object(resources) else { fail("Invalid resources") }
   for key in resources.keys().to_array() {

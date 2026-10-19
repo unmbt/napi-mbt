@@ -33,7 +33,11 @@ N-API 原始 Promise API 属于 v1；async 宿主需要 v8 cleanup。
 `napi4` 和 `dyn-symbols`，并非所有 addon 都要求 Node 22。
 napi-mbt 对齐默认 N-API，并区分 CLI 与运行时要求。
 
-CI 固定 Moon/core `0.10.15+943464bfa`、CMake 4.0.3、构建 Node 26.4.0。
+CI 固定 Moon/core `0.10.15+943464bfa`、CMake 4.4.4、构建 Node 26.4.0。
+CMake 包含当前 Windows runner 使用的 Visual Studio 18 2026 生成器。
+项目检查先于模板校验执行，以下载依赖；`moon update` 只刷新注册表索引。
+`moon run scripts/ci-bootstrap-test.mbtx` 在 Git 源码的无项目缓存临时副本中
+重跑依赖和模板校验。
 对应 moon/moonrun 为 `0.1.20261012 (748b63c)`，启用 `rr_moon_mod,rr_moon_pkg`。
 固定版本 CI 和 WSL 使用 `moon run scripts/toolchain-check.mbtx` 核验编译器、
 构建器、runner 和 feature flags，与当前 Windows 工具链一致。

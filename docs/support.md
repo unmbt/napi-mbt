@@ -35,7 +35,12 @@ The checked napi-rs CLI declares `^20.17.0 || ^22.13.0 || >= 23.5.0`, while its
 core defaults to `napi4` and `dyn-symbols`. It does not impose Node 22 on every
 addon. napi-mbt aligns the default N-API and separates CLI/runtime requirements.
 
-CI pins Moon/core `0.10.15+943464bfa`, CMake 4.0.3 and build Node 26.4.0.
+CI pins Moon/core `0.10.15+943464bfa`, CMake 4.4.4 and build Node 26.4.0.
+CMake includes the Visual Studio 18 2026 generator used by current Windows runners.
+Project checking runs before template validation to download dependencies;
+`moon update` only refreshes the registry index.
+`moon run scripts/ci-bootstrap-test.mbtx` repeats dependency and template checks
+in a temporary copy of the Git sources without project caches.
 The corresponding moon/moonrun are `0.1.20261012 (748b63c)` with
 `rr_moon_mod,rr_moon_pkg`. `moon run scripts/toolchain-check.mbtx` verifies
 the exact compiler, build tool, runner and feature flags in pinned CI jobs and WSL.

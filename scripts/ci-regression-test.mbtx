@@ -1,5 +1,7 @@
 import { "moonbitlang/async", "moonbitlang/async/process" }
 async fn main {
+  let status = @process.run("moon", ["run", "scripts/ci-bootstrap-test.mbtx"])
+  if status != 0 { fail("Clean dependency bootstrap failed") }
   let status = @process.run("moon", ["run", "scripts/source-install-test.mbtx"])
   if status != 0 { fail("Clean source installation failed") }
   let status = @process.run("moon", ["run", "scripts/build-rules-test.mbtx"])

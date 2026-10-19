@@ -11,7 +11,7 @@ async fn checked(distro : String, args : Array[String]) -> String {
 async fn copy(source : String, destination : String) -> Unit {
   @fs.mkdir(destination, recursive=true)
   for name in @fs.readdir(source) {
-    if [".git", ".codegraph", "_build", ".napi-mbt", "napi-rs", "node_modules", "npm", "artifacts", "dist"].contains(name) || name.has_suffix(".tar.gz") { continue }
+    if [".git", ".codegraph", ".mooncakes", "_build", ".napi-mbt", "napi-rs", "node_modules", "npm", "artifacts", "dist"].contains(name) || name.has_suffix(".tar.gz") { continue }
     let src = source + "/" + name
     if @fs.kind(src) == Directory { copy(src, destination + "/" + name) }
     else { @fs.write_file(destination + "/" + name, @fs.read_file(src)) }

@@ -1,0 +1,42 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process" }
+
+///|
+async fn checked(args : Array[String], cwd : String) -> Unit {
+  println("Clean checkout: moon " + args.join(" "))
+  let code = @async.with_timeout(300000, () => @process.run("moon", args, cwd~))
+  if code != 0 { fail("Clean-checkout command failed: moon " + args.join(" ")) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-ci-bootstrap-")
+  let succeeded = Ref(false)
+  defer {
+    if succeeded.val { @fs.rmdir(temp, recursive=true) }
+    else { eprintln("Clean checkout retained for diagnosis: " + temp) }
+  }
+  // Copy tracked sources, including local edits, but never cached dependencies,
+  // generated binaries or downloaded reference repositories.
+  let (code, out, err) = @process.collect_output("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], cwd=root)
+  if code != 0 { fail(err.text()) }
+  for name in out.text().split("\u0000") {
+    if name.is_empty() { continue }
+    let destination = temp + "/" + name.to_owned()
+    let parts = name.split("/").to_array()
+    if parts.length() > 1 {
+      @fs.mkdir(temp + "/" + parts[:parts.length() - 1].join("/"), recursive=true, allow_exist=true)
+    }
+    @fs.write_file(destination, @fs.read_file(root + "/" + name.to_owned()))
+  }
+  assert_true(!@fs.exists(temp + "/.mooncakes"))
+  assert_true(!@fs.exists(temp + "/_build"))
+  assert_true(!@fs.exists(temp + "/.napi-mbt"))
+  let (code, _, err) = @process.collect_output("moon", ["run", "scripts/sync-async-adapter.mbtx", "--check"], cwd=temp)
+  assert_true(code != 0 && err.text().contains("Missing project dependency moonbitlang/async"))
+  checked(["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], temp)
+  checked(["run", "scripts/sync-runtime.mbtx", "--check"], temp)
+  checked(["run", "scripts/sync-async-adapter.mbtx", "--check"], temp)
+  succeeded.val = true
+  println("Clean-checkout dependency bootstrap and template validation passed")
+}
