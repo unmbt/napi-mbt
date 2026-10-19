@@ -131,7 +131,7 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
   }
   // This workspace is disposable. No project output or configuration is touched
   // until the compiler, linker and platform SDK have passed a real build.
-  write_file(
+  write_text_file(
     probe + "/probe.c",
     "#include <stdlib.h>\n#ifdef _WIN32\n#include <windows.h>\n#endif\nint main(void) { void *p = malloc(16); free(p); return 0; }\n",
   )
@@ -141,7 +141,7 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
     #|add_executable(probe probe.c)
     #|file(WRITE "${CMAKE_BINARY_DIR}/toolchain.txt" "${CMAKE_C_COMPILER}\n${CMAKE_C_COMPILER_VERSION}\n${CMAKE_VS_WINDOWS_TARGET_PLATFORM_VERSION}\n")
     #|
-  write_file(probe + "/CMakeLists.txt", cmakelists)
+  write_text_file(probe + "/CMakeLists.txt", cmakelists)
   let configure = ["-S", probe, "-B", probe + "/build"]
   configure.append(args)
   try {

@@ -56,14 +56,14 @@ async fn build(
   mkdirp(workspace + "/.napi-mbt/include")
   for name, text in @assets.files() {
     if !name.has_prefix("template/") && !name.has_prefix("async/") {
-      write_file(workspace + "/.napi-mbt/" + name, text)
+      write_text_file(workspace + "/.napi-mbt/" + name, text)
     }
   }
   if uses_async {
     let definition = workspace + "/.napi-mbt/node_api.def"
-    write_file(
+    write_text_file(
       definition,
-      @fs.read_file(definition).text() +
+      read_text(definition) +
       "\nuv_handle_size\nuv_handle_get_data\nuv_handle_set_data\nuv_timer_init\nuv_timer_start\nuv_timer_stop\nuv_close\n",
     )
   }

@@ -13,7 +13,7 @@ async fn generate(
   check_package~ : Bool = true,
 ) -> Generated {
   let conf = config(dir)
-  let runtime = @fs.read_file(dir + "/napi_runtime_version.mbt").text()
+  let runtime = read_text(dir + "/napi_runtime_version.mbt")
   guard runtime.find("=") is Some(equal) &&
     @json.parse(runtime[equal + 1:].trim().to_owned()) ==
     Json(@assets.runtime_version()) else {
@@ -34,7 +34,7 @@ async fn generate(
       excluded.contains(file) {
       continue
     }
-    sources.push((file, @fs.read_file(dir + "/" + file).text()))
+    sources.push((file, read_text(dir + "/" + file)))
   }
   let source = @generator.parse_sources(sources, classes=conf.classes)
   let exports = source.exports

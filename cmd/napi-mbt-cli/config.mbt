@@ -82,12 +82,12 @@ async fn read_object(
     }
     return Map([])
   }
-  object(@json.parse(@fs.read_file(path).text()))
+  object(@json.parse(read_text(path)))
 }
 
 ///|
 async fn write_json(path : String, value : Json) -> Unit {
-  write_file(path, value.stringify(indent=2) + "\n")
+  write_text_file(path, value.stringify(indent=2) + "\n")
 }
 
 ///|

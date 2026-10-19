@@ -18,7 +18,7 @@ async fn patch_async_dependency(workspace : String) -> Unit {
       "Async exports require moonbitlang/async@0.22.4; run moon add moonbitlang/async@0.22.4 first",
     )
   }
-  let manifest = @fs.read_file(root + "/moon.mod").text()
+  let manifest = read_text(root + "/moon.mod")
   let tokens = package_tokens(manifest)
   let mut version : String? = None
   for i, token in tokens {
@@ -71,32 +71,31 @@ async fn patch_async_dependency(workspace : String) -> Unit {
   }
   mkdirp(root + "/src/napi_host")
   for (path, text) in outputs {
-    write_file(path, text)
+    write_text_file(path, text)
   }
   let event_package = root + "/src/internal/event_loop/moon.pkg"
-  write_file(
+  write_text_file(
     event_package,
     append_package_import(
-      @fs.read_file(event_package).text(),
+      read_text(event_package),
       "moonbitlang/async/io",
       "io",
     ),
   )
   for name in ["napi_async.h", "napi_async.mbt", "LIBUV-LICENSE"] {
-    write_file(workspace + "/" + name, assets["async/" + name])
+    write_text_file(workspace + "/" + name, assets["async/" + name])
   }
-  let pkg = @fs.read_file(workspace + "/moon.pkg").text()
+  let pkg = read_text(workspace + "/moon.pkg")
   if pkg.contains("@napi_mbt_async") {
     fail("Package alias @napi_mbt_async is reserved for the async adapter")
   }
-  write_file(
+  write_text_file(
     workspace + "/moon.pkg",
     append_package_import(pkg, "moonbitlang/async/napi_host", "napi_mbt_async"),
   )
-  write_file(
+  write_text_file(
     workspace + "/stub.c",
-    @fs.read_file(workspace + "/stub.c").text() +
-    "\n#include \"napi_async.h\"\n",
+    read_text(workspace + "/stub.c") + "\n#include \"napi_async.h\"\n",
   )
 }
 

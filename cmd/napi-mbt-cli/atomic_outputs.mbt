@@ -13,7 +13,7 @@ async fn install_outputs(
     if exists && @fs.kind(path, follow_symlink=false) != Regular {
       fail("Generated output must be a regular file: \{path}")
     }
-    if check && (!exists || @fs.read_file(path).text() != text) {
+    if check && (!exists || read_text(path) != text) {
       fail("Generated file is not up-to-date: \{name}")
     }
   }
@@ -38,7 +38,7 @@ async fn install_outputs(
   mkdirp(staging)
   defer @fs.rmdir(staging, recursive=true)
   for i, (_, text) in outputs {
-    write_file(staging + "/\{i}.new", text)
+    write_text_file(staging + "/\{i}.new", text)
   }
   let backups : Array[Int32] = []
   let installed : Array[Int32] = []

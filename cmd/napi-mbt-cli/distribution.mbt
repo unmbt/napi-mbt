@@ -46,7 +46,7 @@ fn validate_artifact(bytes : Bytes, target : String) -> Unit raise {
 async fn validate_package_version(dir : String, version : String) -> Unit {
   let path = dir + "/moon.mod"
   if @fs.exists(path) {
-    let tokens = package_tokens(@fs.read_file(path).text())
+    let tokens = package_tokens(read_text(path))
     for i, token in tokens {
       if token.value == "version" &&
         tokens.get(i + 1).map(t => t.value) == Some("=") {

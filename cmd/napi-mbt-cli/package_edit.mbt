@@ -3,7 +3,7 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
   let exports = generated.source.native_exports()
   let path = dir + "/moon.pkg"
   let overlay = build_package_overlay(
-    @fs.read_file(path).text(),
+    read_text(path),
     exports,
     generated.config.napi_version,
     windows(),
@@ -13,16 +13,15 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
   } else {
     overlay
   }
-  write_file(path, overlay)
+  write_text_file(path, overlay)
   // Reference the registration translation unit from MoonBit initialization,
   // so the native linker pulls it from the package's stub archive.
-  write_file(
+  write_text_file(
     dir + "/napi_link.mbt",
     "///|\nextern \"c\" fn napi_link_anchor() -> Unit = \"napi_mbt_link_anchor\"\n///|\nfn init { napi_link_anchor() }\n",
   )
-  write_file(
+  write_text_file(
     dir + "/napi_glue.c",
-    @fs.read_file(dir + "/napi_glue.c").text() +
-    "\nvoid napi_mbt_link_anchor(void) {}\n",
+    read_text(dir + "/napi_glue.c") + "\nvoid napi_mbt_link_anchor(void) {}\n",
   )
 }

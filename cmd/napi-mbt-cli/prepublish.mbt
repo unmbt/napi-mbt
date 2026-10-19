@@ -38,7 +38,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     ("libuv.txt", "async/LIBUV-LICENSE"),
   ]
   for (filename, key) in licenses {
-    write_file(dir + "/licenses/" + filename, assets[key])
+    write_text_file(dir + "/licenses/" + filename, assets[key])
   }
   let optional = match pkg.get("optionalDependencies") {
     Some(value) => object(value)
@@ -73,7 +73,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     mkdirp(path, recursive=true)
     mkdirp(path + "/licenses")
     for (filename, key) in licenses {
-      write_file(path + "/licenses/" + filename, assets[key])
+      write_text_file(path + "/licenses/" + filename, assets[key])
     }
     if pkg.get("license") is Some(license) {
       child["license"] = license

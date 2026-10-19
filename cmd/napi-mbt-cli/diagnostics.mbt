@@ -35,8 +35,7 @@ async fn local_artifact_root(dir : String) -> String {
   if !@fs.exists(path) {
     return dir + "/artifacts"
   }
-  guard @json.parse(@fs.read_file(path).text())
-    is { "directory": String(directory), .. } else {
+  guard @json.parse(read_text(path)) is { "directory": String(directory), .. } else {
     fail("Invalid local build output record: \{path}")
   }
   if !(directory.has_prefix("/") ||
