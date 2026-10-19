@@ -1,108 +1,63 @@
-# Usage Guide (napi-mbt)
+# Usage
 
-This document provides a comprehensive guide on how to integrate and use `@unmbt/napi-mbt-cli` to develop native Node.js addons with MoonBit.
+Install from the checkout with `moon install ./cmd/napi-mbt-cli`.
+`napi-mbt-cli --help` and each subcommand's `--help` describe the accepted flags.
 
-## 1. Environment Requirements
+| Command | Behavior |
+| --- | --- |
+| `init <directory> --name <name>` | Creates a project; existing files require explicit `--force` |
+| `doctor [directory] --json` | Finds and probes the actual compiler, linker and SDK |
+| `generate [directory] --check` | Parses, resolves types and checks all outputs without writing |
+| `build [directory] --release` | Generates and compiles in isolation, then installs successful outputs |
+| `build --watch --verbose --output-dir <path>` | Watches inputs, reports commands/timings and chooses the artifact root |
+| `targets` | Lists recognized host target profiles |
+| `prepublish [directory] --target <target>` | Validates release artifacts and prepares npm platform metadata |
 
-Before you start, ensure your environment meets the following dependencies:
+Without `--check`, generation validates the complete package before replacing
+managed files. `napi-mbt.json` is strict JSON; the generated
+`napi-mbt.schema.json` supplies editor validation. For example:
 
-- **Node.js**: Version 18 or newer.
-- **MoonBit Toolchain**: Make sure `moon` is available in your PATH. You can install it from the [official MoonBit website](https://www.moonbitlang.com/).
-- **C Compiler**: The toolchain compiles C glue code (`stub.c`).
-  - **Windows**: Microsoft Visual Studio with C++ Desktop Development (MSBuild/lib.exe).
-  - **macOS / Linux**: GCC or Clang.
-
-## 2. CLI Commands
-
-### `napi-mbt-cli doctor [directory] --json`
-
-Checks MoonBit, CMake, the selected C compiler and linker with a disposable
-compile/link probe. On Windows it selects an installed Visual Studio C++
-instance, explicitly passes its MSBuild path to CMake, and reports the compiler
-and Windows SDK versions. Install the MSBuild, C++ tools and Windows SDK
-components if the probe fails. Omit `--json` for readable diagnostics.
-`build` runs this same check before writing generated project files.
-
-Compilation runs in an isolated workspace. The addon overlay appends required
-flags and exports, preserves existing native stubs and libraries, and lets Moon
-link the full package dependency graph. Your `moon.pkg`, `moon.mod` and dependency
-cache are not edited. Conflicting N-API definitions are errors. The final binary
-replaces the previous addon only after a successful build.
-
-The native CLI does not require Node.js or npm. Node.js is needed to run addons.
-
-The `@unmbt/napi-mbt-cli` exposes the `napi-mbt` bin command.
-
-### `napi-mbt build [--release]`
-Executes the full pipeline to build your native module:
-1. Triggers the internal AST parser to scan all `.mbt` files in the current folder for functions tagged with `#export_name("mbt_add")`.
-2. Generates per-export adapters in `napi_exports.mbt` plus matching C callbacks and memory conversions.
-3. Generates the `index.d.ts` file containing exactly matching TypeScript definitions.
-4. Executes `moon build --target native` internally.
-5. C links the Node-API and MoonBit artifacts to produce the `.node` binary.
-6. Moves the resulting `.node` file to `artifacts/[platform]-[arch]/napi_mbt.node`.
-
-**Flag:** Append `--release` for optimized builds.
-
-### `napi-mbt prepublish`
-Automates the structural setup for cross-platform Node distribution.
-It reads your root `package.json`, generates `optionalDependencies` logic, and outputs target packages in the `npm/` directory (e.g., `npm/win32-x64-msvc/package.json`).
-It also creates an intelligent `index.js` loader in the root directory that dynamically loads the correct `.node` package depending on the host's operating system in runtime.
-
-## 3. The `#export_name("mbt_add")` Macro & Supported Types
-
-To expose a MoonBit function to JS, simply document it with the `#export_name("mbt_add")` tag. The parser strictly supports specific Types that guarantee memory safety and bidirectional conversions.
-
-### Current Supported MoonBit Types:
-
-| MoonBit Type     | TypeScript Type        | Description & Notes |
-| ---------------- | ---------------------- | ------------------- |
-| `Int`            | `number`               | Converted bidirectionally to 32-bit integers. |
-| `Double`         | `number`               | Converted bidirectionally to 64-bit floating point numbers. |
-| `Bool`           | `boolean`              | Evaluated properly via JavaScript's boolean values. |
-| `String`         | `string`               | Safely transcoded from V8's UTF-8 implementation to MoonBit strings without losing data. |
-| `Bytes`          | `Buffer`               | Memory is fully copied across the JS <-> N-API boundary. Excellent for safety, but causes heap allocations. |
-| `NapiBufferView` | `Buffer`               | Represents a **Zero-Copy** unmanaged reference to a Node.js Buffer memory space. Perfect for high performance data mutation. |
-| `Unit`           | `void`                 | Used when there is no return value. |
-
-### Note on Complex Types
-Promise and BigInt helpers are available through the feature registry. Object and Array conversion is still outside the supported generated type set.
-
-## 4. Error Handling
-
-Argument conversion, the MoonBit function and return conversion share a single
-error boundary. `NapiError::ApiError` carries a status, error kind, stable code
-and context. The adapter throws an `Error`, `TypeError` or `RangeError` with
-`code`, `status` and `context`, preserving an existing pending JavaScript
-exception. A conversion failure never continues into the function body.
-
-`Int`/`Int32` rejects fractions, NaN, infinities and values outside the signed
-32-bit range (`ERR_NAPI_INT_RANGE`). `Double` preserves IEEE values. Buffer
-exports require N-API 7 to detect detached backing stores. Borrowed views are
-invalidated with `defer` even when a later conversion or the function fails;
-out-of-range and expired access raise errors instead of aborting the process.
-TSFN operations return `Accepted`, `QueueFull` or `Closing`; unexpected statuses
-raise `NapiError`. Call and release modes are typed enums.
-
-Errors originating from user input types are handled automatically by the generated wrapper.
-If you pass a string to a function expecting an `Int`, the generated bindings will catch it and invoke `napi_throw_error()`, terminating the function safely and emitting a standard JavaScript `TypeError`.
-
-## 5. Working with NapiBufferView (Zero Copy)
-
-For applications handling images, encryptions, or massive datasets, copying arrays into MoonBit causes extreme overhead.
-
-`NapiBufferView` avoids this overhead entirely by giving you raw access to V8's ArrayBuffer memory address.
-Because memory is managed entirely by Node.js GC, **never** store a `NapiBufferView` struct into global state, it is strictly only valid during the synchronous execution of your function.
-
-Example usage:
-```moonbit
-#export_name("mbt_add")
-pub fn mutate_image_colors(view : NapiBufferView) -> Unit {
-  let length = view.length()
-  for i = 0; i < length; i = i + 1 {
-    let pixel = view.load8(i)
-    // Darken pixel by 10
-    view.store8(i, if pixel > 10 { pixel - 10 } else { 0 })
-  }
+```json
+{
+  "$schema": "./napi-mbt.schema.json",
+  "napiVersion": 8,
+  "builder": "auto",
+  "cjs": true,
+  "esm": true
 }
 ```
+
+Use `napiVersion: 4` for a basic new project, 6 for bigint, 7 for checked Buffers,
+and 8 for async exports. Features required by signatures are inferred and checked.
+Set `targets` only to constrain host profiles; it does not enable cross-compiling.
+Disabling both module modes is an error. [Support policy](../support.md) explains
+Node minimums and release platforms.
+
+Put exports in the root MoonBit package. The parser resolves exported signatures
+and referenced value types across that package's source files. Generic exports,
+unknown types and unsupported signatures fail with a filename and line.
+`///` documentation preceding an export or value type appears in declarations
+and `napi_manifest.json`; error explanations use the same validated IR.
+
+Read [types](../types.md), [classes/callbacks](../classes-callbacks.md),
+[async](../async.md), and [build/watch](../build.md). The
+[documented addon fixture](../../scripts/fixtures/documented-addon.mbt.txt) is
+compiled and exercised in CI, including basic values, Buffer, errors, objects,
+callbacks and async calls. TypeScript projects using Buffer or async signatures
+need `@types/node`; declarations explicitly identify that dependency.
+
+Use `require('./index.cjs')` or `import addon from './index.mjs'` locally.
+Installed packages use their package name. Existing local binaries take priority;
+damaged binaries do not trigger fallback. Loader errors expose `target`, attempted
+paths, N-API requirements and the original `cause`. Platform packages must have
+matching name/version/target/N-API metadata.
+
+Generation manages the package root entry, engines and its own files while
+preserving other metadata, scripts, dependencies and export subpaths. Build
+preserves MoonBit manifests, native stubs, flags and libraries in the original
+project. See [distribution validation](development.md) before preparing packages.
+
+Project text must be UTF-8. Malformed input reports the offending path; missing
+files retain their I/O errors. Generated text is explicitly encoded as UTF-8.
+External compiler diagnostics tolerate non-UTF-8 bytes, so Windows code-page
+output cannot abort an otherwise successful build.

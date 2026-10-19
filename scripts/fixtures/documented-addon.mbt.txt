@@ -1,0 +1,49 @@
+///|
+/// Add two signed 32-bit integers.
+#export_name("add")
+pub fn add(a : Int, b : Int) -> Int { a + b }
+
+///|
+/// Preserve every UTF-16 code unit.
+#export_name("echo_string")
+pub fn echo_string(value : String) -> String { value }
+
+///|
+/// Return an independent Buffer copy.
+#export_name("copy")
+pub fn copy(value : Bytes) -> Bytes { value }
+
+///|
+/// Mutate the first byte during this synchronous call.
+#export_name("increment")
+pub fn increment(value : NapiBufferView) -> Unit raise NapiError {
+  if value.length() > 0 { value.store8(0, value.load8(0) + 1) }
+}
+
+///|
+/// User-facing profile value.
+pub(all) struct Profile { name : String; age : Int? }
+
+///|
+#export_name("profile")
+pub fn profile(value : Profile) -> Profile { value }
+
+///|
+#export_name("positive")
+pub fn positive(value : Int) -> Int raise {
+  if value < 0 { fail("value must be nonnegative") }
+  value
+}
+
+///|
+#export_name("invoke")
+pub fn invoke(callback : (Int) -> Int raise, value : Int) -> Int raise { callback(value) }
+
+///|
+#export_name("make_adder")
+pub fn make_adder(delta : Int) -> ((Int) -> Int) { value => value + delta }
+
+///|
+/// Resolve after a nonblocking delay; accepts a trailing { signal } in JavaScript.
+#export_name("delay")
+pub async fn delay(ms : Int, value : String) -> String { @async.sleep(ms); value }

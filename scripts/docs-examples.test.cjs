@@ -1,0 +1,30 @@
+const assert = require('node:assert/strict');
+const path = require('node:path');
+const addon = require(path.resolve(process.argv[2]));
+async function main() {
+  assert.equal(addon.add(2, 3), 5);
+  assert.throws(() => addon.add(1.5, 2), { code: 'ERR_NAPI_INT_RANGE' });
+  assert.equal(addon.echo_string('中文\0\ud800'), '中文\0\ud800');
+  const input = Buffer.from([1, 2]);
+  const output = addon.copy(input);
+  addon.increment(output);
+  assert.deepEqual(input, Buffer.from([1, 2]));
+  assert.deepEqual(output, Buffer.from([2, 2]));
+  assert.deepEqual(addon.profile({ name: 'Moon' }), { name: 'Moon', age: null });
+  assert.throws(() => addon.positive(-1), { code: 'ERR_NAPI_CALL' });
+  assert.equal(addon.positive(2), 2);
+  assert.equal(addon.invoke(value => value * 2, 21), 42);
+  const original = new Error('callback');
+  assert.throws(() => addon.invoke(() => { throw original; }, 1), error => error === original);
+  const add = addon.make_adder(3);
+  assert.equal(add(4), 7);
+  add.dispose(); add.dispose();
+  assert.throws(() => add(1), { code: 'ERR_NAPI_DISPOSED' });
+  assert.equal(await addon.delay(1, 'ready'), 'ready');
+  const signal = new AbortController();
+  const pending = addon.delay(1000, 'never', { signal: signal.signal });
+  signal.abort(original);
+  await assert.rejects(pending, error => error === original);
+  console.log('All documented addon examples passed');
+}
+main().catch(error => { console.error(error); process.exitCode = 1; });

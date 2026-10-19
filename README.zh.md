@@ -1,183 +1,75 @@
-<div align="center">
-  <h1>🚀 napi-mbt</h1>
+# napi-mbt
 
-  <p>
-    <b>面向 MoonBit 和 Node.js 的高自动化原生扩展框架。</b>
-  </p>
+[English](README.md)
 
-  <p>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-Node--API-brightgreen?logo=node.js&logoColor=white" alt="Node-API 支持范围按配置功能推导" /></a>
-    <a href="https://www.moonbitlang.com/"><img src="https://img.shields.io/badge/MoonBit-Native-blueviolet?logo=moon&logoColor=white" alt="MoonBit Native" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
-    <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Status" />
-  </p>
+用 MoonBit 编写原生 Node.js addon。独立原生 CLI 通过 Tree-sitter 解析源码，
+校验单一类型 IR，再生成 MoonBit adapter、C glue、TypeScript 声明和独立的
+CJS/ESM loader。项目仍在开发中，请从当前仓库开始使用。
 
-  <p>
-    🇨🇳 简体中文 | <a href="./README.md">🇺🇸 English</a>
-  </p>
-</div>
+导出支持严格数值、bigint、保留 UTF-16 的字符串、拥有/借用 Buffer、嵌套
+Option/Array、struct/enum、显式 class、callback，以及返回可取消 Promise 的
+`async fn`。错误会终止当前调用，已有 JavaScript 异常保留原始身份。
 
----
+## 从源码开始
 
-## 🌟 简介
+安装 MoonBit 和原生 C 工具链，已验证版本和 Node 策略见[支持矩阵](docs/zh/support.md)。
+构建需要 CMake、GCC/Clang，或 Visual Studio C++ Build Tools、MSBuild 和 Windows SDK。
 
-`napi-mbt` 是一款深受 `napi-rs` 启发的框架，它赋予了开发者利用极速、轻量的多范式语言 **MoonBit** 编写原生 Node.js C++ 扩展（Addon）的能力。
-`napi-mbt` 基于无开销的 Node-API (N-API) C ABI，完美连接 MoonBit 与 Node.js，彻底避免了基于 WASM 序列化的内存损耗，让你的代码获得比肩 C++ 的裸机执行性能。
-
-CLI 是通过 Mooncakes 和 GitHub Releases 分发的独立 MoonBit 原生程序。`init`、`generate`、`build` 和 `prepublish` 均不调用 Node.js 或 npm；Tree-sitter 解析器、项目模板和 Node-API 头文件已内嵌。
-
-## ✨ 核心特性
-
-- ⚡ **零开销原生 ABI**：跳过 WASM 虚拟机中间层，以 Native 目标编译直接通过 Node-API 进行内存互操作，保证极限性能。
-- 🪄 **`#export_name` 自动化生成**：注解中的名称同时成为 C ABI、JavaScript 和 TypeScript 导出名；
-- 📝 **自动 TypeScript 定义**：构建时自动分析 MoonBit 签名，同步输出严谨的 `.d.ts` 类型声明文件，实现 JS/TS 的全链路强类型约束。
-- 🚀 **Buffer 零拷贝修改**：提供专属的 `NapiBufferView` 视图，允许在 MoonBit 侧直接读写 Node.js Buffer 内存，极为适合图像处理和加密的高性能场景。
-- 📦 **集成跨平台 CI/CD**：内置针对 Optional Dependencies 的发布支持，配合标准化的 GitHub Actions 矩阵，实现 Windows、Linux、macOS 原生拓展库的一键编译发布。
-
-当前 CI 构建 Windows x64、Linux x64 和 macOS ARM64 的原生模块及 CLI。
-由于当前 MoonBit 工具链安装器不支持 macOS x64，Intel macOS 的预编译发布暂时暂停；
-macOS CI 和 GitHub Releases 仅面向 Apple Silicon（ARM64）。已有 Intel 包元数据保留以兼容旧版本。
-
-## 🚀 快速开始
-
-### 1. 环境准备
-
-- `init / generate / prepublish`：只需要原生 CLI。
-- `build`：需要 [MoonBit](https://www.moonbitlang.com/)、CMake 和 C 编译器（Unix 使用 GCC/Clang，Windows 使用 Visual Studio C++ 构建工具）；CMake 需支持安装的 Visual Studio 版本。
-- [Node.js](https://nodejs.org/en/) 仅用于加载、测试和使用生成的扩展，npm 用于发包；构建工具本身不依赖它们。
-
-### 安装 CLI
-
-首选使用 `moon install`（需要 Mooncakes 上已发布包含此入口的版本）：
-
-```bash
-moon install unmbt/napi-mbt/cmd/napi-mbt-cli
-napi-mbt-cli --help
-```
-
-默认安装到 `~/.moon/bin`，命令名为 `napi-mbt-cli`，Windows 下为
-`napi-mbt-cli.exe`。请将安装目录加入 PATH。新版本发布前，可从当前仓库
-安装；也可以通过 `--bin` 指定安装到 `~/.unmbt`：
-
-```bash
+```sh
+moon update
 moon install ./cmd/napi-mbt-cli
-moon install ./cmd/napi-mbt-cli --bin ~/.unmbt
+napi-mbt-cli init my-addon
+cd my-addon
+napi-mbt-cli doctor --json
+napi-mbt-cli build --release
+node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
-也可以只编译，不安装：
+原生 CLI 的所有命令（包括 addon 编译）均不依赖 Node/npm。
+Node 用于加载 addon，npm 用于包安装和验证。解析器、头文件、runtime 模板和
+带版本的 async 补丁均已内嵌。
 
-```bash
-moon build --target native --release cmd/napi-mbt-cli
-```
+在 `pub fn` 或 `pub async fn` 上添加 `#export_name("name")`；注解决定 JS 导出名。
+生成的声明包含源码文档和错误说明。详见[使用指南](docs/zh/usage.md)、
+[类型](docs/zh/types.md)、[class/callback](docs/zh/classes-callbacks.md)和
+[异步](docs/zh/async.md)。
 
-原生 CLI 使用 `moonbitlang/core/argparse` 解析子命令并提供帮助。
-版本以 `moon.mod` 为唯一来源：`cmd/napi-mbt-cli/moon.pkg` 中的 `gen_version`
-rule 和 `dev_build` 调用 `scripts/gen_version.mbtx` 生成
-`generated_version.mbt`。发布时保留生成文件，供下游构建使用。
-构建 CLI 后运行 `moon run scripts/cli-native-test.mbtx`，可在隔离 Node/npm 的环境验证 Release 程序和 `moon install` 的安装产物。
+## 常用命令
 
-也可以把预编译 CLI 安装到 `~/.unmbt`（Windows 为
-`%USERPROFILE%\.unmbt`）：
-
-Unix 系统可使用仓库安装脚本：
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.sh | bash
-```
-
-Windows PowerShell：
-
-```powershell
-irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
-```
-
-`moon install` 和 Release 安装脚本均提供独立原生 CLI。单一 AST 生成器负责签名校验和所有生成物。项目无需 `node_modules`，构建资源写入已忽略的 `.napi-mbt/` 目录。
-
-### 2. 项目初始化
-
-使用已加入 PATH 的原生 CLI 创建项目：
-
-```bash
-napi-mbt-cli init my-napi-addon
-cd my-napi-addon
+```sh
 napi-mbt-cli generate --check
+napi-mbt-cli build --watch --verbose --output-dir "native output"
+napi-mbt-cli prepublish --target win32-x64-msvc
 ```
 
-命令会创建 MoonBit 包、扩展配置、加载器、类型声明和 Node 加载测试。默认拒绝覆盖已有文件，需要覆盖时使用 `--force`。
+`generate --check` 只检查、不写文件。`doctor` 和 `build` 共用真实 compile/link probe。
+构建在隔离工作区补充配置，保留用户 flags、exports、依赖和原生输入。Watch 合并连续
+变更、串行构建；失败时保留最后成功的二进制与声明。详见[构建行为](docs/zh/build.md)。
 
-### 3. 编写 MoonBit 逻辑代码
+新项目默认 N-API 4，与 napi-rs 对齐，**不统一要求 Node 22 起**。
+生成的 `engines.node` 按 N-API 和 loader 功能推导。主 CI 覆盖 Node 22/24/26，
+另测最低版本。Bytes/BufferView 要求 N-API 7；异步宿主要求 N-API 8 和
+`moonbitlang/async@0.22.4`。
 
-在 `lib.mbt` 文件中，写一个函数并附带 `#export_name("mbt_add")` 标记：
+CJS/ESM 默认同时启用，也可独立启用。未知配置字段、不支持的功能、不满足的 N-API
+要求会报错。Loader 优先加载存在的本地构件；构件损坏时保留原始 cause。
+平台包的版本和元数据必须匹配。
 
-```moonbit
-#export_name("mbt_add")
-pub fn add(a : Int, b : Int) -> Int {
-  a + b
-}
-```
+## 验证与分发
 
-### 4. 构建与编译
-
-通过 CLI 工具自动生成所有绑定并编译出 `.node` 二进制插件：
-
-```bash
-napi-mbt-cli build
-```
-
-上述命令会自动执行：
-1. 🔍 扫描 AST 并识别 `#export_name("mbt_add")` 标记。
-2. 🛠️ 生成逐导出的 `napi_exports.mbt`、`napi_glue.c` 和 `index.d.ts`。
-3. 🏗️ 执行底层的原生编译 (`moon build --target native`) 并链接 C 代码。
-4. 📦 将产生的 `.node` 输出到对应环境的构件目录 `artifacts/[platform]-[arch]/` 中。
-
-最后，你可以在 JavaScript 中直接调用了：
-
-```javascript
-const addon = require('./artifacts/win32-x64-msvc/napi_mbt.node');
-console.log(addon.mbt_add(2, 3)); // 输出: 5
-```
-
-在 `napi-mbt.json` 中设置单一 N-API 版本。新项目默认 v4，与 napi-rs 对齐。Threadsafe Function 需要 v4，BigInt 需要 v6，带分离检查的 Buffer 访问需要 v7；核心 Promise API 属于 v1。原生 CLI 不依赖 Node。扩展的 `engines.node` 按 napi-rs 的 N-API 引入版本表及启用的 loader 模式推导，不统一要求 Node 22。默认双模式项目要求 Node `>=12.20.0 <13 || >=14.13.1`，具体要求写入生成的 package.json。
-
-配置遵循生成的 `napi-mbt.schema.json`：未知字段、错误类型、重复或不支持的目标和 feature，以及不满足的 N-API 版本都会报错。`cjs`、`esm` 默认同时启用，可以关闭其中任意一个，不能全部关闭。ESM 入口可独立使用。生成器同步条件入口、`.d.cts`/`.d.mts` 声明、引擎要求及管理的发布文件，保留其他元数据和导出子路径。`generate --check` 只检查，不写文件。
-
-loader 优先使用存在的本地构件；本地构件损坏时保留原始 `cause` 并报错。平台包的版本、目标和 N-API 元数据必须与根包一致。诊断包含目标、尝试路径和 N-API 版本，不支持的 OS/CPU/libc 会明确报错。`prepublish` 要求所有指定平台的构件齐全，也可用 `--target` 单独准备一个平台。
-
-bigint、嵌套 Option/Array、struct、enum 表示及 TypeScript 规则见
-[导出值类型](docs/zh/types.md)。
-
-### 发包
-
-版本发布使用仓库中的 `bump.config.json`，会在版本提交前执行 `moon check`。完成各目标平台构建后，按平台包、根包的顺序准备并发布；CLI 单独通过 Mooncakes 和 GitHub Releases 分发：
-
-```bash
-napi-mbt-cli prepublish
-npm run publish:all
-```
-
-使用 `npm run publish:dry-run` 可以只检查 npm 包内容而不实际发布。
-
-### 开发验证
-
-```bash
+```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-moon run scripts/cli-native-test.mbtx
-moon check --target native --warn-list +73 --deny-warn
-moon test --target native
-moon run scripts/parser-asan-test.mbtx
-node --test scripts/test.js
+npm ci --ignore-scripts
+moon run scripts/ci-regression-test.mbtx
+moon run scripts/ci-consumers.mbtx
+moon run scripts/sanitizer-test.mbtx
 ```
 
-先完成原生命令验证，再单独使用 Node 做加载测试。解析器固定版本及许可证记录在 `internal/syntax/VENDOR.md`；模板与头文件资源维护在 `internal/assets/data/resources.json`，MoonBit 构建规则会根据资源修改更新内嵌内容。
+发布门禁会打包、dry-run，在干净目录安装主包/平台包，再验证 CJS/ESM 和已安装的
+类型声明。CLI 归档面向 Windows x64、Linux x64 glibc 和 macOS ARM64；测试不向
+registry 发布。详见[工程化](docs/zh/development.md)、[实际验证记录](docs/validation.md)、
+[性能](docs/zh/performance.md)和[路线图](docs/zh/roadmap.md)。
 
-## 📚 文档
-
-想深入了解所支持的数据类型、CLI 的高级用法，或是 `napi-mbt` 底层的系统架构与跨端分发原理？请参阅以下详细的手册：
-
-- 📖 [使用文档 (zh)](docs/zh/usage.md)
-- ⚙️ [架构开发与贡献指南 (zh)](docs/zh/development.md)
-
-## 📄 协议
-
-本项目基于 MIT 协议开源，详情请参阅 [LICENSE](LICENSE) 文件。
+项目采用 MIT 许可证；分发归档包含 parser、Unicode、Node-API、async 和 libuv
+的许可证。见 [LICENSE](LICENSE)。

@@ -1,0 +1,39 @@
+import { "moonbitlang/async", "moonbitlang/async/fs" }
+
+///|
+async fn check(path : String) -> Unit {
+  let source = @fs.read_file(path).text()
+  if source.contains("devenv.com") { fail("Removed tool reference in " + path) }
+  let segments = path.split("/").to_array()
+  let base = segments[:segments.length() - 1].map(s => s.to_owned()).join("/")
+  let mut offset = 0
+  while offset < source.length() {
+    guard source[offset:].find("](") is Some(start) else { break }
+    let begin = offset + start + 2
+    guard source[begin:].find(")") is Some(length) else { break }
+    let link = source[begin:begin + length].to_owned()
+    offset = begin + length + 1
+    if link.contains(":") || link.has_prefix("#") { continue }
+    let relative = link.split("#").to_array()[0].to_owned()
+    if !relative.is_empty() && !@fs.exists(base + "/" + relative) { fail(path + ": missing link " + relative) }
+  }
+}
+
+///|
+async fn visit(directory : String) -> Unit {
+  for name in @fs.readdir(directory) {
+    let path = directory + "/" + name
+    if @fs.kind(path) == Directory { visit(path) }
+    else if name.has_suffix(".md") { check(path) }
+  }
+}
+
+///|
+async fn main {
+  for name in @fs.readdir(".") {
+    if name.has_suffix(".md") { check("./" + name) }
+  }
+  visit(".githooks")
+  visit("docs")
+  println("Documentation links and removed-tool checks passed")
+}

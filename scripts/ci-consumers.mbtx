@@ -9,7 +9,7 @@ async fn checked(program : String, args : Array[String], timeout~ : Int = 300000
 ///|
 async fn main {
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
-  for fixture in ["loader", "class", "callback", "lifecycle", "async-adapter", "async-runtime", "async-exports", "watch", "distribution", "minimum-fixtures"] {
+  for fixture in ["loader", "class", "callback", "lifecycle", "async-adapter", "async-runtime", "async-exports", "docs-examples", "watch", "distribution", "minimum-fixtures"] {
     let filename = if fixture == "minimum-fixtures" { "scripts/minimum-fixtures.mbtx" } else { "scripts/" + fixture + "-test.mbtx" }
     checked("moon", ["run", filename, binary], timeout=600000)
   }

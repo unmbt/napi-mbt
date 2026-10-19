@@ -1,182 +1,84 @@
-<div align="center">
-  <h1>🚀 napi-mbt</h1>
+# napi-mbt
 
-  <p>
-    <b>A highly-automated native extension framework for MoonBit and Node.js.</b>
-  </p>
+[简体中文](README.zh.md)
 
-  <p>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-Node--API-brightgreen?logo=node.js&logoColor=white" alt="Node-API support depends on configured features" /></a>
-    <a href="https://www.moonbitlang.com/"><img src="https://img.shields.io/badge/MoonBit-Native-blueviolet?logo=moon&logoColor=white" alt="MoonBit Native" /></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
-    <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Status" />
-  </p>
+Build native Node.js addons in MoonBit. A standalone native CLI parses MoonBit
+with Tree-sitter, validates one type IR, and generates MoonBit adapters, C glue,
+TypeScript declarations and independent CJS/ESM loaders. The project is under
+active development; start from this checkout.
 
-  <p>
-    <a href="./README.zh.md">🇨🇳 简体中文</a> | 🇺🇸 English
-  </p>
-</div>
+Supported exports include strict numeric conversions, bigint, exact UTF-16
+strings, owned and borrowed Buffers, nested Option/Array, structs/enums, explicit
+classes, callbacks and `async fn` returning cancellable Promises. Runtime errors
+stop the current call. JavaScript exceptions retain their identity.
 
----
+## Start from source
 
-## 🌟 Introduction
+Install MoonBit and a native C toolchain. The verified versions and Node policy
+are in the [support matrix](docs/support.md). Build requires CMake and GCC/Clang,
+or Visual Studio C++ Build Tools, MSBuild and a Windows SDK.
 
-`napi-mbt` is a framework inspired by `napi-rs` that empowers developers to build native Node.js addons using **MoonBit**, a fast and lightweight multi-paradigm language. `napi-mbt` bridges MoonBit and Node.js with a zero-overhead Node-API (N-API) C ABI, avoiding the memory cost of WASM-based marshaling while maintaining optimal execution performance.
-
-The CLI is a standalone MoonBit native executable distributed through Mooncakes and GitHub Releases. `init`, `generate`, `build`, and `prepublish` do not invoke Node.js or npm. The Tree-sitter parser, project templates, and Node-API headers are bundled into the executable.
-
-## ✨ Key Features
-
-- ⚡ **Zero Overhead Native ABI**: `napi-mbt` natively connects MoonBit with Node-API without WASM intermediaries, guaranteeing bare-metal execution performance.
-- 🪄 **`#export_name` generation**: The annotation name becomes the C ABI, JavaScript, and TypeScript export name;
-- 📝 **Automatic TypeScript Typing**: Generates `.d.ts` declaration files effortlessly alongside your MoonBit compilations for strong-typed JS/TS consumption.
-- 🚀 **Zero-Copy Buffer Mutation**: Safely manipulate Node.js Buffers directly in MoonBit memory using `NapiBufferView`.
-- 📦 **Integrated Cross-Platform CI/CD**: Builds native modules and CLI binaries for Windows x64, Linux x64, and macOS ARM64. Platform packages use NPM's `optionalDependencies` pattern.
-
-Intel macOS prebuilt releases are paused because the current MoonBit toolchain
-installer does not support macOS x64. macOS CI and GitHub Releases target Apple
-Silicon (ARM64). Existing Intel package metadata is retained for compatibility.
-
-## 🚀 Quick Start
-
-### 1. Requirements
-
-- `init`, `generate`, `prepublish`: the native CLI only.
-- `build`: [MoonBit](https://www.moonbitlang.com/), CMake, and GCC/Clang on Unix or Visual Studio C++ build tools on Windows. CMake must support the installed Visual Studio version.
-- [Node.js](https://nodejs.org/en/) is needed to load/test the generated addon; npm is needed to publish packages. Neither is a CLI build dependency.
-
-### Installing the CLI
-
-Use `moon install` (recommended, once a release containing this entry point is on Mooncakes):
-
-```bash
-moon install unmbt/napi-mbt/cmd/napi-mbt-cli
-napi-mbt-cli --help
-```
-
-This installs `napi-mbt-cli` (`napi-mbt-cli.exe` on Windows) into `~/.moon/bin`.
-Ensure that directory is on PATH. To install the current checkout before a new
-Mooncakes release, or choose `~/.unmbt` as the destination:
-
-```bash
+```sh
+moon update
 moon install ./cmd/napi-mbt-cli
-moon install ./cmd/napi-mbt-cli --bin ~/.unmbt
+napi-mbt-cli init my-addon
+cd my-addon
+napi-mbt-cli doctor --json
+napi-mbt-cli build --release
+node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
-You can also build from source:
+The native CLI does not require Node or npm, including during addon compilation.
+Node is needed to load an addon; npm is needed for package installation/testing.
+The parser, headers, runtime templates and versioned async patch are embedded.
 
-```bash
-moon build --target native --release cmd/napi-mbt-cli
-```
+Export functions with `#export_name("name")` on `pub fn` or `pub async fn`.
+The annotation determines the JavaScript export name. Generated declarations
+include the source documentation and error contract. See the
+[usage guide](docs/en/usage.md), [types](docs/types.md),
+[classes and callbacks](docs/classes-callbacks.md), and [async](docs/async.md).
 
-The native CLI uses `moonbitlang/core/argparse` for subcommands and help.
-Its version comes from `moon.mod`: the `gen_version` rule and `dev_build` in
-`cmd/napi-mbt-cli/moon.pkg` run `scripts/gen_version.mbtx` to regenerate
-`generated_version.mbt`. Keep that generated file in releases for downstream
-builds. After building the CLI, run `moon run scripts/cli-native-test.mbtx` to test both the release executable and `moon install` without Node/npm on PATH.
+## Commands
 
-Or install the precompiled native CLI into `~/.unmbt` (Windows uses
-`%USERPROFILE%\.unmbt`):
-
-On Unix-like systems the repository installer performs the same version check:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.sh | bash
-```
-
-On Windows PowerShell:
-
-```powershell
-irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
-```
-
-`moon install` and the Release installer provide the same standalone CLI. One AST-based generator validates signatures and produces every artifact. No `node_modules` directory is required. Build resources are extracted into the ignored `.napi-mbt/` directory.
-
-### 2. Project Setup
-
-Create a project with the native CLI on PATH:
-
-```bash
-napi-mbt-cli init my-napi-addon
-cd my-napi-addon
+```sh
 napi-mbt-cli generate --check
+napi-mbt-cli build --watch --verbose --output-dir "native output"
+napi-mbt-cli prepublish --target win32-x64-msvc
 ```
 
-The command creates the MoonBit package, addon configuration, loaders, type declarations, and Node smoke tests. It refuses to overwrite existing files unless `--force` is given.
+`generate --check` validates without writing. `doctor` and `build` share an actual
+compile/link probe. Builds supplement configuration in an isolated workspace,
+preserving user flags, exports, dependencies and native inputs. Watch serializes
+changes and keeps the last successful binary and declarations after failures.
+See [build behavior](docs/build.md).
 
-### 3. Writing MoonBit Code
+New projects default to N-API 4, matching napi-rs. There is **no blanket Node 22
+minimum**: generated `engines.node` follows the chosen N-API and loader features.
+Main CI covers Node 22/24/26, plus minimum-version consumers. Bytes/BufferView
+require N-API 7; the async host requires N-API 8 and `moonbitlang/async@0.22.4`.
 
-In your `lib.mbt`, write a function and tag it with `#export_name("mbt_add")`:
+CJS and ESM default to enabled; either can run independently. Unknown config
+fields, unsupported features and incompatible N-API requirements fail explicitly.
+Loaders prefer existing local artifacts and retain the original cause when a
+candidate is broken. Platform package versions and metadata must match.
 
-```moonbit
-#export_name("mbt_add")
-pub fn add(a : Int, b : Int) -> Int {
-  a + b
-}
-```
+## Validation and distribution
 
-### 4. Build the Addon
-
-Run the CLI tool to auto-generate bindings and build the `.node` binary:
-
-```bash
-napi-mbt-cli build
-```
-
-This command will:
-1. 🔍 Parse your `#export_name("mbt_add")` annotated functions.
-2. 🛠️ Generate `napi_exports.mbt` and `index.d.ts`.
-3. 🏗️ Compile the Native target (`moon build --target native`).
-4. 📦 Generate `.node` binary at `artifacts/[platform]-[arch]/`.
-
-You can now use your native addon in JavaScript:
-
-```javascript
-const addon = require('./artifacts/win32-x64-msvc/napi_mbt.node');
-console.log(addon.mbt_add(2, 3)); // Output: 5
-```
-
-Set one package-wide N-API version in `napi-mbt.json`. New projects default to v4, matching napi-rs. Threadsafe Function requires v4, BigInt v6, and checked Buffer access v7. Core Promise APIs are v1. The native CLI does not require Node. Addon `engines.node` follows napi-rs's N-API introduction table and the enabled loader modes; it does not impose a blanket Node 22 minimum. Default dual-mode projects require Node `>=12.20.0 <13 || >=14.13.1`; the generated package records the precise requirement.
-
-Configuration is checked against the contract in `napi-mbt.schema.json`: unknown fields, wrong types, duplicate or unsupported targets/features, and incompatible N-API levels fail. `cjs` and `esm` both default to `true`; either can be disabled, but at least one must remain enabled. ESM works independently. Generation synchronizes conditional entry points, `.d.cts`/`.d.mts` declarations, engines and the managed file list while preserving other metadata and export subpaths. `generate --check` validates without writing.
-
-Loaders prefer an existing local artifact. A broken local artifact fails with its original error as `cause`, without silently loading another binary. Platform packages must match the root version, target and N-API metadata. Diagnostics include the target, attempted paths and N-API versions; unsupported OS/CPU/libc combinations are rejected explicitly. `prepublish` requires every requested artifact; use `--target` to prepare one platform.
-
-See [exported value types](docs/types.md) for bigint, nested Option/Array,
-structs, enum representations and their generated TypeScript contracts.
-
-### Release and publish
-
-Version releases use the repository's `bump.config.json`; it runs `moon check` before the version is committed. After all target binaries have been built, prepare platform packages and publish them in dependency order:
-
-```bash
-napi-mbt-cli prepublish
-npm run publish:all
-```
-
-Use `npm run publish:dry-run` to inspect package contents without publishing.
-
-### Development checks
-
-```bash
+```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-moon run scripts/cli-native-test.mbtx
-moon check --target native --warn-list +73 --deny-warn
-moon test --target native
-moon run scripts/parser-asan-test.mbtx
-node --test scripts/test.js
+npm ci --ignore-scripts
+moon run scripts/ci-regression-test.mbtx
+moon run scripts/ci-consumers.mbtx
+moon run scripts/sanitizer-test.mbtx
 ```
 
-The native test stages run before Node load tests. Vendored parser versions and licenses are recorded in `internal/syntax/VENDOR.md`. Editable templates and header resources live in `internal/assets/data/resources.json`; the MoonBit resource build rule regenerates the embedded copy when that input changes.
+Release gates package, dry-run and install facade/platform tarballs into a clean
+directory, then load CJS/ESM and type-check the installed declarations. CLI
+archives target Windows x64, Linux x64 glibc and macOS ARM64. No registry publish
+is performed by these tests. See [engineering](docs/en/development.md),
+[executed validation](docs/validation.md), [benchmarks](docs/performance.md),
+and [roadmap](docs/roadmap.md).
 
-## 📚 Documentation
-
-For a detailed guide on supported types, advanced configurations, and internal architectures, refer to the documentation directories:
-
-- 📖 [Usage Guide (en)](docs/en/usage.md)
-- ⚙️ [Development & Architecture (en)](docs/en/development.md)
-
-## 📄 License
-
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+MIT licensed; bundled parser, Unicode, Node-API, async and libuv notices are
+included in distribution archives. See [LICENSE](LICENSE).

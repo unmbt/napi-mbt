@@ -1,0 +1,38 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd : String) -> String {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd~))
+  if code != 0 { fail(program + " " + args.join(" ") + "\n" + out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-mooncake-")
+  defer @fs.rmdir(temp, recursive=true)
+  println(checked("moon", ["package", "--target-dir", temp + "/build"], root))
+  let directory = temp + "/build/publish"
+  let archives = @fs.readdir(directory).filter(name => name.has_suffix(".zip"))
+  assert_eq(archives.length(), 1)
+  let archive = directory + "/" + archives[0]
+  let unpacked = temp + "/unpacked"
+  @fs.mkdir(unpacked)
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let files = if windows { checked("tar", ["-tf", archive], root) } else { checked("unzip", ["-Z1", archive], root) }
+  for name in files.split("\n") {
+    for prefix in ["napi-rs/", "node_modules/", ".git/", "artifacts/", "_build/", "dist/", "npm/", ".napi-mbt/"] {
+      assert_true(!name.has_prefix(prefix), msg="Unexpected packaged input: " + name.to_owned())
+    }
+    assert_true(!name.trim().has_suffix(".node"), msg="Native addon leaked into Mooncake")
+  }
+  if windows { ignore(checked("tar", ["-xf", archive, "-C", unpacked], root)) }
+  else { ignore(checked("unzip", ["-q", archive, "-d", unpacked], root)) }
+  assert_eq(@fs.read_file(unpacked + "/moon.mod").binary(), @fs.read_file(root + "/moon.mod").binary())
+  for path in ["internal/assets/data/resources.json", "internal/syntax/VENDOR.md", "cmd/napi-mbt-cli/main.mbt", "LICENSE"] {
+    assert_true(@fs.exists(unpacked + "/" + path), msg="Missing packaged source: " + path)
+  }
+  println(checked("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], unpacked))
+  println("Mooncake packed, unpacked and checked without registry publication")
+}

@@ -30,7 +30,12 @@
       "ret": "Int",
       "throws": false,
       "line": 2,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "check_bool",
@@ -44,7 +49,12 @@
       "ret": "Bool",
       "throws": false,
       "line": 28,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "check_double",
@@ -58,7 +68,12 @@
       "ret": "Double",
       "throws": false,
       "line": 34,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "concat",
@@ -76,7 +91,12 @@
       "ret": "String",
       "throws": false,
       "line": 8,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     },
     {
       "sourceName": "mutate_buffer",
@@ -90,7 +110,13 @@
       "ret": "Unit",
       "throws": true,
       "line": 14,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution.",
+        "Business errors use ERR_NAPI_CALL unless they already carry NapiError details."
+      ]
     },
     {
       "sourceName": "roundtrip_bytes",
@@ -104,7 +130,12 @@
       "ret": "Bytes",
       "throws": false,
       "line": 22,
-      "filename": "examples.mbt"
+      "filename": "examples.mbt",
+      "documentation": [],
+      "errors": [
+        "Node-API errors carry code, status and context; existing JS exceptions preserve identity.",
+        "Argument conversion failure prevents business execution."
+      ]
     }
   ],
   "types": [],

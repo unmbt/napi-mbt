@@ -1,60 +1,63 @@
-# 架构开发与贡献指南
+# 工程化与分发
 
-本文档深入剖析了 `napi-mbt` 的内部架构设计。它旨在帮助那些想要了解项目底层运作原理、进行系统级调试、或希望为本项目贡献代码的开发者。
+生成链路为 AST → 类型 IR → 整包校验 → MoonBit/C/TypeScript/loader。
+`generator/` 是唯一公开生成器；`internal/syntax/` 包含内嵌 parser，
+[来源记录](../../internal/syntax/VENDOR.md)说明固定版本和许可证。
 
-## 1. 系统架构总览
+根目录 runtime 源码是唯一来源。修改后运行 `moon run scripts/sync-runtime.mbtx`，
+资源构建规则再生成内嵌文本。async 0.22.4 适配有独立源码、校验值和许可证，使用
+`moon run scripts/sync-async-adapter.mbtx` 同步。两者都支持 `--check`，并进入 CI。
+不要手工修改 `resources.json` 中的 runtime 副本。
 
-`napi-mbt` 被设计为 V8 JavaScript 引擎与 MoonBit 语言之间的高性能、自动化桥梁。其底层直接依赖于标准的 Node-API (N-API)。
+每次 addon 调用进入可重入的 addon 锁。MoonBit 代码和引用计数在所属 JS 环境线程执行；
+C 回调在重入期间保留借用 payload，持久 JS 引用有明确释放路径。
+Class finalizer、dispose 和环境关闭使用统一资源管理。Node 驱动有限轮次的异步调度；
+后台线程仅负责 C 层等待/I/O。详见[异步架构](async-adapter.md)。
 
-我们的架构由三个边界清晰的层次组成：
-1. **工具链核心 (`napi-mbt-cli`)**：独立 MoonBit 原生程序，静态链接 Tree-sitter，完成 AST 分析、生成与原生构建，无需 Node/npm。
-2. **MoonBit N-API 运行时引擎**: 包含与 N-API 对接的基础内存通信结构和类型转换 helper。
-3. **C glue (`napi_glue.c`)**：提供 Node-API 注册入口和逐导出的回调。
+## 验证
 
-
-Node-API 是纯 C 的接口协议。当 Node.js 试图调用一个原生扩展时，它要求目标必须是签名类似于 `napi_value cb(napi_env env, napi_callback_info info)` 的标准 C 函数指针。
-
-然而，当前的 MoonBit 尚不能直接将其内部的动态闭包作为原生 C 函数指针导出给宿主。
-为了解决这一语言层面的阻隔，生成器为每个导出函数生成独立的 adapter 和 C wrapper。
-
-## 2. 逐导出 C wrapper 架构
-
-CLI 为每个 `#export_name("...")` 函数生成一个 MoonBit adapter 和独立的 N-API callback。调用时直接进入对应 adapter，不使用全局 dispatcher 或函数 ID。
-
-1. **加载初始化**：Node.js 调用 `napi_glue.c` 的 `napi_register_module_v1`，该函数调用 `moonbit_init()`。
-2. **函数挂载**：生成的 C glue 为每个导出创建独立的 N-API callback，并把同名属性挂载到 exports。
-
-## 3. 双重 GC 灾难与内存安全
-
-MoonBit 和 V8 分别拥有完全独立的垃圾收集器 (Garbage Collectors)。在这两者之间随意传递内存非常危险。
-
-- `Int`, `Double`, `Bool` 属于基础数据类型，直接通过寄存器传递，GC 风险为零。
-- `String` 涉及到内存申请，Node-API 会自动帮你将 V8 字符串提取成 MoonBit 独立管理的 String 对象。
-- `Bytes` 使用了 `napi_create_buffer_copy`。数据被完全克隆进了 MoonBit 的 GC 堆内，由于两边拥有各自独立的内存副本，因此安全性达到 100%。
-- `NapiBufferView` 极其危险。我们在此处刺穿了 GC 边界，直接抽取出 V8 数组的底层物理内存地址指针 (`napi_get_buffer_info`)。需要极其注意的是：V8 的“移动式垃圾回收机制 (Moving GC)”可能在任何非同步周期内把内存搬家，导致指针变成野指针。所以，`NapiBufferView` 在结构上被严格限制在同步的 Call Stack 中使用，杜绝持久化引用。
-
-## 4. 参与 `napi-mbt` 的贡献
-
-### 在本地进行测试
-我们的测试用例无需执行任何外围发布。
-先执行 `moon build --target native --release cmd/napi-mbt-cli` 构建 CLI，再用 `moon run --target native --release cmd/napi-mbt-cli -- build --release` 构建根项目扩展。`moon run scripts/ci-regression-test.mbtx` 在隔离 Node/npm 的环境测试原生命令，`moon test --target native` 执行单元测试。最后用 `node --test scripts/test.js` 加载已生成的根项目及测试项目扩展。
-
-### 验证 Npm 分发逻辑
-为了调试 `napi-mbt prepublish` 所输出的多平台分发架构，请运行：
-```bash
-napi-mbt-cli prepublish
+```sh
+moon info --target native
+moon fmt
+moon check --target native --warn-list +73 --deny-warn
+moon test --target native
+moon build --target native --release cmd/napi-mbt-cli
+moon run --target native --release cmd/napi-mbt-cli -- build --release
+npm ci --ignore-scripts
+moon run scripts/ci-regression-test.mbtx
+moon run scripts/ci-consumers.mbtx
+moon run scripts/sanitizer-test.mbtx
 ```
-该指令会在 `npm/` 文件夹中输出各平台包的元数据。生成的 `index.cjs` 和 `index.mjs` 负责加载这些平台包。
 
-### 如何添加对新数据类型 (如 Object/Array) 的支持
-1. 在 `generator/strict.mbt` 扩展 AST 校验，在 `generator/types.mbt` 扩展类型 IR。
-2. 扩展 `generator/render.mbt` 及私有输出函数；MoonBit、C、TypeScript 和 loader 共用同一 IR。通过 `scripts/generator-snapshot-test.mbtx` 更新完整输出快照，并加入真实 Node 测试。
-3. 仓库根目录的 runtime 源码是唯一来源，运行 `moon run scripts/sync-runtime.mbtx` 自动派生内嵌模板，不手工修改 JSON 中的副本。生成物与 runtime 契约变化时更新 `napi_runtime_version.mbt`。CI 使用 `--check` 检测模板漂移。
+核对 `.mbti` 的公开接口变化。快照更新必须审阅完整输出，再运行实际编译和 Node
+消费者测试。测试覆盖 NodeNext/Bundler 正反例、worker 关闭、取消竞态、资源计数、
+Unicode、分离 Buffer、用户配置和原生依赖；子进程测试带超时。
+ASan 覆盖 parser 与 addon；Linux 额外启用 leak detection。
+[验证记录](../validation.md)区分本机结果与仅配置的 CI job。
 
-生成器先完成所有校验和渲染，再暂存完整输出。每个文件通过 rename 替换，后续
-文件失败时回滚此前替换。`generate --check` 仅读取文件，不创建工作目录。
-3. 在 `lib.mbt` 内: 调用底层的 Node-API（如 `napi_get_named_property` 等等），编写底层的内存提取和安全检验逻辑。
+## 打包门禁
 
-### 常见问题排查 (Troubleshooting)
+`moon.mod`、package.json、lockfile、平台依赖版本必须一致；release tag 也会核对。
+`prepublish` 拒绝缺失、架构错误、非动态库构件和过期声明/生成物，保留用户包元数据，
+并附带第三方许可证。生成的 `npm/`、`artifacts/`、`licenses/` 不入库。
 
-构建由 MoonBit、CMake 和平台 C 编译器完成。检查 `napi-mbt.json` 的 builder/target 配置，并确认对应的 CMake、clang/GCC 或 MSVC 工具链已安装。
+```sh
+moon run scripts/release-check.mbtx
+moon run scripts/distribution-test.mbtx
+moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root
+moon run scripts/mooncake-package-test.mbtx
+```
+
+分发测试执行 npm pack/dry-run，在干净目录离线安装真实 tarball，再加载 CJS/ESM 并
+检查已安装的 TypeScript 声明。也验证损坏二进制、过期声明和版本不一致会失败。
+`--root` 将主包和平台包 tarball 写到 `dist/npm/<target>/`；不会发布到 registry。
+目前构件没有绑定源码摘要的 build receipt，打包前应构建当前 checkout。
+
+Mooncake 门禁使用 `moon package`，检查 ZIP 清单，在临时目录解包并执行严格检查，
+不依赖 registry 登录或版本是否已发布。`moon publish --dry-run` 还会访问 registry
+检查版本可用性；当前 0.1.1 已存在时返回 409，不代表解包后的源码检查失败。
+
+CI 固定 Moon/core 和 CMake，保留三个发布平台，测试 Node 22/24/26 与最低版本，
+通过后才生成 release 归档；新 MoonBit 兼容性独立测试。
+自动化使用 `.mbtx`；`.cjs/.mts/.cts` 是真实消费者。下载的 `napi-rs/` 仅供本地参考。
+[性能](performance.md)和[路线图](roadmap.md)记录后续优化与平台工作。

@@ -80,5 +80,5 @@ they must not be used to transfer JavaScript callbacks between environments.
 
 Real native fixtures and complete snapshots live in `scripts/class-test.mbtx`
 and `scripts/callback-test.mbtx`; `scripts/lifecycle-test.mbtx` covers concurrent
-workers. `scripts/lifecycle-sanitizer.mbtx` runs the class/callback fixtures with
-AddressSanitizer. Windows also needs its ASan runtime directory as the argument.
+workers. `moon run scripts/sanitizer-test.mbtx` runs the parser and native
+fixtures with AddressSanitizer and discovers the platform's ASan runtime.

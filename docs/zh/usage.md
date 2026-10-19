@@ -1,104 +1,54 @@
-# 使用指南 (Usage Guide)
+# 使用指南
 
-本文档提供有关如何引入及使用 `@unmbt/napi-mbt-cli` 工具，来辅助你通过 MoonBit 快速开发 Node.js 原生 C++ 扩展 (Addons) 的详细教程。
+从仓库执行 `moon install ./cmd/napi-mbt-cli` 安装。
+`napi-mbt-cli --help` 和各子命令的 `--help` 列出实际接受的参数。
 
-## 1. 环境依赖要求
+| 命令 | 行为 |
+| --- | --- |
+| `init <directory> --name <name>` | 创建工程；覆盖已有文件必须显式指定 `--force` |
+| `doctor [directory] --json` | 发现并探测实际编译器、链接器和 SDK |
+| `generate [directory] --check` | 解析、类型校验、检查全部生成物，不写文件 |
+| `build [directory] --release` | 隔离生成和编译，成功后安装产物 |
+| `build --watch --verbose --output-dir <path>` | 监听输入，输出命令/计时并指定构件目录 |
+| `targets` | 列出已识别的宿主目标配置 |
+| `prepublish [directory] --target <target>` | 校验发布构件，准备 npm 平台包元数据 |
 
-在开始之前，请确保你的机器环境满足以下依赖条件：
+不加 `--check` 时，生成器先校验整个包，再替换管理的文件。`napi-mbt.json` 使用严格
+JSON，生成的 `napi-mbt.schema.json` 提供编辑器校验。例如：
 
-- **Node.js**: 最低版本 18。
-- **MoonBit 工具链**: 确保 `moon` 命令位于系统环境变量中。你可前往 [MoonBit 官网](https://www.moonbitlang.com/) 获取。
-- **C 编译器**: CLI 需要利用 C 编译器去连接底层生成的 C 跳板代码 (`stub.c`)。
-  - **Windows**: 必须安装带有“C++ 桌面开发”组件的 Microsoft Visual Studio (用于获取 MSBuild 及 lib.exe)。
-  - **macOS / Linux**: GCC 或 Clang。
-
-## 2. CLI 核心命令
-
-### `napi-mbt-cli doctor [directory] --json`
-
-在临时目录执行最小编译和链接检查，检测 MoonBit、CMake、C 编译器及链接器。
-Windows 上选择已安装的 Visual Studio C++ 实例，将其 MSBuild 完整路径交给
-CMake，并报告编译器和 Windows SDK 版本。检查失败时，根据诊断安装 MSBuild、
-C++ 工具及 Windows SDK 组件。省略 `--json` 可获得可读的诊断输出。
-`build` 在写入项目生成物之前执行相同检查。
-
-编译在隔离工作区执行，仅在副本中追加必需的 flags 和 exports，保留已有的
-原生 stub 和链接库，并由 Moon 按完整包依赖图完成链接。原工程的 `moon.pkg`、
-`moon.mod` 及依赖缓存不会被改写。N-API 宏定义冲突会报错。只有构建成功后才
-替换最终 addon，失败时保留上一次成功产物。
-
-原生 CLI 不依赖 Node.js 或 npm；运行 addon 时才需要 Node.js。
-
-`@unmbt/napi-mbt-cli` 提供了主入口命令 `napi-mbt`。
-
-### `napi-mbt build [--release]`
-一键全自动打包流程。它内部依次执行以下事务：
-1. 调用 AST 语法分析器扫描当前项目中的所有 `.mbt` 文件，抓取被 `#export_name("mbt_add")` 标记修饰的导出函数。
-2. 自动生成处理参数解析、内存安全校验与数据结构映射转换的胶水代码 (`napi_exports.mbt`)。
-3. 自动生成 100% 精确匹配原函数的 TypeScript 声明文件 (`index.d.ts`)。
-4. 调用 `moon build --target native` 进行静态编译。
-5. 通过 C 编译器桥接 V8 与 MoonBit 的 Native 构件。
-6. 输出结果 `.node` 到标准化的 `artifacts/[platform]-[arch]/napi_mbt.node` 路径中。
-
-**可选参数:** 追加 `--release` 可使用 Release 模式构建极速优化的版本。
-
-### `napi-mbt prepublish`
-处理跨平台 Npm 发布的包结构构建。
-它会读取项目的 `package.json`，并根据配置生成利用 `optionalDependencies` 模式分发的子包体系（放置于 `npm/` 目录下，如 `npm/win32-x64-msvc/package.json`）。
-同时在根目录下自动创建智能加载入口 `index.js`，保证使用者在 `require` 时，能够自动根据宿主的真实操作系统，实时加载正确架构的 `.node` 二进制产物。
-
-## 3. 伪宏 `#export_name("mbt_add")` 与类型支持
-
-为了将某个普通的 MoonBit 业务函数暴露给 JS 使用，你只需要给它添加一个 `#export_name("mbt_add")` 的注释段即可。目前，为了避免跨语言 GC 灾难，转换器执行非常严格的类型限制，只有安全的数据类型才会被接纳。
-
-### 当前稳定支持的类型映射表：
-
-| MoonBit 语法     | TypeScript 类型        | 内部行为说明 |
-| ---------------- | ---------------------- | ------------------- |
-| `Int`            | `number`               | 无损双向映射 32位整型。 |
-| `Double`         | `number`               | 无损双向映射 64位浮点。 |
-| `Bool`           | `boolean`              | JavaScript 的基础布尔值。 |
-| `String`         | `string`               | 将 V8 引擎内的 UTF-8 底层字节流直接无损转码进 MoonBit 的原生字符串内存。 |
-| `Bytes`          | `Buffer`               | 二进制字节数组，在 JS 与 N-API 的边界发生**完整的数据拷贝（Copy）**。极端安全，但大量数据操作时可能触发 GC 压力。 |
-| `NapiBufferView` | `Buffer`               | 表示一段对 Node.js 原始 Buffer 内存堆的**零拷贝（Zero-Copy）裸指针**。极度适合对二进制内容做性能敏感的原位修改。 |
-| `Unit`           | `void`                 | 无返回值场景。 |
-
-### 复杂类型说明 (Roadmap)
-Promise 和 BigInt 已通过 feature registry 提供封装；对象（Object）和数组（Array）仍不属于当前生成器支持的自动转换类型。
-
-## 4. 健壮的错误阻断机制
-
-参数转换、MoonBit 函数和返回值转换共用一个错误边界。`NapiError::ApiError`
-携带状态、错误类别、稳定 code 和上下文。adapter 统一抛出带 `code`、`status`
-及 `context` 的 `Error`、`TypeError` 或 `RangeError`，并保留已经 pending 的
-JS 异常。转换失败后不会继续执行业务函数。
-
-`Int`/`Int32` 拒绝小数、NaN、无穷值及超出 32 位有符号整数范围的数值
-（`ERR_NAPI_INT_RANGE`）；`Double` 保留 IEEE 数值语义。Buffer 导出要求
-N-API 7，以准确检测 backing store 分离。借用 view 通过 `defer` 在后续转换
-或业务失败时同样失效，越界和失效访问会抛错，不会终止进程。TSFN 操作返回
-`Accepted`、`QueueFull` 或 `Closing`；其他失败抛出 `NapiError`，调用和释放
-模式均使用枚举。
-
-如果 JS 调用方传入了类型不符的参数，系统不会像常规 C 代码一样导致进程崩溃 (Segfault)。
-自动生成的转换代码含有前置防御边界：假设你需要一个 `Int` 却接收到了 `"hello"` 字符串，代码会立刻执行失败，调用 `napi_throw_error()` 直接中止当前方法调用，并优雅地抛出一个合法的 JavaScript `TypeError`。
-
-## 5. NapiBufferView 高级用法（零拷贝特性）
-
-如果你的扩展业务涉及到如图像矩阵运算、加解密算法或流式处理等性能瓶颈场景，将所有数据深度 Copy 成 MoonBit 的 `Bytes` 会产生不可忍受的延时。
-
-`NapiBufferView` 允许你彻底屏蔽这层拷贝开销！它将一段未经处理的裸内存交予你读写。
-请注意：由于此段内存被 Node.js V8 的垃圾回收器监控，**绝对不能**在方法执行结束后，依然将 `NapiBufferView` 保留或缓存到全局静态变量中（一旦被 JS 回收即变成悬空指针）。
-
-使用范例:
-```moonbit
-#export_name("mbt_add")
-pub fn mutate_image_colors(view : NapiBufferView) -> Unit {
-  let length = view.length()
-  for i = 0; i < length; i = i + 1 {
-    let pixel = view.load8(i)
-    // 直接原位将像素值减 10 
-    view.store8(i, if pixel > 10 { pixel - 10 } else { 0 })
-  }
+```json
+{
+  "$schema": "./napi-mbt.schema.json",
+  "napiVersion": 8,
+  "builder": "auto",
+  "cjs": true,
+  "esm": true
 }
 ```
+
+基础新工程用 N-API 4；bigint 用 6；带分离检查的 Buffer 用 7；异步导出用 8。
+签名需要的 feature 会自动推导和检查。`targets` 仅限制宿主目标，不启用交叉编译。
+不能同时关闭 CJS 和 ESM。[支持策略](support.md)说明 Node 最低版本和发布平台。
+
+导出放在根 MoonBit 包中，解析器跨该包源码文件解析签名和引用的值类型。
+泛型导出、未解析类型及不支持的签名会带文件名、行号报错。
+导出函数、值类型前的 `///` 文档进入声明和 `napi_manifest.json`；错误说明也由同一
+校验后的 IR 派生。
+
+详见[类型](types.md)、[class/callback](classes-callbacks.md)、[异步](async.md)和
+[构建/watch](build.md)。[完整示例源码](../../scripts/fixtures/documented-addon.mbt.txt)
+在 CI 中实际编译和运行，覆盖基础类型、Buffer、错误、对象、callback、异步。
+使用 Buffer 或异步声明的 TypeScript 项目需要 `@types/node`；声明会显式引用它。
+
+本地通过 `require('./index.cjs')` 或 `import addon from './index.mjs'` 加载；
+安装后使用包名。存在的本地二进制优先，损坏时不会悄悄回退。
+Loader 错误包含目标、尝试路径、N-API 要求和原始 cause；平台包名称、版本、目标、
+N-API 元数据必须匹配。
+
+生成器管理根入口、engines 和自己的发布文件，保留其他元数据、scripts、依赖及
+export 子路径。构建保留用户的 MoonBit manifests、原生 stubs、flags 和链接库。
+准备分发包前请阅读[工程化与发布验收](development.md)。
+
+工程文本必须使用 UTF-8。非法文本报告具体文件路径，文件不存在等 I/O 错误保留原始原因。
+生成文件显式写为 UTF-8；外部编译器诊断允许包含非 UTF-8 字节，避免 Windows 代码页输出
+中断已经成功的构建。

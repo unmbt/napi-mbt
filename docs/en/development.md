@@ -1,62 +1,77 @@
-# Architecture & Development Guide
+# Engineering and distribution
 
-This document dives deep into the internal architecture of `napi-mbt`. It is intended for those who wish to understand the inner workings of the project, debug its systems, or contribute to its development.
+The pipeline is AST → typed IR → whole-package validation → MoonBit/C/TypeScript/
+loader outputs. `generator/` owns the only public generator. `internal/syntax/`
+owns the bundled parser; [vendor provenance](../../internal/syntax/VENDOR.md)
+records source versions and licenses.
 
-## 1. System Architecture Overview
+Root runtime sources are authoritative. After editing them, run
+`moon run scripts/sync-runtime.mbtx`; the resource build rule embeds that result.
+The async 0.22.4 adaptation has separate sources, checksums and licenses:
+`moon run scripts/sync-async-adapter.mbtx`. Both support `--check` and run in CI.
+Do not hand-edit duplicated runtime text in `resources.json`.
 
-`napi-mbt` is designed to be a highly performant and automated bridge between V8 JavaScript engine and MoonBit, facilitated through Node-API (N-API).
+Every addon call enters a recursive per-addon lock. MoonBit code and reference
+counting run on the owning JS environment thread. C callbacks pin borrowed
+payloads around reentry; persistent JS references have explicit release paths.
+Class finalizers, disposal and environment cleanup share resource management.
+The async host drives bounded scheduler rounds from Node; background threads
+perform only C waiting/I/O. See [async architecture](../async-adapter.md).
 
-The architecture is broadly split into three distinct layers:
-1. **The Toolchain (`napi-mbt-cli`)**: A standalone MoonBit executable with a statically linked Tree-sitter parser. It handles generation and native compilation without Node/npm.
-2. **The MoonBit N-API Core**: Contains memory primitives and type-conversion helpers.
-3. **The C glue (`napi_glue.c`)**: Creates one Node-API callback for each export.
+## Checks
 
-
-Node-API is a C interface. When Node.js wants to call a Native Addon, it expects a C-style function pointer matching the signature:
-`napi_value cb(napi_env env, napi_callback_info info)`.
-
-MoonBit does not (yet) allow arbitrary closures to be exported directly as C function pointers.
-To solve this, the generator emits one adapter and C wrapper for each exported function.
-
-## 2. Per-export C wrapper architecture
-
-The CLI generates one MoonBit adapter and one N-API callback for every `#export_name("...")` function. Calls enter the matching adapter directly without a global dispatcher or function IDs.
-
-1. **Initialization**: Node.js invokes `napi_register_module_v1` in `napi_glue.c`, which calls `moonbit_init()`.
-2. **Registration**: Generated C glue creates one N-API callback per export and attaches the exact export name to the module exports object.
-
-## 3. The Dual-GC Problem and Safety
-
-MoonBit and V8 both have independent Garbage Collectors. Passing memory between them is dangerous, as one GC might collect memory while the other is still holding a reference to it.
-
-- `Int`, `Double`, `Bool` are primitive value types and carry zero GC risk.
-- `String` involves memory copying. Node-API handles extraction of the string into MoonBit-managed memory.
-- `Bytes` uses `napi_create_buffer_copy`. The data is fully cloned from V8 memory into MoonBit memory, severing dependencies between the two GCs.
-- `NapiBufferView` requires extreme caution. We bypass the GC boundary by extracting the direct address pointer of the V8 buffer (`napi_get_buffer_info`). However, V8's Moving GC might invalidate this pointer. Hence, `NapiBufferView` is structurally safe **only** when used synchronously. It does not escape the current call stack.
-
-## 4. Contributing to `napi-mbt`
-
-### Testing Locally
-The testing framework operates without needing to publish packages.
-Build the CLI with `moon build --target native --release cmd/napi-mbt-cli`, then build the root addon with `moon run --target native --release cmd/napi-mbt-cli -- build --release`. Run `moon run scripts/ci-regression-test.mbtx` for native command tests in an environment without Node/npm and `moon test --target native` for unit tests. Finally, `node --test scripts/test.js` loads the already-built root and fixture addons.
-
-### Building Optional Dependencies
-To debug the `napi-mbt prepublish` generation logic:
-```bash
-napi-mbt-cli prepublish
+```sh
+moon info --target native
+moon fmt
+moon check --target native --warn-list +73 --deny-warn
+moon test --target native
+moon build --target native --release cmd/napi-mbt-cli
+moon run --target native --release cmd/napi-mbt-cli -- build --release
+npm ci --ignore-scripts
+moon run scripts/ci-regression-test.mbtx
+moon run scripts/ci-consumers.mbtx
+moon run scripts/sanitizer-test.mbtx
 ```
-This generates the target JSON layouts within the `npm/` folder. The generated `index.cjs` and `index.mjs` resolve these platform packages.
 
-### Adding New Types (e.g., Object, Array)
-1. Extend AST validation in `generator/strict.mbt` and the typed IR in `generator/types.mbt`.
-2. Extend `generator/render.mbt` and its private output helpers. MoonBit, C, TypeScript and loaders consume this same IR. Add complete artifact snapshots with `scripts/generator-snapshot-test.mbtx` and actual Node tests.
-3. Runtime source files at the repository root are canonical. Run `moon run scripts/sync-runtime.mbtx` to derive embedded templates; do not edit their JSON copies. Bump `napi_runtime_version.mbt` when the generated/runtime contract changes. CI runs the script with `--check` to detect stale templates.
+Inspect `.mbti` changes. Snapshot updates require reviewing complete generated
+files, followed by actual compilation and Node consumers. Tests cover positive
+and negative NodeNext/Bundler declarations, worker shutdown, cancellation races,
+resource counts, Unicode, detached buffers, user configuration and native
+dependencies. Process tests have timeouts. ASan runs parser and addon scenarios;
+Linux also enables leak detection. [Validation](../validation.md) distinguishes
+local results from configured CI jobs.
 
-Generation validates and renders the complete output set before staging it.
-Each replacement uses a filesystem rename, with rollback if a later file fails.
-`generate --check` only reads files and creates no working directory.
-3. In `lib.mbt`: Implement the extraction primitives utilizing underlying raw N-API signatures (`napi_get_named_property`, etc.).
+## Package gates
 
-### Troubleshooting
+Versions in `moon.mod`, `package.json`, lockfile and platform dependencies must
+match; release tags are checked. `prepublish` rejects missing, wrong-architecture,
+non-library or stale artifacts/declarations. It preserves user package metadata
+and includes bundled licenses. Generated `npm/`, `artifacts/` and `licenses/`
+are not source-controlled.
 
-The build uses MoonBit, CMake, and the platform C compiler. Check `napi-mbt.json` and install the selected CMake, clang/GCC, or MSVC toolchain.
+```sh
+moon run scripts/release-check.mbtx
+moon run scripts/distribution-test.mbtx
+moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root
+moon run scripts/mooncake-package-test.mbtx
+```
+
+The distribution test runs npm pack/dry-run, installs actual tarballs offline in
+a clean directory, loads CJS/ESM and checks installed TypeScript declarations.
+It also verifies that corrupt binaries, stale declarations and version mismatches
+are rejected. `--root` emits root/package tarballs to `dist/npm/<target>/`.
+No registry publication occurs. Source digests are not currently tied to binary
+receipts; always build the checkout being packaged.
+
+The Mooncake gate packs the module, rejects accidental dependencies/binaries in
+the archive, extracts it, and strictly checks the extracted sources. It uses no
+registry publication. `moon publish --dry-run` additionally contacts the registry
+and rejects a version that already exists (including the current 0.1.1); use it
+only when checking availability of an actual new release version.
+
+CI pins Moon/core and CMake, builds the three release platforms, runs the Node
+22/24/26 matrix and minimum consumers, and gates release archives on tests.
+A separate job checks latest MoonBit compatibility. Test orchestration uses
+`.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`
+as local reference only. [Benchmarks](../performance.md) and the
+[roadmap](../roadmap.md) describe remaining performance and platform work.

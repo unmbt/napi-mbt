@@ -47,4 +47,4 @@ the OS may still access them.
 `scripts/async-runtime-test.mbtx` builds a real addon and checks timers, filesystem,
 TCP, task groups, JS heartbeats, worker termination, unchanged dependency sources,
 version rejection and checksum rejection. Run the sanitizer variant with
-`scripts/lifecycle-sanitizer.mbtx <asan-runtime-directory> --async` on Windows.
+`moon run scripts/sanitizer-test.mbtx` for the parser and native memory gates.

@@ -53,3 +53,9 @@ copies an existing report to `docs/benchmarks/`. Run benchmarks without sanitize
 instrumentation. Correctness tests cover every UTF-16 code unit, invalid inputs,
 empty/sliced/detached Buffers and independent copies up to 1 MiB. The same
 conversion scenarios and class/callback/async consumers pass Windows ASan.
+
+These reports compare the conversion change at `0634d1c` with `cf407a1`.
+The later async adapter patch 3 replaces deferred handles with owned resolver
+callbacks for leak-free worker teardown; its extra Promise setup is outside
+these recorded before/after measurements. Rerun the benchmark against captured
+current binaries when evaluating async scheduling performance.

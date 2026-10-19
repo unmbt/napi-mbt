@@ -39,3 +39,8 @@ moon run scripts/benchmark.mbtx after --build
 `docs/benchmarks/`。基准使用普通构建；独立的 Windows ASan 测试覆盖全部 UTF-16
 code unit、非法输入、空/切片/分离 Buffer、最大 1 MiB 的独立副本，以及 class、
 callback 和异步调用。
+
+上述报告比较 `0634d1c` 的转换优化与 `cf407a1`。后续 async 适配补丁版本 3
+为避免 worker 关闭时的泄漏，将 deferred 句柄改为拥有 resolve/reject callback 引用。
+它新增的 Promise 构造成本不在这组历史对比中；评估当前异步调度性能时，应重新捕获
+当前二进制运行基准。

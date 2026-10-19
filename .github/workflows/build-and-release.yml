@@ -48,9 +48,11 @@ jobs:
           cache: npm
       - run: moon update
       - run: npm ci --ignore-scripts
+      - run: moon run scripts/toolchain-check.mbtx
       - run: moon run scripts/sync-runtime.mbtx --check
       - run: moon run scripts/sync-async-adapter.mbtx --check
       - run: moon run scripts/release-check.mbtx
+      - run: moon run scripts/docs-check.mbtx
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon run --target native --release cmd/napi-mbt-cli -- doctor --json
       - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
@@ -59,7 +61,7 @@ jobs:
       - run: moon run scripts/ci-regression-test.mbtx
       - run: moon run scripts/ci-consumers.mbtx
       - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
-      - run: moon publish --dry-run
+      - run: moon run scripts/mooncake-package-test.mbtx
       - run: moon run scripts/ci-artifacts.mbtx
       - uses: actions/upload-artifact@v4
         with:
@@ -158,6 +160,7 @@ jobs:
         with:
           node-version: '26.4.0'
       - run: moon update
+      - run: moon run scripts/toolchain-check.mbtx
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon run scripts/sanitizer-test.mbtx
 

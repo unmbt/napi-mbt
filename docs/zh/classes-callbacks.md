@@ -68,5 +68,5 @@ callback 签名支持普通导出的拥有型数据，禁止 `NapiBufferView` �
 
 真实原生用例和完整生成物快照位于 `scripts/class-test.mbtx`、
 `scripts/callback-test.mbtx`；`scripts/lifecycle-test.mbtx` 验证并发 worker。
-`scripts/lifecycle-sanitizer.mbtx` 运行 class/callback ASan 用例，Windows 需传入
-ASan 运行时目录。
+`moon run scripts/sanitizer-test.mbtx` 统一运行 parser 与原生 ASan 用例，
+自动发现当前平台的 ASan 运行时。

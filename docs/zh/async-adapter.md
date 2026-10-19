@@ -36,4 +36,4 @@ MoonBit 状态，最后完成 N-API 异步 cleanup hook。取消不会提前丢�
 `scripts/async-runtime-test.mbtx` 构建真实 addon，验证计时器、文件、TCP、任务组、
 JS 心跳、worker 终止、依赖源码不变，以及版本和校验失败诊断。
 Windows 的 sanitizer 入口为
-`scripts/lifecycle-sanitizer.mbtx <asan-runtime-directory> --async`。
+`moon run scripts/sanitizer-test.mbtx`。

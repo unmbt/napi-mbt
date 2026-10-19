@@ -1,0 +1,46 @@
+# Support policy
+
+| Layer | Policy |
+| --- | --- |
+| Native CLI | No Node/npm dependency |
+| New addon | N-API 4, CJS and ESM enabled |
+| Main Node CI | 22, 24, 26 on the three release platforms |
+| Minimum consumers | Node 10.16 CJS/N-API 4; 12.20 dual/N-API 4; 12.22 async/N-API 8 |
+| Release platforms | Windows x64 MSVC, Linux x64 glibc, macOS ARM64 |
+| Additional host profiles | Linux ARM64 glibc and macOS x64 are recognized; no prebuilt release gate |
+| Cross-compilation | Requires a matching host; the CLI rejects a different target |
+| libc | glibc; musl is rejected |
+
+Generated `engines.node` is the intersection of N-API introduction versions and
+loader requirements. The default dual-mode range is
+`>=12.20.0 <13 || >=14.13.1`. N-API 8 requires
+`>=12.22.0 <13 || >=14.17.0 <15 || >=15.12.0 <16 || >=16.0.0`.
+Other configurations receive their own precise range. A minimum-version test
+checks compatibility; it is not a recommendation to deploy an EOL Node release.
+
+| Feature | Minimum N-API |
+| --- | ---: |
+| Numbers, Bool, UTF-16 strings, owned structured values | 1 |
+| Class and callback lifecycle | 3 |
+| Threadsafe Function | 4 |
+| Int64/UInt64 bigint | 6 |
+| Bytes and checked BufferView | 7 |
+| Embedded async host, Promise exports and async cleanup | 8 |
+
+Bare N-API Promise operations exist in v1; the async host needs v8 cleanup.
+Features can compose: a structured value containing bigint or Buffer inherits
+the higher requirement. `moonbitlang/async` must be exactly 0.22.4.
+
+The checked napi-rs CLI declares `^20.17.0 || ^22.13.0 || >= 23.5.0`, while its
+core defaults to `napi4` and `dyn-symbols`. It does not impose Node 22 on every
+addon. napi-mbt aligns the default N-API and separates CLI/runtime requirements.
+
+CI pins Moon/core `0.10.15+943464bfa`, CMake 4.0.3 and build Node 26.4.0.
+The corresponding moon/moonrun are `0.1.20261012 (748b63c)` with
+`rr_moon_mod,rr_moon_pkg`. `moon run scripts/toolchain-check.mbtx` verifies
+the exact compiler, build tool, runner and feature flags in pinned CI jobs and WSL.
+The local Windows toolchain uses MSVC 19.44.35211, MSBuild 17.14.14 and SDK
+10.0.26100.0. Hosted compiler/SDK images can still change; `doctor --json`
+records the selected compiler/SDK, and actual compile/link probes gate builds.
+A separate latest-MoonBit job detects compiler changes. See the
+[validation record](validation.md) for what has actually run locally.
