@@ -4,7 +4,7 @@ package "unmbt/napi-mbt/generator"
 // Values
 pub fn parse_source(String, String) -> ParsedSource raise
 
-pub fn render(Array[ParsedExport], String, Int) -> Array[(String, String)] raise
+pub fn render(Array[ParsedExport], String, Int, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
 
 // Errors
 

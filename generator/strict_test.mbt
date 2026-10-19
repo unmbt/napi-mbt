@@ -3,7 +3,13 @@ fn rendered(
   exports : Array[@generator.ParsedExport],
   name : String,
 ) -> String raise {
-  for (file, content) in @generator.render(exports, "fixture", 7) {
+  for
+    (file, content) in @generator.render(
+      exports,
+      "fixture",
+      7,
+      package_version="0.1.0",
+    ) {
     if file == name {
       return content
     }

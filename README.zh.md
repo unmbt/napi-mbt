@@ -6,7 +6,7 @@
   </p>
 
   <p>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D8.6-brightgreen?logo=node.js&logoColor=white" alt="Node.js version" /></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-Node--API-brightgreen?logo=node.js&logoColor=white" alt="Node-API 支持范围按配置功能推导" /></a>
     <a href="https://www.moonbitlang.com/"><img src="https://img.shields.io/badge/MoonBit-Native-blueviolet?logo=moon&logoColor=white" alt="MoonBit Native" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Status" />
@@ -91,7 +91,7 @@ Windows PowerShell：
 irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
 ```
 
-`moon install` 和 Release 安装脚本均提供独立原生 CLI，旧 npm CLI 包和 Node 回退实现已移除。生成器使用 `--generator=auto` 或 `--generator=moonbit`；旧 `node` 值会返回迁移提示。项目无需 `node_modules`，构建资源写入已忽略的 `.napi-mbt/` 目录。
+`moon install` 和 Release 安装脚本均提供独立原生 CLI。单一 AST 生成器负责签名校验和所有生成物。项目无需 `node_modules`，构建资源写入已忽略的 `.napi-mbt/` 目录。
 
 ### 2. 项目初始化
 
@@ -137,7 +137,11 @@ const addon = require('./artifacts/win32-x64-msvc/napi_mbt.node');
 console.log(addon.mbt_add(2, 3)); // 输出: 5
 ```
 
-在 `napi-mbt.json` 中设置单一 N-API 版本。默认 v1 覆盖 Node 8.6–26；Threadsafe Function 需要 v4，BigInt 需要 v6。核心 Promise API 按当前 Node-API 头文件属于 v1。
+在 `napi-mbt.json` 中设置单一 N-API 版本。新项目默认 v4，与 napi-rs 对齐。Threadsafe Function 需要 v4，BigInt 需要 v6，带分离检查的 Buffer 访问需要 v7；核心 Promise API 属于 v1。原生 CLI 不依赖 Node。扩展的 `engines.node` 按 napi-rs 的 N-API 引入版本表及启用的 loader 模式推导，不统一要求 Node 22。默认双模式项目要求 Node `>=12.20.0 <13 || >=14.13.1`，具体要求写入生成的 package.json。
+
+配置遵循生成的 `napi-mbt.schema.json`：未知字段、错误类型、重复或不支持的目标和 feature，以及不满足的 N-API 版本都会报错。`cjs`、`esm` 默认同时启用，可以关闭其中任意一个，不能全部关闭。ESM 入口可独立使用。生成器同步条件入口、`.d.cts`/`.d.mts` 声明、引擎要求及管理的发布文件，保留其他元数据和导出子路径。`generate --check` 只检查，不写文件。
+
+loader 优先使用存在的本地构件；本地构件损坏时保留原始 `cause` 并报错。平台包的版本、目标和 N-API 元数据必须与根包一致。诊断包含目标、尝试路径和 N-API 版本，不支持的 OS/CPU/libc 会明确报错。`prepublish` 要求所有指定平台的构件齐全，也可用 `--target` 单独准备一个平台。
 
 ### 发包
 

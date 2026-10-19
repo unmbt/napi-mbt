@@ -6,11 +6,6 @@ fn cli_command() -> @argparse.Command {
     default_values=["."],
     num_args=ValueRange(lower=0, upper=1),
   )
-  let generator = @argparse.OptionArg(
-    "generator",
-    long="generator",
-    about="Generator: auto or moonbit (native)",
-  )
   let target = @argparse.OptionArg(
     "target",
     long="target",
@@ -34,7 +29,6 @@ fn cli_command() -> @argparse.Command {
         "generate",
         about="Generate bindings and loaders",
         positionals=[directory],
-        options=[generator],
         flags=[
           FlagArg(
             "check",
@@ -47,7 +41,7 @@ fn cli_command() -> @argparse.Command {
         "build",
         about="Build the native addon",
         positionals=[directory],
-        options=[generator, target],
+        options=[target],
         flags=[
           FlagArg("release", long="release", about="Release build"),
           FlagArg("dry-run", long="dry-run", about="Show build commands"),
@@ -87,11 +81,8 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
     return normalized
   }
   normalized.push(values.values.get("directory").unwrap()[0])
-  for option in ["name", "generator", "target"] {
+  for option in ["name", "target"] {
     if values.values.get(option) is Some([value, ..]) {
-      if option == "generator" {
-        validate_generator(value)
-      }
       normalized.push("--" + option)
       normalized.push(value)
     }

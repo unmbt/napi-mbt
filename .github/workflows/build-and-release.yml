@@ -78,6 +78,12 @@ jobs:
       - name: Check runtime error boundaries with a process timeout
         run: moon run scripts/test-runtime.mbtx
 
+      - name: Install TypeScript consumer checker
+        run: npm install --ignore-scripts --omit=optional
+
+      - name: Check loader modes and TypeScript consumers
+        run: moon run scripts/loader-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
+
       - name: Prepare Artifact
         shell: bash
         run: |

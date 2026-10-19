@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "napi-mbt configuration",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string"
+    },
+    "napiVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 10,
+      "default": 4
+    },
+    "builder": {
+      "enum": [
+        "auto",
+        "cmake",
+        "gcc",
+        "clang",
+        "msvc"
+      ],
+      "default": "auto"
+    },
+    "targets": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "win32-x64-msvc",
+          "darwin-x64",
+          "darwin-arm64",
+          "linux-x64-gnu",
+          "linux-arm64-gnu"
+        ]
+      }
+    },
+    "features": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "promise",
+          "threadsafe_function",
+          "bigint",
+          "buffer"
+        ]
+      }
+    },
+    "cjs": {
+      "type": "boolean",
+      "default": true
+    },
+    "esm": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "not": {
+    "required": [
+      "cjs",
+      "esm"
+    ],
+    "properties": {
+      "cjs": {
+        "const": false
+      },
+      "esm": {
+        "const": false
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "promise"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "threadsafe_function"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 4
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "bigint"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 6
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "buffer"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 7
+          }
+        }
+      }
+    }
+  ]
+}

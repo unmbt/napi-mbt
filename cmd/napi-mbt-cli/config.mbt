@@ -24,16 +24,6 @@ fn windows() -> Bool {
 }
 
 ///|
-fn validate_generator(value : String) -> Unit raise {
-  if value == "node" {
-    fail("The Node generator was removed; use --generator=auto or moonbit")
-  }
-  if value != "auto" && value != "moonbit" {
-    fail("Unknown generator: \{value}; expected auto or moonbit")
-  }
-}
-
-///|
 fn object(value : Json) -> Map[String, Json] raise {
   guard value is Object(items) else { fail("Expected a JSON object") }
   items
@@ -66,6 +56,22 @@ fn strings(items : Map[String, Json], key : String) -> Array[String] raise {
 }
 
 ///|
+fn unique_strings(
+  items : Map[String, Json],
+  key : String,
+) -> Array[String] raise {
+  let values = strings(items, key)
+  let seen : Map[String, Bool] = Map([])
+  for value in values {
+    if seen.contains(value) {
+      fail("Duplicate \{key} value: \{value}")
+    }
+    seen[value] = true
+  }
+  values
+}
+
+///|
 async fn read_object(
   path : String,
   required~ : Bool = false,
@@ -87,10 +93,11 @@ async fn write_json(path : String, value : Json) -> Unit {
 ///|
 struct Config {
   napi_version : Int32
-  generator : String
   builder : String
   targets : Array[String]
   features : Array[String]
+  cjs : Bool
+  esm : Bool
 }
 
 ///|
@@ -105,18 +112,38 @@ fn feature_version(name : String) -> Int32 raise {
 }
 
 ///|
-async fn config(dir : String, override_generator : String?) -> Config {
-  let items = read_object(dir + "/napi-mbt.json")
-  let version = match items.get("napiVersion") {
-    None => 1
-    Some(Number(n, ..)) if n >= 1 &&
-      n <= 2147483647.0 &&
-      n == n.to_int().to_double() => n.to_int()
-    _ => fail("napiVersion must be a positive integer")
+fn parse_config(value : Json) -> Config raise {
+  let items = object(value)
+  for key in items.keys() {
+    if ![
+        "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
+      ].contains(key) {
+      fail("Unknown napi-mbt.json field: \{key}")
+    }
   }
-  let generator = override_generator.unwrap_or(str(items, "generator", "auto"))
-  validate_generator(generator)
-  let features = strings(items, "features")
+  ignore(str(items, "$schema", ""))
+  let version = match items.get("napiVersion") {
+    None => 4
+    Some(Number(n, ..)) if n >= 1 && n <= 10 && n == n.to_int().to_double() =>
+      n.to_int()
+    _ => fail("napiVersion must be an integer from 1 to 10")
+  }
+  let cjs = boolean(items, "cjs", true)
+  let esm = boolean(items, "esm", true)
+  if !cjs && !esm {
+    fail("At least one of cjs and esm must be enabled")
+  }
+  let builder = str(items, "builder", "auto")
+  if !["auto", "cmake", "gcc", "clang", "msvc"].contains(builder) {
+    fail("Unknown builder: \{builder}")
+  }
+  let targets = unique_strings(items, "targets")
+  for target in targets {
+    if !supported_targets.contains(target) {
+      fail("Unsupported target: \{target}")
+    }
+  }
+  let features = unique_strings(items, "features")
   for feature in features {
     let required = feature_version(feature)
     if version < required {
@@ -125,11 +152,24 @@ async fn config(dir : String, override_generator : String?) -> Config {
       )
     }
   }
-  {
-    napi_version: version,
-    generator,
-    builder: str(items, "builder", "auto"),
-    targets: strings(items, "targets"),
-    features,
+  { napi_version: version, builder, targets, features, cjs, esm, }
+}
+
+///|
+fn boolean(
+  items : Map[String, Json],
+  key : String,
+  fallback : Bool,
+) -> Bool raise {
+  match items.get(key) {
+    None => fallback
+    Some(True) => true
+    Some(False) => false
+    _ => fail("\{key} must be a boolean")
   }
+}
+
+///|
+async fn config(dir : String) -> Config {
+  parse_config(Json(read_object(dir + "/napi-mbt.json")))
 }

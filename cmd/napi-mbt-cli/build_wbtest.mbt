@@ -114,8 +114,8 @@ test "export ordering is lexical rather than length based" {
 }
 
 ///|
-test "removed node generator is rejected" {
-  try validate_generator("node") catch {
+test "generator selector is not an accepted CLI option" {
+  try parse_cli(["generate", "--generator=moonbit"]) catch {
     _ => ()
   } noraise {
     _ => fail("Node must not be available")

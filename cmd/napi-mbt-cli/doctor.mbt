@@ -174,7 +174,7 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
 async fn doctor(directory : String, json : Bool) -> Unit {
   let report = try {
     let dir = @fs.realpath(directory)
-    let conf = config(dir, None)
+    let conf = config(dir)
     let toolchain = detect_toolchain(dir, conf.builder)
     defer toolchain.close()
     toolchain.report

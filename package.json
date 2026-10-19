@@ -12,12 +12,27 @@
   "main": "index.cjs",
   "module": "index.mjs",
   "types": "index.d.ts",
-  "files": ["index.cjs", "index.mjs", "index.d.ts", "README.md", "README.zh.md", "LICENSE"],
+  "files": [
+    "README.md",
+    "README.zh.md",
+    "LICENSE",
+    "index.d.ts",
+    "napi_manifest.json",
+    "index.cjs",
+    "index.d.cts",
+    "index.mjs",
+    "index.d.mts"
+  ],
   "exports": {
     ".": {
-      "types": "./index.d.ts",
-      "require": "./index.cjs",
-      "import": "./index.mjs",
+      "require": {
+        "types": "./index.d.cts",
+        "default": "./index.cjs"
+      },
+      "import": {
+        "types": "./index.d.mts",
+        "default": "./index.mjs"
+      },
       "default": "./index.cjs"
     }
   },
@@ -35,5 +50,8 @@
     "napi-mbt-win32-x64-msvc": "0.1.0",
     "napi-mbt-darwin-arm64": "0.1.0",
     "napi-mbt-linux-x64-gnu": "0.1.0"
+  },
+  "engines": {
+    "node": ">=12.20.0 <13 || >=14.13.1"
   }
 }

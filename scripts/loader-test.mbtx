@@ -1,0 +1,48 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let (code, out, err) = @process.collect_output(binary, args)
+    if code != 0 { fail(out.text() + err.text()) }
+  })
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-loader-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project 空格"
+  checked(binary, ["init", dir, "--name", "loader-fixture"])
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  for (mode, cjs, esm) in [("dual", true, true), ("esm", false, true), ("cjs", true, false)] {
+    @fs.write_file(dir + "/napi-mbt.json", ({ "napiVersion": 4, "cjs": cjs, "esm": esm } : Json).stringify())
+    checked(binary, ["generate", dir])
+    checked(binary, ["generate", dir, "--check"])
+    checked(binary, ["prepublish", dir, "--target", target])
+    checked("node", ["scripts/loader.test.cjs", dir, mode, target])
+    // Resolve conditional declaration branches as an installed consumer would.
+    let project = dir.replace_all(old="\\", new="/")
+    let consumer = temp + "/consumer-" + mode
+    @fs.mkdir(consumer + "/node_modules", recursive=true)
+    @fs.symlink(target=project, consumer + "/node_modules/loader-fixture")
+    let source = "import { mbt_add } from 'loader-fixture';\nconst value: number = mbt_add(1, 2);\n// @ts-expect-error wrong argument type\nmbt_add('one', 2);\n// @ts-expect-error missing argument\nmbt_add(1);\n"
+    let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--skipLibCheck", "--module", "NodeNext", "--moduleResolution", "NodeNext"]
+    if cjs {
+      @fs.write_file(consumer + "/check.cts", source)
+      args.push(consumer + "/check.cts")
+    }
+    if esm {
+      @fs.write_file(consumer + "/check.mts", source + "import addon from 'loader-fixture';\nconst other: number = addon.mbt_add(1, 2);\n")
+      args.push(consumer + "/check.mts")
+    }
+    checked("node", args)
+    if esm {
+      checked("node", ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--skipLibCheck", "--module", "ESNext", "--moduleResolution", "Bundler", consumer + "/check.mts"])
+    }
+    @fs.remove(consumer + "/node_modules/loader-fixture")
+  }
+  println("Loader/configuration CJS, ESM, NodeNext and Bundler consumer tests passed")
+}

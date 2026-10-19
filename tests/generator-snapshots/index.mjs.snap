@@ -1,6 +1,65 @@
 import { createRequire } from 'module';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 const require = createRequire(import.meta.url);
-const addon = require('./index.cjs');
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const path = require('path');
+const fs = require('fs');
+const requiredNapi = 7;
+const actualNapi = Number(process.versions && process.versions.napi || 0);
+let target = process.platform + '-' + process.arch;
+const attemptedPaths = [];
+function failure(code, detail, cause) {
+  const error = new Error(detail + ' [target=' + target + ', N-API=' + actualNapi + ', required=' + requiredNapi + ', paths=' + attemptedPaths.join(', ') + ']');
+  error.code = code;
+  error.target = target;
+  error.requiredNapiVersion = requiredNapi;
+  error.actualNapiVersion = actualNapi;
+  error.attemptedPaths = attemptedPaths.slice();
+  if (cause !== undefined) error.cause = cause;
+  return error;
+}
+if (process.platform === 'win32' && process.arch === 'x64') {
+  target += '-msvc';
+} else if (process.platform === 'darwin' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
+  // Both Darwin architectures use the system C library.
+} else if (process.platform === 'linux' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
+  let glibc = false;
+  try {
+    if (process.report && process.report.getReport) {
+      glibc = Boolean(process.report.getReport().header.glibcVersionRuntime);
+    } else {
+      glibc = /GNU C Library|GNU libc|GLIBC/.test(fs.readFileSync('/usr/bin/ldd', 'utf8'));
+    }
+  } catch (cause) {
+    throw failure('ERR_NAPI_PLATFORM', 'Cannot identify Linux libc', cause);
+  }
+  if (!glibc) throw failure('ERR_NAPI_PLATFORM', 'Unsupported Linux libc; glibc is required');
+  target += '-gnu';
+} else {
+  throw failure('ERR_NAPI_PLATFORM', 'Unsupported OS or CPU');
+}
+if (actualNapi < requiredNapi) throw failure('ERR_NAPI_VERSION', 'Unsupported Node-API version');
+const local = path.join(__dirname, 'artifacts', target, 'napi_mbt.node');
+attemptedPaths.push(local);
+let addon;
+if (fs.existsSync(local)) {
+  try { addon = require(local); }
+  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load local addon', cause); }
+} else {
+  const packageName = "snapshot-fixture-" + target;
+  const metadataPath = packageName + '/package.json';
+  attemptedPaths.push(metadataPath);
+  let metadata;
+  try { metadata = require(metadataPath); }
+  catch (cause) { throw failure('ERR_NAPI_PACKAGE', 'Cannot load platform package metadata', cause); }
+  if (metadata.name !== packageName || metadata.version !== "0.1.0" || metadata.napiVersion !== requiredNapi || metadata.napiTarget !== target) {
+    throw failure('ERR_NAPI_PACKAGE_VERSION', 'Platform package metadata mismatch; expected ' + packageName + '@' + "0.1.0");
+  }
+  attemptedPaths.push(packageName);
+  try { addon = require(packageName); }
+  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
+}
 export default addon;
 export const noop = addon.noop;
 export const public_name = addon.public_name;

@@ -1,10 +1,58 @@
 const path = require('path');
+const fs = require('fs');
 const requiredNapi = 7;
 const actualNapi = Number(process.versions && process.versions.napi || 0);
-if (actualNapi < requiredNapi) throw new Error('This native module requires N-API ' + requiredNapi + ', found ' + actualNapi);
 let target = process.platform + '-' + process.arch;
-if (process.platform === 'win32') target += '-msvc';
-if (process.platform === 'linux') target += '-gnu';
+const attemptedPaths = [];
+function failure(code, detail, cause) {
+  const error = new Error(detail + ' [target=' + target + ', N-API=' + actualNapi + ', required=' + requiredNapi + ', paths=' + attemptedPaths.join(', ') + ']');
+  error.code = code;
+  error.target = target;
+  error.requiredNapiVersion = requiredNapi;
+  error.actualNapiVersion = actualNapi;
+  error.attemptedPaths = attemptedPaths.slice();
+  if (cause !== undefined) error.cause = cause;
+  return error;
+}
+if (process.platform === 'win32' && process.arch === 'x64') {
+  target += '-msvc';
+} else if (process.platform === 'darwin' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
+  // Both Darwin architectures use the system C library.
+} else if (process.platform === 'linux' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
+  let glibc = false;
+  try {
+    if (process.report && process.report.getReport) {
+      glibc = Boolean(process.report.getReport().header.glibcVersionRuntime);
+    } else {
+      glibc = /GNU C Library|GNU libc|GLIBC/.test(fs.readFileSync('/usr/bin/ldd', 'utf8'));
+    }
+  } catch (cause) {
+    throw failure('ERR_NAPI_PLATFORM', 'Cannot identify Linux libc', cause);
+  }
+  if (!glibc) throw failure('ERR_NAPI_PLATFORM', 'Unsupported Linux libc; glibc is required');
+  target += '-gnu';
+} else {
+  throw failure('ERR_NAPI_PLATFORM', 'Unsupported OS or CPU');
+}
+if (actualNapi < requiredNapi) throw failure('ERR_NAPI_VERSION', 'Unsupported Node-API version');
+const local = path.join(__dirname, 'artifacts', target, 'napi_mbt.node');
+attemptedPaths.push(local);
 let addon;
-try { addon = require("napi-mbt-" + target); } catch (e) { addon = require(path.join(__dirname, 'artifacts', target, 'napi_mbt.node')); }
+if (fs.existsSync(local)) {
+  try { addon = require(local); }
+  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load local addon', cause); }
+} else {
+  const packageName = "napi-mbt-" + target;
+  const metadataPath = packageName + '/package.json';
+  attemptedPaths.push(metadataPath);
+  let metadata;
+  try { metadata = require(metadataPath); }
+  catch (cause) { throw failure('ERR_NAPI_PACKAGE', 'Cannot load platform package metadata', cause); }
+  if (metadata.name !== packageName || metadata.version !== "0.1.0" || metadata.napiVersion !== requiredNapi || metadata.napiTarget !== target) {
+    throw failure('ERR_NAPI_PACKAGE_VERSION', 'Platform package metadata mismatch; expected ' + packageName + '@' + "0.1.0");
+  }
+  attemptedPaths.push(packageName);
+  try { addon = require(packageName); }
+  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
+}
 module.exports = addon;

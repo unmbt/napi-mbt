@@ -6,7 +6,8 @@
     "buffer"
   ],
   "targets": [],
-  "generator": "auto",
+  "cjs": true,
+  "esm": true,
   "builder": "auto",
   "exports": [
     {

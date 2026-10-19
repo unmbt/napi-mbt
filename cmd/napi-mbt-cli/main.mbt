@@ -4,7 +4,7 @@ async fn main {
   let options : Map[String, String] = Map([])
   let flags : Array[String] = []
   for i = 2; i < args.length(); {
-    if ["--name", "--generator", "--target"].contains(args[i]) {
+    if ["--name", "--target"].contains(args[i]) {
       options[args[i]] = args[i + 1]
       continue i + 2
     } else {
@@ -22,17 +22,13 @@ async fn main {
   match args[0] {
     "doctor" => doctor(dir, flags.contains("--json"))
     "init" => initialize(dir, options.get("--name"), flags.contains("--force"))
-    "generate" =>
-      ignore(
-        generate(dir, flags.contains("--check"), options.get("--generator")),
-      )
+    "generate" => ignore(generate(dir, flags.contains("--check")))
     "build" =>
       build(
         dir,
         flags.contains("--release"),
         flags.contains("--dry-run"),
         options.get("--target"),
-        options.get("--generator"),
       )
     "prepublish" => prepublish(dir, options.get("--target"))
     _ => fail("Unknown command")

@@ -6,7 +6,7 @@
   </p>
 
   <p>
-    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-%3E%3D8.6-brightgreen?logo=node.js&logoColor=white" alt="Node.js version" /></a>
+    <a href="https://nodejs.org"><img src="https://img.shields.io/badge/Node.js-Node--API-brightgreen?logo=node.js&logoColor=white" alt="Node-API support depends on configured features" /></a>
     <a href="https://www.moonbitlang.com/"><img src="https://img.shields.io/badge/MoonBit-Native-blueviolet?logo=moon&logoColor=white" alt="MoonBit Native" /></a>
     <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License" /></a>
     <img src="https://img.shields.io/badge/Status-Beta-orange" alt="Status" />
@@ -90,7 +90,7 @@ On Windows PowerShell:
 irm https://raw.githubusercontent.com/unmbt/napi-mbt/master/scripts/install.ps1 | iex
 ```
 
-`moon install` and the Release installer provide the same standalone CLI. The old npm CLI package and Node fallback are retired. Use `--generator=auto` or `--generator=moonbit`; the old `node` value produces a migration error. No `node_modules` directory is required. Build resources are extracted into the ignored `.napi-mbt/` directory.
+`moon install` and the Release installer provide the same standalone CLI. One AST-based generator validates signatures and produces every artifact. No `node_modules` directory is required. Build resources are extracted into the ignored `.napi-mbt/` directory.
 
 ### 2. Project Setup
 
@@ -136,7 +136,11 @@ const addon = require('./artifacts/win32-x64-msvc/napi_mbt.node');
 console.log(addon.mbt_add(2, 3)); // Output: 5
 ```
 
-Set one package-wide N-API version in `napi-mbt.json`. The default v1 covers Node 8.6–26; Threadsafe Function requires v4 and BigInt requires v6. Core Promise APIs are v1 according to the Node-API headers.
+Set one package-wide N-API version in `napi-mbt.json`. New projects default to v4, matching napi-rs. Threadsafe Function requires v4, BigInt v6, and checked Buffer access v7. Core Promise APIs are v1. The native CLI does not require Node. Addon `engines.node` follows napi-rs's N-API introduction table and the enabled loader modes; it does not impose a blanket Node 22 minimum. Default dual-mode projects require Node `>=12.20.0 <13 || >=14.13.1`; the generated package records the precise requirement.
+
+Configuration is checked against the contract in `napi-mbt.schema.json`: unknown fields, wrong types, duplicate or unsupported targets/features, and incompatible N-API levels fail. `cjs` and `esm` both default to `true`; either can be disabled, but at least one must remain enabled. ESM works independently. Generation synchronizes conditional entry points, `.d.cts`/`.d.mts` declarations, engines and the managed file list while preserving other metadata and export subpaths. `generate --check` validates without writing.
+
+Loaders prefer an existing local artifact. A broken local artifact fails with its original error as `cause`, without silently loading another binary. Platform packages must match the root version, target and N-API metadata. Diagnostics include the target, attempted paths and N-API versions; unsupported OS/CPU/libc combinations are rejected explicitly. `prepublish` requires every requested artifact; use `--target` to prepare one platform.
 
 ### Release and publish
 

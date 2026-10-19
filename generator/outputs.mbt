@@ -105,30 +105,3 @@ fn declarations(exports : Array[ParsedExport]) -> String {
   .join("\n") +
   "\n"
 }
-
-///|
-fn loaders(
-  exports : Array[ParsedExport],
-  package_name : String,
-  version : Int32,
-) -> (String, String) {
-  let name = Json(package_name + "-").stringify()
-  let cjs =
-    $|const path = require('path');
-    $|const requiredNapi = \{version};
-    $|const actualNapi = Number(process.versions && process.versions.napi || 0);
-    $|if (actualNapi < requiredNapi) throw new Error('This native module requires N-API ' + requiredNapi + ', found ' + actualNapi);
-    $|let target = process.platform + '-' + process.arch;
-    $|if (process.platform === 'win32') target += '-msvc';
-    $|if (process.platform === 'linux') target += '-gnu';
-    $|let addon;
-    $|try { addon = require(\{name} + target); } catch (e) { addon = require(path.join(__dirname, 'artifacts', target, 'napi_mbt.node')); }
-    $|module.exports = addon;
-    $|
-  let esm = "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);\nconst addon = require('./index.cjs');\nexport default addon;\n" +
-    exports
-    .map(item => "export const \{item.export_name} = addon.\{item.export_name};")
-    .join("\n") +
-    "\n"
-  (cjs, esm)
-}

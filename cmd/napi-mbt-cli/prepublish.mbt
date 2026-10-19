@@ -6,7 +6,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
   if name.is_empty() || version.is_empty() {
     fail("package.json requires name and version")
   }
-  let conf = config(dir, None)
+  let conf = config(dir)
   let targets = match target_override {
     Some(target) => [target]
     None => if conf.targets.is_empty() { [host_target()] } else { conf.targets }
@@ -15,14 +15,20 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     if !supported_targets.contains(target) {
       fail("Unsupported target: \{target}")
     }
+    if !@fs.exists(dir + "/artifacts/" + target + "/napi_mbt.node") {
+      fail(
+        "Missing release artifact for \{target}; build every requested target before prepublish",
+      )
+    }
   }
+  ignore(generate(dir, false))
   let optional = match pkg.get("optionalDependencies") {
     Some(value) => object(value)
     None => Map([])
   }
   if target_override is None {
     for key in optional.keys().to_array() {
-      if key.has_prefix(name + "-") {
+      if supported_targets.any(target => key == name + "-" + target) {
         optional.remove(key)
       }
     }
@@ -37,37 +43,25 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       "os": [parts[0].to_owned()],
       "cpu": [parts[1].to_owned()],
       "main": "napi_mbt.node",
-      "files": ["napi_mbt.node", "index.mjs"],
-      "exports": {
-        ".": {
-          "require": "./napi_mbt.node",
-          "import": "./index.mjs",
-          "default": "./napi_mbt.node",
-        },
-      },
-      "engines": { "node": ">=8.6" },
+      "files": ["napi_mbt.node"],
+      "exports": { ".": "./napi_mbt.node", "./package.json": "./package.json" },
+      "engines": { "node": node_engine(conf.napi_version, false) },
       "napiVersion": conf.napi_version,
+      "napiTarget": target,
     })
     if parts[0] == "linux" {
       child["libc"] = ["glibc"]
     }
     mkdirp(path, recursive=true)
     let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
-    if @fs.exists(artifact) {
-      write_file(path + "/napi_mbt.node", @fs.read_file(artifact))
-    } else {
-      println(
-        "[napi-mbt] no artifact for \{target}; metadata was generated for CI cross-builds",
-      )
-    }
+    write_file(path + "/napi_mbt.node", @fs.read_file(artifact))
     write_json(path + "/package.json", Json(child))
-    write_file(
-      path + "/index.mjs",
-      "import { createRequire } from 'module';\nconst require = createRequire(import.meta.url);\nexport default require('./napi_mbt.node');\n",
-    )
+    if @fs.exists(path + "/index.mjs") {
+      @fs.remove(path + "/index.mjs")
+    }
     optional[child_name] = Json(version)
   }
   pkg["optionalDependencies"] = Json(optional)
-  write_json(dir + "/package.json", Json(pkg))
+  write_json(dir + "/package.json", package_metadata(pkg, conf))
   println("[napi-mbt] prepared \{targets.length()} platform package(s)")
 }

@@ -5,12 +5,8 @@ struct Generated {
 }
 
 ///|
-async fn generate(
-  dir : String,
-  check : Bool,
-  override_generator : String?,
-) -> Generated {
-  let conf = config(dir, override_generator)
+async fn generate(dir : String, check : Bool) -> Generated {
+  let conf = config(dir)
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
     "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt",
@@ -59,6 +55,9 @@ async fn generate(
     exports,
     str(pkg, "name", "napi-mbt-package"),
     conf.napi_version,
+    package_version=str(pkg, "version", "0.1.0"),
+    cjs=conf.cjs,
+    esm=conf.esm,
   )
   let manifest : Json = {
     "runtimeTemplateVersion": @assets.runtime_version(),
@@ -66,12 +65,26 @@ async fn generate(
     "requiredNapiVersion": conf.napi_version,
     "features": features,
     "targets": conf.targets,
-    "generator": conf.generator,
+    "cjs": conf.cjs,
+    "esm": conf.esm,
     "builder": conf.builder,
     "exports": exports.map(e => e.manifest()),
   }
   outputs.push(("napi_manifest.json", manifest.stringify(indent=2) + "\n"))
-  install_outputs(dir, outputs, check)
+  outputs.push(
+    ("napi-mbt.schema.json", config_schema().stringify(indent=2) + "\n"),
+  )
+  outputs.push(
+    ("package.json", package_metadata(pkg, conf).stringify(indent=2) + "\n"),
+  )
+  let removals = []
+  if !conf.cjs {
+    removals.append(["index.cjs", "index.d.cts"])
+  }
+  if !conf.esm {
+    removals.append(["index.mjs", "index.d.mts"])
+  }
+  install_outputs(dir, outputs, check, removals~)
   if !check {
     println("Generated \{exports.length()} N-API export(s).")
   }

@@ -4,10 +4,9 @@ async fn build(
   release : Bool,
   dry_run : Bool,
   target_override : String?,
-  generator_override : String?,
 ) -> Unit {
   let dir = @fs.realpath(directory)
-  let conf = config(dir, generator_override)
+  let conf = config(dir)
   let target = target_override.unwrap_or(host_target())
   if !conf.targets.is_empty() && !conf.targets.contains(target) {
     fail("Target \{target} is not listed in napi-mbt.json")
@@ -27,7 +26,7 @@ async fn build(
   }
   let toolchain = detect_toolchain(dir, conf.builder)
   defer toolchain.close()
-  let generated = generate(dir, false, generator_override)
+  let generated = generate(dir, false)
   let workspace = @fs.tmpdir(prefix="napi-mbt-build-")
   defer @fs.rmdir(workspace, recursive=true)
   copy_build_workspace(dir, workspace, [])

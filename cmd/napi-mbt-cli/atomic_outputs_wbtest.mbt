@@ -21,11 +21,13 @@ async test "output batch restores earlier files after a later rename fails" {
   let dir = @fs.tmpdir(prefix="napi-mbt-atomic-")
   defer @fs.rmdir(dir, recursive=true)
   write_file(dir + "/one.txt", "original")
+  write_file(dir + "/disabled.txt", "restore me")
   try
     install_outputs(
       dir,
       [("one.txt", "changed"), ("missing/two.txt", "new")],
       false,
+      removals=["disabled.txt"],
     )
   catch {
     _ => ()
@@ -33,6 +35,7 @@ async test "output batch restores earlier files after a later rename fails" {
     _ => fail("Expected failed installation")
   }
   assert_eq(@fs.read_file(dir + "/one.txt").text(), "original")
+  assert_eq(@fs.read_file(dir + "/disabled.txt").text(), "restore me")
   assert_true(!@fs.exists(dir + "/missing/two.txt"))
   install_outputs(dir, [("one.txt", "changed"), ("two.txt", "new")], false)
   assert_eq(@fs.read_file(dir + "/one.txt").text(), "changed")

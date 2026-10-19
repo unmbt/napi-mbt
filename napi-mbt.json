@@ -1,6 +1,5 @@
 {
   "napiVersion": 7,
-  "generator": "auto",
   "builder": "auto",
   "targets": [
     "win32-x64-msvc",

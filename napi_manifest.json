@@ -10,7 +10,8 @@
     "darwin-arm64",
     "linux-x64-gnu"
   ],
-  "generator": "auto",
+  "cjs": true,
+  "esm": true,
   "builder": "auto",
   "exports": [
     {

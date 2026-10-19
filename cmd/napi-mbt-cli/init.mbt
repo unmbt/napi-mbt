@@ -38,8 +38,8 @@ async fn initialize(
   files["package.json"] = pkg_json.stringify(indent=2) + "\n"
   files["napi-mbt.json"] = (
       {
-        "napiVersion": 1,
-        "generator": "auto",
+        "$schema": "./napi-mbt.schema.json",
+        "napiVersion": 4,
         "builder": "auto",
         "targets": ["win32-x64-msvc", "darwin-arm64", "linux-x64-gnu"],
         "features": [],
@@ -121,6 +121,6 @@ async fn initialize(
     }
     write_file(path, text)
   }
-  ignore(generate(dir, false, None))
+  ignore(generate(dir, false))
   println("[napi-mbt] initialized \{dir}")
 }

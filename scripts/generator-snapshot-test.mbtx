@@ -19,7 +19,7 @@ async fn main {
   checked(binary, ["generate", dir])
   let expected = "tests/generator-snapshots"
   if update && !@fs.exists(expected) { @fs.mkdir(expected, recursive=true) }
-  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.cjs", "index.mjs", "napi_manifest.json"] {
+  for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.d.cts", "index.d.mts", "index.cjs", "index.mjs", "napi_manifest.json", "package.json", "napi-mbt.schema.json"] {
     let actual = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
     if update { @fs.write_file(expected + "/" + name + ".snap", actual) }
     assert_eq(actual, @fs.read_file(expected + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
