@@ -164,6 +164,16 @@ MOONBIT_FFI_EXPORT int napi_mbt_async_schedule(napi_env env) {
 MOONBIT_FFI_EXPORT int napi_mbt_async_closing(napi_env env) {
     return !napi_mbt_active || napi_mbt_active->env != env || napi_mbt_active->closing;
 }
+MOONBIT_FFI_EXPORT int napi_mbt_async_promise_create(napi_env env, napi_value executor, napi_value *result) {
+    napi_value global, constructor;
+    napi_status status = napi_get_global(env, &global);
+    if (status == napi_ok) status = napi_get_named_property(env, global, "Promise", &constructor);
+    if (status == napi_ok) status = napi_new_instance(env, constructor, 1, &executor, result);
+    bool is_promise = false;
+    if (status == napi_ok) status = napi_is_promise(env, *result, &is_promise);
+    if (status == napi_ok && !is_promise) status = napi_invalid_arg;
+    return (int)status;
+}
 MOONBIT_FFI_EXPORT napi_env napi_mbt_current_env(void) {
     return napi_mbt_active ? napi_mbt_active->env : NULL;
 }

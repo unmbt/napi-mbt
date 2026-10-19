@@ -49,4 +49,11 @@ JS timer. Standard stream handles/buffers and scheduler state are per environmen
 Worker shutdown cancels tasks and waits for I/O cleanup without calling JS or
 settling Promises in the closing environment. See [adapter details](async-adapter.md)
 and [executed validation](validation.md). Run `moon run scripts/async-exports-test.mbtx`
-and the async variant of `scripts/lifecycle-sanitizer.mbtx` to exercise the native addon.
+and `moon run scripts/sanitizer-test.mbtx` for the parser and native memory gates.
+
+Async exports construct a Promise in the current JS realm and retain its resolver
+functions as environment-owned callbacks. Settlement or teardown releases those
+references. This avoids retaining an unsettled `napi_deferred`, which has no
+Node-API release operation when a worker is terminated. A replacement Promise
+constructor must invoke its executor synchronously with two functions; invalid
+constructors and later executor calls fail with `ERR_NAPI_PROMISE_EXECUTOR`.

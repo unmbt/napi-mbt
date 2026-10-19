@@ -56,11 +56,72 @@ fn napi_async_submit(env : NapiEnv, task : async () -> Unit) -> @napi_mbt_async.
 ///|
 priv struct NapiAsyncCall {
   env : NapiEnv
-  promise : NapiPromise
+  promise : NapiAsyncPromise
   mut task : @napi_mbt_async.Task?
   mut signal : NapiReference?
   mut listener : NapiReference?
   pin : NapiReference
+}
+
+///|
+// Node-API provides no release operation for an unsettled napi_deferred.
+// Own JS resolver references instead so worker teardown can release them
+// without entering JavaScript or settling a Promise in a closing environment.
+priv struct NapiAsyncPromise {
+  mut promise : NapiValue
+  mut resolve : NapiCallback?
+  mut reject : NapiCallback?
+  mut accepting : Bool
+  mut settled : Bool
+}
+
+///|
+#borrow(result)
+extern "c" fn napi_async_promise_create(env : NapiEnv, executor : NapiValue, result : Ref[NapiValue]) -> Int32 = "napi_mbt_async_promise_create"
+
+///|
+fn NapiAsyncPromise::dispose(self : NapiAsyncPromise) -> Unit {
+  let resolve = self.resolve
+  let reject = self.reject
+  self.resolve = None
+  self.reject = None
+  self.accepting = false
+  self.settled = true
+  if resolve is Some(callback) { callback.dispose() catch { _ => () } }
+  if reject is Some(callback) { callback.dispose() catch { _ => () } }
+}
+
+///|
+fn napi_async_promise_new(env : NapiEnv) -> NapiAsyncPromise raise {
+  let state : NapiAsyncPromise = { promise: moonbit_dummy_napi_value(), resolve: None, reject: None, accepting: true, settled: false }
+  errdefer state.dispose()
+  defer { state.accepting = false }
+  let executor = napi_closure_new(env, fn(env, args) {
+    try {
+      if !state.accepting { raise napi_failure(1, TypeError, "ERR_NAPI_PROMISE_EXECUTOR", "Promise executor invoked outside construction") }
+      state.accepting = false
+      args.require(2)
+      state.resolve = Some(NapiCallback::new(env, args.get(env, 0)))
+      state.reject = Some(NapiCallback::new(env, args.get(env, 1)))
+      set_Unit(env, ())
+    } catch { error => { throw_napi_error(env, error); moonbit_dummy_napi_value() } }
+  })
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(env, napi_async_promise_create(env, executor, result), b"Constructing async Promise")
+  if state.resolve is None || state.reject is None { raise napi_failure(1, TypeError, "ERR_NAPI_PROMISE_EXECUTOR", "Promise constructor did not provide resolvers") }
+  state.promise = result.val
+  state
+}
+
+///|
+fn NapiAsyncPromise::settle(self : NapiAsyncPromise, env : NapiEnv, value : NapiValue, reject~ : Bool) -> Unit raise {
+  if self.settled { raise napi_failure(1, Error, "ERR_NAPI_PROMISE_SETTLED", "Promise has already settled") }
+  self.settled = true
+  defer self.dispose()
+  guard (if reject { self.reject } else { self.resolve }) is Some(callback) else { raise napi_failure(1, Error, "ERR_NAPI_PROMISE_EXECUTOR", "Missing Promise resolver") }
+  let args = napi_array_new(env, 1)
+  napi_array_set(env, args, 0, value)
+  ignore(callback.call(args))
 }
 
 ///|
@@ -91,6 +152,7 @@ fn napi_signal_get(env : NapiEnv, object : NapiValue, name : Bytes) -> NapiValue
 
 ///|
 fn NapiAsyncCall::cleanup(self : NapiAsyncCall) -> Unit {
+  self.promise.dispose()
   // Clear fields before invoking JS: removeEventListener may reenter the addon.
   let signal = self.signal
   let listener = self.listener
@@ -110,7 +172,7 @@ fn NapiAsyncCall::cleanup(self : NapiAsyncCall) -> Unit {
 ///|
 fn NapiAsyncCall::reject(self : NapiAsyncCall, error : Error) -> Unit {
   if !self.promise.settled && !napi_async_closing(self.env) {
-    try { napi_promise_reject(self.env, self.promise, napi_error_value(self.env, error)) }
+    try { self.promise.settle(self.env, napi_error_value(self.env, error), reject=true) }
     catch { error => { eprintln("napi-mbt: rejecting async call: " + (error : Error).to_string()) } }
   }
   self.cleanup()
@@ -124,7 +186,7 @@ fn NapiAsyncCall::abort(self : NapiAsyncCall) -> Unit {
     if self.signal is Some(signal) {
       let reason = Ref(moonbit_dummy_napi_value())
       result_from_status(self.env, napi_abort_reason(self.env, signal.get(self.env), reason), b"Reading abort reason")
-      napi_promise_reject(self.env, self.promise, reason.val)
+      self.promise.settle(self.env, reason.val, reject=true)
     }
   } catch { error => self.reject(error) }
   if task is Some(task) {
@@ -152,7 +214,7 @@ fn NapiAsyncCall::listen(self : NapiAsyncCall, options : NapiValue) -> Unit rais
 
 ///|
 fn napi_async_call_new(env : NapiEnv) -> NapiAsyncCall raise {
-  { env, promise: napi_promise_new(env), task: None, signal: None, listener: None, pin: napi_reference_empty() }
+  { env, promise: napi_async_promise_new(env), task: None, signal: None, listener: None, pin: napi_reference_empty() }
 }
 
 ///|
@@ -163,7 +225,7 @@ fn NapiAsyncCall::start(self : NapiAsyncCall, work : async () -> NapiValue) -> U
     if self.promise.settled || napi_async_closing(self.env) { return }
     try {
       let result = work()
-      if !self.promise.settled && !napi_async_closing(self.env) { napi_promise_resolve(self.env, self.promise, result) }
+      if !self.promise.settled && !napi_async_closing(self.env) { self.promise.settle(self.env, result, reject=false) }
     } catch { error => self.reject(error) }
   }))
 }

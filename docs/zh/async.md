@@ -42,4 +42,9 @@ await result // 拒绝值就是上面同一个 Error
 worker 关闭时取消任务并等待 I/O 清理，不在关闭中的环境调用 JS 或 settle Promise。
 参见 [适配实现](async-adapter.md) 和 [实际验证记录](../validation.md)。
 `moon run scripts/async-exports-test.mbtx` 运行真实 addon 用例，
-`scripts/lifecycle-sanitizer.mbtx --async-exports` 提供对应内存检查入口。
+`moon run scripts/sanitizer-test.mbtx` 统一执行 parser 和原生内存检查。
+
+异步导出在当前 JS realm 构造 Promise，并将 resolve/reject 函数作为环境所属的
+callback 引用持有；完成或关闭时释放。这样避免 worker 强制终止后留下无法通过
+Node-API 释放的未完成 `napi_deferred`。替换全局 Promise 构造器时，必须同步调用
+executor 并传入两个函数；非法构造器及延迟调用 executor 报 `ERR_NAPI_PROMISE_EXECUTOR`。

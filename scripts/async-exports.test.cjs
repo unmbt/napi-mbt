@@ -21,6 +21,16 @@ async function main() {
     return
   }
   const baseline = addon.resources()
+  // Constructors may retain the executor; it must be inert after construction.
+  const NativePromise = global.Promise
+  let retainedExecutor
+  try {
+    global.Promise = function (executor) { retainedExecutor = executor; return NativePromise.resolve() }
+    assert.throws(() => addon.group(), { code: 'ERR_NAPI_PROMISE_EXECUTOR' })
+  } finally { global.Promise = NativePromise }
+  assert.throws(() => retainedExecutor(() => {}, () => {}), { code: 'ERR_NAPI_PROMISE_EXECUTOR' })
+  retainedExecutor.dispose()
+  retainedExecutor = null
   phase = 'delay'
   let heartbeat = 0
   const interval = setInterval(() => heartbeat++, 1)
