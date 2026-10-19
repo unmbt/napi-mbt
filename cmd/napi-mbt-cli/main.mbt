@@ -4,7 +4,7 @@ async fn main {
   let options : Map[String, String] = Map([])
   let flags : Array[String] = []
   for i = 2; i < args.length(); {
-    if ["--name", "--target"].contains(args[i]) {
+    if ["--name", "--target", "--output-dir"].contains(args[i]) {
       options[args[i]] = args[i + 1]
       continue i + 2
     } else {
@@ -23,13 +23,25 @@ async fn main {
     "doctor" => doctor(dir, flags.contains("--json"))
     "init" => initialize(dir, options.get("--name"), flags.contains("--force"))
     "generate" => ignore(generate(dir, flags.contains("--check")))
-    "build" =>
-      build(
-        dir,
-        flags.contains("--release"),
-        flags.contains("--dry-run"),
-        options.get("--target"),
-      )
+    "build" => {
+      verbose_commands.val = flags.contains("--verbose")
+      if flags.contains("--watch") {
+        watch_build(
+          dir,
+          flags.contains("--release"),
+          options.get("--target"),
+          options.get("--output-dir"),
+        )
+      } else {
+        build(
+          dir,
+          flags.contains("--release"),
+          flags.contains("--dry-run"),
+          options.get("--target"),
+          output_directory=options.get("--output-dir"),
+        )
+      }
+    }
     "prepublish" => prepublish(dir, options.get("--target"))
     _ => fail("Unknown command")
   }

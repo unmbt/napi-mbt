@@ -6,6 +6,8 @@ package "unmbt/napi-mbt/cmd/napi-mbt-cli"
 // Errors
 
 // Types and methods
+type BuildTimer
+
 type Config
 
 type Generated

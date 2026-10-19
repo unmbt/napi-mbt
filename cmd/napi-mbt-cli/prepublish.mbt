@@ -7,6 +7,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     fail("package.json requires name and version")
   }
   let conf = config(dir)
+  let artifact_root = local_artifact_root(dir)
   let targets = match target_override {
     Some(target) => [target]
     None => if conf.targets.is_empty() { [host_target()] } else { conf.targets }
@@ -15,7 +16,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     if !supported_targets.contains(target) {
       fail("Unsupported target: \{target}")
     }
-    if !@fs.exists(dir + "/artifacts/" + target + "/napi_mbt.node") {
+    if !@fs.exists(artifact_root + "/" + target + "/napi_mbt.node") {
       fail(
         "Missing release artifact for \{target}; build every requested target before prepublish",
       )
@@ -53,7 +54,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       child["libc"] = ["glibc"]
     }
     mkdirp(path, recursive=true)
-    let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
+    let artifact = artifact_root + "/" + target + "/napi_mbt.node"
     write_file(path + "/napi_mbt.node", @fs.read_file(artifact))
     write_json(path + "/package.json", Json(child))
     if @fs.exists(path + "/index.mjs") {

@@ -24,7 +24,7 @@ function loadVirtual(source, options = {}) {
       report: { getReport: () => ({ header: options.musl ? {} : { glibcVersionRuntime: '2.36' } }) } },
     require(name) {
       if (name === 'path') return path;
-      if (name === 'fs') return { existsSync: () => Boolean(options.local) };
+      if (name === 'fs') return { existsSync: file => !file.endsWith('build-output.json') && Boolean(options.local) };
       loads.push(name);
       if (name.endsWith('/package.json')) {
         if (options.missing) throw cause;

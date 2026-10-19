@@ -45,7 +45,17 @@ fn loaders(
     $|  throw failure('ERR_NAPI_PLATFORM', 'Unsupported OS or CPU');
     $|}
     $|if (actualNapi < requiredNapi) throw failure('ERR_NAPI_VERSION', 'Unsupported Node-API version');
-    $|const local = path.join(__dirname, 'artifacts', target, 'napi_mbt.node');
+    $|let outputDirectory = path.join(__dirname, 'artifacts');
+    $|const buildLocation = path.join(__dirname, '.napi-mbt', 'build-output.json');
+    $|if (fs.existsSync(buildLocation)) {
+    $|  attemptedPaths.push(buildLocation);
+    $|  try {
+    $|    const location = JSON.parse(fs.readFileSync(buildLocation, 'utf8'));
+    $|    if (!location || typeof location.directory !== 'string' || !path.isAbsolute(location.directory)) throw new TypeError('Invalid build output directory');
+    $|    outputDirectory = location.directory;
+    $|  } catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot read local build location', cause); }
+    $|}
+    $|const local = path.join(outputDirectory, target, 'napi_mbt.node');
     $|attemptedPaths.push(local);
     $|let addon;
     $|if (fs.existsSync(local)) {

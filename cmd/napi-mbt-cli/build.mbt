@@ -4,7 +4,9 @@ async fn build(
   release : Bool,
   dry_run : Bool,
   target_override : String?,
+  output_directory~ : String? = None,
 ) -> Unit {
+  let timer = BuildTimer::new()
   let dir = @fs.realpath(directory)
   let conf = config(dir)
   let target = target_override.unwrap_or(host_target())
@@ -26,12 +28,28 @@ async fn build(
   }
   let toolchain = detect_toolchain(dir, conf.builder)
   defer toolchain.close()
-  let generated = generate(dir, false)
-  let uses_async = conf.features.contains("async") ||
-    generated.source.features.contains("async")
+  timer.stage("toolchain")
   let workspace = @fs.tmpdir(prefix="napi-mbt-build-")
   defer @fs.rmdir(workspace, recursive=true)
-  copy_build_workspace(dir, workspace, [])
+  let package_before = if @fs.exists(dir + "/package.json") {
+    Some(@fs.read_file(dir + "/package.json").binary())
+  } else {
+    None
+  }
+  let artifact_root = output_path(dir, output_directory)
+  let excluded = if @fs.exists(artifact_root) {
+    [@fs.realpath(artifact_root)]
+  } else {
+    []
+  }
+  if excluded.contains(dir) {
+    fail("Output directory must not be the project root")
+  }
+  copy_build_workspace(dir, workspace, [], excluded~)
+  let generated = generate(workspace, false)
+  timer.stage("generate")
+  let uses_async = conf.features.contains("async") ||
+    generated.source.features.contains("async")
   if uses_async {
     patch_async_dependency(workspace)
   }
@@ -66,6 +84,7 @@ async fn build(
     )
   }
   prepare_package(workspace, generated)
+  timer.stage("prepare")
   let env : Map[String, String] = {
     "MOONBIT_NEW_NATIVE": "0",
     "MOONBIT_ALLOCATOR": "system",
@@ -79,14 +98,16 @@ async fn build(
   }
   // Moon owns the package dependency graph and the complete linker invocation:
   // this includes every reachable stub archive, native dependency and user flag.
-  println(
-    command(
-      toolchain.moon,
-      ["build", "--target", "native", "--" + mode, "."],
-      workspace,
-      env~,
-    ),
+  let build_output = command(
+    toolchain.moon,
+    ["build", "--target", "native", "--" + mode, "."],
+    workspace,
+    env~,
   )
+  if verbose_commands.val {
+    println(build_output)
+  }
+  timer.stage("compile-link")
   let artifacts = workspace + "/_build/native/" + mode + "/build"
   let binaries = @fs.readdir(artifacts, sort=true).filter(file => {
     file.has_suffix(".exe")
@@ -94,7 +115,7 @@ async fn build(
   if binaries.length() != 1 {
     fail("Expected one MoonBit foreign-library artifact in \{artifacts}")
   }
-  let output = dir + "/artifacts/" + target
+  let output = output_path(dir, output_directory) + "/" + target
   mkdirp(output)
   let workspace_parts = workspace
     .replace_all(old="\\", new="/")
@@ -106,6 +127,45 @@ async fn build(
     ".node"
   write_file(pending, @fs.read_file(artifacts + "/" + binaries[0]))
   errdefer (if @fs.exists(pending) { @fs.remove(pending) })
-  @fs.rename(pending, output + "/napi_mbt.node", replace=true)
+  let package_after = if @fs.exists(dir + "/package.json") {
+    Some(@fs.read_file(dir + "/package.json").binary())
+  } else {
+    None
+  }
+  if package_before != package_after {
+    fail(
+      "package.json changed during build; retry to preserve the new configuration",
+    )
+  }
+  let destination = output + "/napi_mbt.node"
+  let backup = pending + ".previous"
+  let had_binary = @fs.exists(destination)
+  if had_binary {
+    write_file(backup, @fs.read_file(destination))
+  }
+  errdefer (if had_binary {
+    @fs.rename(backup, destination, replace=true)
+  } else if @fs.exists(destination) {
+    @fs.remove(destination)
+  })
+  @fs.rename(pending, destination, replace=true)
+  mkdirp(dir + "/.napi-mbt")
+  let location_text = (
+      { "directory": @fs.realpath(output_path(dir, output_directory)) } : Json).stringify(
+      indent=2,
+    ) +
+    "\n"
+  let outputs = generated.outputs.copy()
+  outputs.push((".napi-mbt/build-output.json", location_text))
+  install_outputs(dir, outputs, false, removals=generated.removals)
+  if had_binary {
+    @fs.remove(backup) catch {
+      error => eprintln("[napi-mbt] backup cleanup: " + error.to_string())
+    }
+  }
+  timer.stage("publish-artifact")
   println("[napi-mbt] built \{output}/napi_mbt.node")
+  if verbose_commands.val {
+    eprintln("[napi-mbt] total: \{@env.now() - timer.start} ms")
+  }
 }

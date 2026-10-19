@@ -17,6 +17,14 @@ MSVC 19.44.35211, Windows SDK 10.0.26100.0.
 
 | Promise exports and cancellation | 36 MoonBit tests; two isolated scheduler tests; complete async snapshots; NodeNext/Bundler TS consumers; Promise microtask delivery, conversion rejection without business effects, original JS thrown values across suspension, pre-abort, 100 completion/cancel races, callback reentry, file/TCP/task-group operations, standard output, four concurrent workers and forced termination; resource counts restored; full async addon and dependency C stubs passed Windows ASan; 18 parser/generator ASan tests; class/callback/structured regressions | Linux/macOS runtime and leak sanitizer not executed locally. Runtime template version 6, adapter patch version 2. Standard streams and buffers are environment-local; interface lookup sockets are call-owned |
 
+Watch and diagnostics validation: 38 MoonBit tests; strict warning checks;
+real initial build, three rapid source changes coalesced into one build, a syntax
+failure preserving both binary and declarations, automatic recovery, no loops
+from generated outputs, CJS/ESM loading from Chinese/space output paths,
+prepublish from that custom directory, stage timings, and isolated dependency
+regression. Loader CJS/ESM/ESM-only and TS consumer tests also passed. These
+native watch scenarios were executed on Windows only.
+
 Test orchestration is in `.mbtx` files. Node fixtures exercise built binaries;
 they do not stand in for native CLI tests. No registry publication or remote
 push has been performed. The downloaded `napi-rs/` checkout is reference material.

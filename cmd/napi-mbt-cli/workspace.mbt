@@ -3,8 +3,12 @@ async fn copy_build_workspace(
   source : String,
   destination : String,
   ancestors : Array[String],
+  excluded~ : Array[String] = [],
 ) -> Unit {
   let canonical = @fs.realpath(source)
+  if excluded.contains(canonical) {
+    return
+  }
   if ancestors.contains(canonical) {
     fail("Cyclic directory link in build inputs: \{source}")
   }
@@ -21,7 +25,7 @@ async fn copy_build_workspace(
     let src = source + "/" + name
     let dst = destination + "/" + name
     if @fs.kind(src) == Directory {
-      copy_build_workspace(src, dst, parents)
+      copy_build_workspace(src, dst, parents, excluded~)
     } else {
       write_file(dst, @fs.read_file(src))
       if !windows() && @fs.can_execute(src) {

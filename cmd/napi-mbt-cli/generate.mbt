@@ -2,6 +2,8 @@
 struct Generated {
   config : Config
   source : @generator.ParsedSource
+  outputs : Array[(String, String)]
+  removals : Array[String]
 }
 
 ///|
@@ -95,5 +97,5 @@ async fn generate(dir : String, check : Bool) -> Generated {
   if !check {
     println("Generated \{exports.length()} N-API export(s).")
   }
-  { config: conf, source, }
+  { config: conf, source, outputs, removals, }
 }

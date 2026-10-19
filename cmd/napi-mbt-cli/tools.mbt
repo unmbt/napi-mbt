@@ -1,4 +1,7 @@
 ///|
+let verbose_commands : Ref[Bool] = Ref(false)
+
+///|
 fn lexical_compare(a : String, b : String) -> Int32 {
   let length = if a.length() < b.length() { a.length() } else { b.length() }
   for i in 0..<length {
@@ -33,6 +36,17 @@ async fn command(
   dir : String,
   env? : Map[String, String],
 ) -> String {
+  if verbose_commands.val {
+    eprintln(
+      "[napi-mbt] command " +
+      Json(program).stringify() +
+      " " +
+      args.map(arg => Json(arg).stringify()).join(" ") +
+      " [cwd=" +
+      dir +
+      "]",
+    )
+  }
   let (code, out, err) = @process.collect_output(
     program,
     args,

@@ -1,0 +1,71 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @process.collect_output(binary, args)
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn wait_for(log : String, marker : String, count : Int) -> String {
+  @async.with_timeout(120000, () => {
+    while true {
+      let text = @fs.read_file(log).text()
+      if text.split(marker).to_array().length() > count { return text }
+      @async.sleep(100)
+    }
+    ""
+  })
+}
+
+///|
+fn source(value : Int) -> String {
+  "///|\n#export_name(\"answer\")\npub fn answer() -> Int { \{value} }\n"
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-watch-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/项目 with spaces"
+  checked(binary, ["init", dir, "--name", "watch-fixture"])
+  @fs.write_file(dir + "/lib.mbt", source(1))
+  let log = temp + "/watch.log"
+  let stream = @process.redirect_to_file(log, shared=true)
+  defer stream.close()
+  @async.with_task_group(group => {
+    let child = @process.spawn(group, binary, ["build", dir, "--watch", "--verbose", "--output-dir", "build 输出"], stdout=stream, stderr=stream, cancel_handler=@process.hard_cancel())
+    defer child.cancel()
+    let text = wait_for(log, "watch: waiting", 1)
+    for stage in ["toolchain", "generate", "prepare", "compile-link", "publish-artifact"] { assert_true(text.contains("stage " + stage + ":"), msg=stage) }
+    assert_true(text.contains("[napi-mbt] command"))
+    let targets = @fs.readdir(dir + "/build 输出")
+    let artifact = dir + "/build 输出/" + targets[0] + "/napi_mbt.node"
+    assert_true(@fs.exists(artifact))
+    checked("node", ["scripts/watch.test.cjs", dir, "1"])
+    @async.sleep(700)
+    assert_eq(@fs.read_file(log).text().split("watch: building").to_array().length(), 2)
+    for value in 2..=4 { @fs.write_file(dir + "/lib.mbt", source(value)); @async.sleep(15) }
+    ignore(wait_for(log, "watch: waiting", 2))
+    checked("node", ["scripts/watch.test.cjs", dir, "4"])
+    let good = @fs.read_file(artifact).binary()
+    let declarations = @fs.read_file(dir + "/index.d.ts").text()
+    @fs.write_file(dir + "/lib.mbt", "pub fn broken(\n")
+    ignore(wait_for(log, "watch: build failed", 1))
+    ignore(wait_for(log, "watch: waiting", 3))
+    assert_eq(@fs.read_file(artifact).binary(), good)
+    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), declarations)
+    checked("node", ["scripts/watch.test.cjs", dir, "4"])
+    @fs.write_file(dir + "/lib.mbt", source(5))
+    ignore(wait_for(log, "watch: waiting", 4))
+    checked("node", ["scripts/watch.test.cjs", dir, "5"])
+    @async.sleep(700)
+    assert_eq(@fs.read_file(log).text().split("watch: building").to_array().length(), 5)
+    checked(binary, ["generate", dir, "--check"])
+  })
+  let target = @fs.readdir(dir + "/build 输出")[0]
+  checked(binary, ["prepublish", dir, "--target", target])
+  assert_eq(@fs.read_file(dir + "/npm/" + target + "/napi_mbt.node").binary(), @fs.read_file(dir + "/build 输出/" + target + "/napi_mbt.node").binary())
+  println("Watch debounce, generated-output exclusions, custom loading, timings, failure preservation and recovery passed")
+}

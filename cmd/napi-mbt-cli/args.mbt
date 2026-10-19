@@ -41,10 +41,27 @@ fn cli_command() -> @argparse.Command {
         "build",
         about="Build the native addon",
         positionals=[directory],
-        options=[target],
+        options=[
+          target,
+          OptionArg(
+            "output-dir",
+            long="output-dir",
+            about="Artifact directory (relative to project, or absolute)",
+          ),
+        ],
         flags=[
           FlagArg("release", long="release", about="Release build"),
           FlagArg("dry-run", long="dry-run", about="Show build commands"),
+          FlagArg(
+            "watch",
+            long="watch",
+            about="Rebuild when project inputs change",
+          ),
+          FlagArg(
+            "verbose",
+            long="verbose",
+            about="Print commands, compiler output and stage timings",
+          ),
         ],
       ),
       Command(
@@ -81,16 +98,20 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
     return normalized
   }
   normalized.push(values.values.get("directory").unwrap()[0])
-  for option in ["name", "target"] {
+  for option in ["name", "target", "output-dir"] {
     if values.values.get(option) is Some([value, ..]) {
       normalized.push("--" + option)
       normalized.push(value)
     }
   }
-  for flag in ["force", "check", "release", "dry-run", "json"] {
+  for
+    flag in ["force", "check", "release", "dry-run", "json", "watch", "verbose"] {
     if values.flags.get(flag) == Some(true) {
       normalized.push("--" + flag)
     }
+  }
+  if normalized.contains("--watch") && normalized.contains("--dry-run") {
+    fail("--watch cannot be combined with --dry-run")
   }
   normalized
 }
