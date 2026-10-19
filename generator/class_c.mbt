@@ -7,6 +7,14 @@ fn class_callbacks(classes : Array[ParsedClass]) -> String {
     )
   }
   for cls in classes {
+    // Each concrete MoonBit pointer type needs its own external declaration.
+    // Reusing a symbol causes the compiler to choose one class's C prototype.
+    out.write_string(
+      "extern void *napi_mbt_class_payload(void *);\nextern int napi_mbt_class_create(napi_env, void *, int, napi_value *);\nextern int napi_mbt_class_wrap(napi_env, napi_value, void *, int);\n" +
+      "void *napi_mbt_class_payload_\{cls.id}(void *handle) { return napi_mbt_class_payload(handle); }\n" +
+      "int napi_mbt_class_create_\{cls.id}(napi_env env, void *value, int type, napi_value *result) { return napi_mbt_class_create(env, value, type, result); }\n" +
+      "int napi_mbt_class_wrap_\{cls.id}(napi_env env, napi_value receiver, void *value, int type) { return napi_mbt_class_wrap(env, receiver, value, type); }\n",
+    )
     let functions = [cls.construct]
     for entry in cls.members {
       functions.push(entry.function)

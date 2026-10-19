@@ -56,6 +56,12 @@ static napi_value napi_mbt_callback_resources(napi_env env, napi_callback_info i
 
 extern int napi_mbt_save_constructor(napi_env, napi_value, int);
 extern int napi_mbt_construct_pending(napi_env, napi_value, int, bool *);
+extern void *napi_mbt_class_payload(void *);
+extern int napi_mbt_class_create(napi_env, void *, int, napi_value *);
+extern int napi_mbt_class_wrap(napi_env, napi_value, void *, int);
+void *napi_mbt_class_payload_0(void *handle) { return napi_mbt_class_payload(handle); }
+int napi_mbt_class_create_0(napi_env env, void *value, int type, napi_value *result) { return napi_mbt_class_create(env, value, type, result); }
+int napi_mbt_class_wrap_0(napi_env env, napi_value receiver, void *value, int type) { return napi_mbt_class_wrap(env, receiver, value, type); }
 extern napi_value napi_mbt_adapter_class_0_construct(napi_env, napi_value, napi_value);
 static napi_value napi_mbt_callback_class_0_construct(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -198,6 +204,12 @@ static napi_value napi_mbt_dispose_callback_0(napi_env env, napi_callback_info i
   napi_mbt_leave(previous);
   return result;
 }
+extern void *napi_mbt_class_payload(void *);
+extern int napi_mbt_class_create(napi_env, void *, int, napi_value *);
+extern int napi_mbt_class_wrap(napi_env, napi_value, void *, int);
+void *napi_mbt_class_payload_1(void *handle) { return napi_mbt_class_payload(handle); }
+int napi_mbt_class_create_1(napi_env env, void *value, int type, napi_value *result) { return napi_mbt_class_create(env, value, type, result); }
+int napi_mbt_class_wrap_1(napi_env env, napi_value receiver, void *value, int type) { return napi_mbt_class_wrap(env, receiver, value, type); }
 extern napi_value napi_mbt_adapter_class_1_construct(napi_env, napi_value, napi_value);
 static napi_value napi_mbt_callback_class_1_construct(napi_env env, napi_callback_info info) {
   size_t argc = 1;
