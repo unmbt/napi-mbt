@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import addon from './index.mjs';
+import { createRequire } from 'node:module';
+const cjs = createRequire(import.meta.url)('./index.cjs');
+for (const name of Object.keys(addon)) assert.equal(cjs[name], addon[name]);
+addon.save(n => n * 2); assert.equal(addon.invoke(21), 42);
+const error = new Error('original');
+addon.save(() => { throw error });
+assert.throws(() => addon.invoke(1), e => e === error); addon.clear();
+const add = addon.make_adder(3); assert.equal(add(4), 7);
+add.dispose(); assert.throws(() => add(1), { code: 'ERR_NAPI_DISPOSED' });
+console.log('callbacks passed');

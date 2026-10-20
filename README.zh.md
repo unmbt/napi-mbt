@@ -36,6 +36,8 @@ Node 用于加载 addon，npm 用于包安装和验证。解析器、头文件�
 生成的声明包含源码文档和错误说明。详见[使用指南](docs/zh/usage.md)、
 [类型](docs/zh/types.md)、[class/callback](docs/zh/classes-callbacks.md)和
 [异步](docs/zh/async.md)。
+六个[独立样例](examples/README.md)涵盖基础导出、结构化值、class、callback、
+异步文件和 Buffer；CI 使用打包安装的 CLI 验证真实运行与 TypeScript 消费方式。
 
 ## 常用命令
 

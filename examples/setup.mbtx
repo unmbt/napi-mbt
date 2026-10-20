@@ -1,0 +1,36 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd : String) -> Unit {
+  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args, cwd~))
+  if code != 0 { fail(out.text() + err.text()) }
+  println(out.text())
+}
+
+///|
+async fn main {
+  guard @env.args() is [_, source, destination, ..rest] else { fail("Usage: moon run examples/setup.mbtx <example-directory> <new-project-directory> [installed-cli]") }
+  let source = @fs.realpath(source)
+  let binary = rest.get(0).unwrap_or("napi-mbt-cli")
+  let cwd = @fs.realpath(".")
+  checked(binary, ["init", destination], cwd)
+  let destination = @fs.realpath(destination)
+  // Resolve sample dependencies while the freshly generated starter adapter
+  // still matches its starter function. Async adapters are checked by build
+  // only after the isolated dependency patch has been applied.
+  for name in ["moon.mod", "moon.pkg"] {
+    if @fs.exists(source + "/" + name) {
+      @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name))
+    }
+  }
+  checked("moon", ["check", "--target", "native"], destination)
+  // Only checked-in example inputs are copied. Runtime boilerplate comes from
+  // the installed CLI, so examples cannot silently use a checkout's templates.
+  for name in @fs.readdir(source) {
+    if @fs.kind(source + "/" + name) != Directory {
+      @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name))
+    }
+  }
+  checked(binary, ["build", "--release"], destination)
+  checked("node", ["test.mjs"], destination)
+}

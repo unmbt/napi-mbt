@@ -1,0 +1,7 @@
+{
+  "name": "napi-mbt-example-callbacks",
+  "version": "0.1.0",
+  "scripts": {
+    "test": "node test.mjs"
+  }
+}

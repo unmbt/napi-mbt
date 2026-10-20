@@ -31,3 +31,5 @@ and sanitizer results are reported only when actually executed.
 - Step 1: development lockfile/source installation and documentation checks passed.
 - Step 2: packed CLI installed without Node/npm, extracted source deleted, new
   addon built outside the checkout; CJS/ESM and both TS resolution modes passed.
+- Step 3: all six standalone examples passed native builds, CJS/ESM smoke tests
+  and positive/negative NodeNext/Bundler consumers using the packed, installed CLI.

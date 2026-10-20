@@ -64,6 +64,7 @@ jobs:
       - run: moon run scripts/ci-consumers.mbtx
       - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
       - run: moon run scripts/mooncake-package-test.mbtx
+      - run: moon run scripts/examples-test.mbtx
       - run: moon run scripts/ci-artifacts.mbtx
       - uses: actions/upload-artifact@v4
         with:
