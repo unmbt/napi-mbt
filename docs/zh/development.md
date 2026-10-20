@@ -45,9 +45,17 @@ ASan 覆盖 parser 与 addon；Linux 额外启用 leak detection。
 
 ## 打包门禁
 
-`moon.mod`、package.json、lockfile、平台依赖版本必须一致；release tag 也会核对。
+`moon.mod` 中的 Mooncakes 版本独立于根目录 private npm 清单；package.json 与
+lockfile 必须一致，release tag 会根据 `moon.mod` 核对。
 `prepublish` 拒绝缺失、架构错误、非动态库构件和过期声明/生成物，保留用户包元数据，
 并附带第三方许可证。生成的 `npm/`、`artifacts/`、`licenses/` 不入库。
+
+在仓库根目录使用 `moon-bump` 发版。配置中的 `prepare-release.mbtx` 会先根据
+`moon.mod` 规范化开发锁文件，再严格检查项目（同时重新生成 CLI 版本），并在
+提交、打 tag 前执行发布检查。它不会把 private npm 版本同步到 `moon.mod`。
+`all: true` 会将这些生成的改动一起提交。可运行
+`moon run scripts/prepare-release.mbtx` 修复并验证当前 checkout。
+CI 仍执行不带 `--write` 的 `release-check.mbtx`，版本不一致时会失败。
 
 源码清单包含开发依赖，不包含尚未发布的平台包。`prepublish` 为分发添加平台依赖，
 根目录分发测试结束后恢复源码清单。`source-install-test.mbtx` 在仅含清单的全新临时

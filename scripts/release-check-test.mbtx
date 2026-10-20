@@ -1,0 +1,99 @@
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/async/process",
+  "moonbitlang/core/json",
+}
+
+///|
+async fn run(
+  args : Array[String],
+  cwd : String,
+  tag? : String,
+) -> (Int32, String) {
+  let env = { "GITHUB_REF_TYPE": "branch", "GITHUB_REF_NAME": "master" }
+  if tag is Some(value) {
+    env["GITHUB_REF_TYPE"] = "tag"
+    env["GITHUB_REF_NAME"] = value
+  }
+  let (code, out, err) = @async.with_timeout(120000, () => {
+    @process.collect_output("moon", args, cwd~, extra_env=env)
+  })
+  (code, out.text() + err.text())
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-release-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.mkdir(temp + "/scripts")
+  @fs.write_file(
+    temp + "/scripts/release-check.mbtx",
+    @fs.read_file(root + "/scripts/release-check.mbtx"),
+  )
+  guard @json.parse(@fs.read_file(root + "/package.json").text()) is
+    Object(root_manifest) else {
+    fail("Invalid root manifest")
+  }
+  assert_eq(root_manifest.get("private"), Some(Json(true)))
+  guard @json.parse(@fs.read_file(root + "/bump.config.json").text()) is
+    { "execute": String(execute), "all": True, .. } else {
+    fail("Release config must run the Mooncakes preparation hook")
+  }
+  assert_true(execute.contains("prepare-release.mbtx"))
+  let manifest : Json = {
+    "name": "release-fixture",
+    "version": "0.1.1",
+    "private": true,
+    "description": "Keep the npm development version independent",
+    "devDependencies": { "fixture-tool": "0.1.1" },
+  }
+  let lock : Json = {
+    "name": "release-fixture",
+    "version": "0.1.1",
+    "lockfileVersion": 3,
+    "packages": {
+      "": {
+        "name": "release-fixture",
+        "version": "0.1.1",
+        "devDependencies": { "fixture-tool": "0.1.1" },
+      },
+      "node_modules/fixture-tool": {
+        "version": "0.1.1",
+        "resolved": "https://registry.npmjs.org/fixture-tool/-/fixture-tool-0.1.1.tgz",
+        "integrity": "unchanged",
+      },
+    },
+  }
+  @fs.write_file(temp + "/package.json", manifest.stringify(indent=2) + "\n")
+  @fs.write_file(temp + "/package-lock.json", lock.stringify(indent=2) + "\n")
+  for version in ["0.2.0", "0.3.0-rc.1"] {
+    @fs.write_file(
+      temp + "/moon.mod",
+      "name = \"test/release\"\nversion = \"\{version}\"\npreferred_target = \"native\"\n",
+    )
+    let before_manifest = @fs.read_file(temp + "/package.json").text()
+    let before_lock = @fs.read_file(temp + "/package-lock.json").text()
+    let (code, output) = run(["run", "scripts/release-check.mbtx"], temp)
+    assert_eq(code, 0, msg=output)
+    assert_eq(@fs.read_file(temp + "/package.json").text(), before_manifest)
+    assert_eq(@fs.read_file(temp + "/package-lock.json").text(), before_lock)
+    let (code, output) = run(
+      ["run", "scripts/release-check.mbtx", "--write"],
+      temp,
+      tag="v" + version,
+    )
+    assert_eq(code, 0, msg=output)
+    let (code, output) = run(
+      ["run", "scripts/release-check.mbtx"],
+      temp,
+      tag="v0.1.1",
+    )
+    assert_true(code != 0 && output.contains("Release tag must match moon.mod"), msg=output)
+  }
+  let (code, output) = run(["run", "scripts/release-check.mbtx"], temp)
+  assert_eq(code, 0, msg=output)
+  println("Mooncakes release metadata and private npm lockfile checks passed")
+}

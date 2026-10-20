@@ -1,0 +1,22 @@
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/process",
+}
+
+///|
+async fn main {
+  // Runs after moon-bump edits moon.mod and before it commits or tags.
+  // The project check also regenerates the CLI version from moon.mod.
+  for
+    args in [
+      ["run", "scripts/release-check.mbtx", "--write"],
+      ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"],
+      ["run", "scripts/release-check.mbtx"],
+    ] {
+    let status = @process.run("moon", args)
+    if status != 0 {
+      fail("Release preparation failed: moon " + args.join(" "))
+    }
+  }
+}

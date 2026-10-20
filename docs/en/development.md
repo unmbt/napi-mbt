@@ -54,11 +54,21 @@ verify that leak detection remains active; no whole-library suppression is used.
 
 ## Package gates
 
-Versions in `moon.mod`, `package.json`, lockfile and platform dependencies must
-match; release tags are checked. `prepublish` rejects missing, wrong-architecture,
+The Mooncakes version in `moon.mod` is independent from the private root npm
+manifest. The manifest and lockfile must agree; release tags are checked against
+`moon.mod`. `prepublish` rejects missing, wrong-architecture,
 non-library or stale artifacts/declarations. It preserves user package metadata
 and includes bundled licenses. Generated `npm/`, `artifacts/` and `licenses/`
 are not source-controlled.
+
+Release with `moon-bump` from the repository root. Its configured
+`prepare-release.mbtx` hook canonicalizes the development lockfile, strictly
+checks the project (regenerating the CLI version), and runs the release checks
+before committing and tagging. It does not synchronize the private npm version
+with `moon.mod`. `all: true` includes generated changes in the release commit.
+Run `moon run scripts/prepare-release.mbtx` to repair or validate a checkout.
+CI runs `release-check.mbtx` without `--write`, so an inconsistent release still
+fails.
 
 The checkout manifest contains development dependencies, without unpublished
 platform packages. `prepublish` adds the platform dependencies for distribution;
@@ -84,7 +94,8 @@ The Mooncake gate packs the module, rejects accidental dependencies/binaries in
 the archive, extracts and checks its sources, then installs the CLI without
 Node/npm on PATH. It deletes the extracted source and uses that installed CLI
 outside the checkout to build and execute CJS/ESM and TypeScript consumers.
-It uses no registry publication. `moon publish --dry-run` additionally contacts the registry
+It uses no registry publication. `moon publish --dry-run` additionally contacts
+the registry
 and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
