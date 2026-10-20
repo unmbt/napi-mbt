@@ -28,7 +28,8 @@ function loadVirtual(source, options = {}) {
       loads.push(name);
       if (name.endsWith('/package.json')) {
         if (options.missing) throw cause;
-        return { name: 'loader-fixture-win32-x64-msvc', version: options.wrongVersion ? '9.0.0' : '0.1.0', napiVersion: 4, napiTarget: 'win32-x64-msvc' };
+        const target = (options.platform || 'win32') + '-' + (options.arch || 'x64') + ((options.platform || 'win32') === 'win32' ? '-msvc' : options.platform === 'linux' ? '-gnu' : '');
+        return { name: 'loader-fixture-' + target, version: options.wrongVersion ? '9.0.0' : '0.1.0', napiVersion: 4, napiTarget: target };
       }
       if (options.broken) throw cause;
       return addon;
@@ -66,6 +67,13 @@ function loadVirtual(source, options = {}) {
     assert.strictEqual(loadVirtual(source, { platform: 'linux', musl: true }).error.code, 'ERR_NAPI_PLATFORM');
     const linux = loadVirtual(source, { platform: 'linux', local: true });
     assert.strictEqual(linux.result, linux.addon);
+    for (const platform of ['linux', 'darwin']) for (const arch of ['x64', 'arm64']) {
+      for (const local of [true, false]) {
+        const loaded = loadVirtual(source, {platform, arch, local});
+        assert.strictEqual(loaded.result, loaded.addon);
+        assert.ok(loaded.loads.some(name => name.includes(platform + '-' + arch)));
+      }
+    }
   }
   // Exercise package metadata resolution and the real native entry with no local artifact.
   const child = path.join(dir, 'node_modules', 'loader-fixture-' + target);

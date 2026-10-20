@@ -77,3 +77,7 @@ and sanitizer results are reported only when actually executed.
   fix for borrowed closure pins being freed as owned resources during teardown;
   resumed reads also guard against creating JS handles in a closing environment.
   Strict check, 53 MoonBit tests and generator snapshots passed. Linux awaits CI.
+- Step 12: Linux ARM64 and macOS x64 native build, installed CLI/examples and
+  Node 22/24/26 consumer jobs added. Local architecture-header rejection and
+  simulated loader local/platform-package branches pass; these do not substitute
+  for native execution. Both added platform jobs await CI.

@@ -4,10 +4,10 @@
 | --- | --- |
 | Native CLI | No Node/npm dependency |
 | New addon | N-API 4, CJS and ESM enabled |
-| Main Node CI | 22, 24, 26 on the three release platforms |
+| Main Node CI | 22, 24, 26 on five native host profiles |
 | Minimum consumers | Node 10.16 CJS/N-API 4; 12.20 dual/N-API 4; 12.22 async/N-API 8 |
-| Release platforms | Windows x64 MSVC, Linux x64 glibc, macOS ARM64 |
-| Additional host profiles | Linux ARM64 glibc and macOS x64 are recognized; no prebuilt release gate |
+| Native build gates | Windows x64 MSVC; Linux x64/ARM64 glibc; macOS x64/ARM64 |
+| New platform status | Linux ARM64 and macOS x64 gates configured; awaiting CI execution |
 | Cross-compilation | Requires a matching host; the CLI rejects a different target |
 | libc | glibc; musl is rejected |
 
