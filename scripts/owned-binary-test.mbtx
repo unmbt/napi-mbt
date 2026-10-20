@@ -33,6 +33,9 @@ async fn main {
     @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
   }
   checked(binary, ["build", dir, "--release"])
+  let (warm_code, warm_out, warm_err) = @async.with_timeout(180000, () => @process.collect_output(binary, ["build", dir, "--release", "--verbose"]))
+  assert_eq(warm_code, 0, msg=warm_out.text() + warm_err.text())
+  assert_true((warm_out.text() + warm_err.text()).contains("no work to do"), msg="Async patches and generated configuration must preserve cache timestamps")
   let target = @fs.readdir(dir + "/artifacts")[0]
   let output = root + "/.napi-mbt/" + (if asan { "owned-binary-asan" } else { "owned-binary-smoke" })
   @fs.mkdir(output, recursive=true, allow_exist=true)

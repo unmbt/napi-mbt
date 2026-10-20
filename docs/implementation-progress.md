@@ -45,3 +45,9 @@ and sanitizer results are reported only when actually executed.
   each of delivery, queue-full and abort, plus 12 worker terminations. All 72
   finalizers ran once, C allocations returned to baseline and callback thread
   checks passed. Strict check, 48 tests and documentation checks passed.
+- Step 7: persistent cache, receipts, source/header/dependency/toolchain changes,
+  corruption recovery, concurrent build/clean, killed-process lock release and
+  failed-build preservation passed. Async warm builds, npm installation and watch
+  consumers passed. Windows ASan covered lock lifetime; strict check and 50 tests
+  passed. Warm median 3.812 s versus 24.510 s without cache (84.4% reduction), with
+  no project compilation/linking. POSIX cache validation awaits CI.

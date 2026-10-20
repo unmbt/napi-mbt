@@ -53,6 +53,11 @@ fn cli_command() -> @argparse.Command {
           FlagArg("release", long="release", about="Release build"),
           FlagArg("dry-run", long="dry-run", about="Show build commands"),
           FlagArg(
+            "no-cache",
+            long="no-cache",
+            about="Build in a disposable workspace",
+          ),
+          FlagArg(
             "watch",
             long="watch",
             about="Rebuild when project inputs change",
@@ -63,6 +68,12 @@ fn cli_command() -> @argparse.Command {
             about="Print commands, compiler output and stage timings",
           ),
         ],
+      ),
+      Command(
+        "clean",
+        about="Remove this project's persistent build cache",
+        positionals=[directory],
+        flags=[FlagArg("cache", long="cache", about="Remove cached workspaces")],
       ),
       Command(
         "doctor",
@@ -105,13 +116,19 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
     }
   }
   for
-    flag in ["force", "check", "release", "dry-run", "json", "watch", "verbose"] {
+    flag in [
+      "force", "check", "release", "dry-run", "json", "watch", "verbose", "cache",
+      "no-cache",
+    ] {
     if values.flags.get(flag) == Some(true) {
       normalized.push("--" + flag)
     }
   }
   if normalized.contains("--watch") && normalized.contains("--dry-run") {
     fail("--watch cannot be combined with --dry-run")
+  }
+  if command == "clean" && !normalized.contains("--cache") {
+    fail("clean requires --cache")
   }
   normalized
 }

@@ -68,30 +68,43 @@ async fn validate_package_compilers(dir : String, compiler : String) -> Unit {
 async fn prepare_posix_compiler(
   workspace : String,
   compiler : String,
+  validated~ : Bool = false,
 ) -> String {
-  validate_package_compilers(workspace, compiler)
+  if !validated {
+    validate_package_compilers(workspace, compiler)
+  }
   let source = workspace + "/.napi-mbt/cc.c"
   let driver = workspace + "/.napi-mbt/cc"
   let archiver = @env.get_env_var("MOON_AR").unwrap_or(
     command(compiler, ["-print-prog-name=ar"], workspace).trim().to_owned(),
   )
-  @fs.symlink(
-    workspace + "/.napi-mbt/ar",
-    target=resolve_compiler(archiver, workspace),
-  )
+  let archive_path = resolve_compiler(archiver, workspace)
+  let archive_link = workspace + "/.napi-mbt/ar"
+  if @fs.exists(archive_link) &&
+    @fs.realpath(archive_link) != @fs.realpath(archive_path) {
+    @fs.remove(archive_link)
+  }
+  if !@fs.exists(archive_link) {
+    @fs.symlink(archive_link, target=archive_path)
+  }
   let compiler_literal = Json(compiler).stringify()
-  write_text_file(
-    source,
-    "#include <unistd.h>\n#include <stdlib.h>\n#include <stdio.h>\nint main(int argc, char **argv) {\n  char **args = calloc((size_t)argc + 2, sizeof(char *));\n  if (!args) return 127;\n  args[0] = " +
+  let contents = "#include <unistd.h>\n#include <stdlib.h>\n#include <stdio.h>\nint main(int argc, char **argv) {\n  char **args = calloc((size_t)argc + 2, sizeof(char *));\n  if (!args) return 127;\n  args[0] = " +
     compiler_literal +
-    ";\n  for (int i = 1; i < argc; i++) args[i] = argv[i];\n  args[argc] = \"-fPIC\";\n  execv(args[0], args);\n  perror(\"napi-mbt native compiler\");\n  free(args);\n  return 127;\n}\n",
-  )
-  ignore(command(compiler, [source, "-o", driver], workspace))
+    ";\n  for (int i = 1; i < argc; i++) args[i] = argv[i];\n  args[argc] = \"-fPIC\";\n  execv(args[0], args);\n  perror(\"napi-mbt native compiler\");\n  free(args);\n  return 127;\n}\n"
+  if !@fs.exists(driver) || !@fs.exists(source) || read_text(source) != contents {
+    write_text_file(source, contents)
+    ignore(command(compiler, [source, "-o", driver], workspace))
+  }
   let path = workspace + "/moon.pkg"
   let text = read_text(path)
-  write_text_file(
-    path,
-    package_set(text, native_block(text), "cc", Json(driver).stringify()),
+  let updated = package_set(
+    text,
+    native_block(text),
+    "cc",
+    Json(driver).stringify(),
   )
+  if text != updated {
+    write_text_file(path, updated)
+  }
   driver
 }

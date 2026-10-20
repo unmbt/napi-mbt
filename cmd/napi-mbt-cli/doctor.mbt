@@ -8,6 +8,9 @@ struct NativeToolchain {
 
 ///|
 async fn NativeToolchain::close(self : NativeToolchain) -> Unit {
+  if self.workspace.is_empty() {
+    return
+  }
   // Remove the junction itself before recursively deleting our private workspace.
   if @fs.exists(self.workspace + "/msbuild") {
     @fs.remove(self.workspace + "/msbuild")

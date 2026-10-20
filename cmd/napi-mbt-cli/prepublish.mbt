@@ -1,5 +1,8 @@
 ///|
 async fn prepublish(dir : String, target_override : String?) -> Unit {
+  let dir = @fs.realpath(dir)
+  let lock = project_lock(dir)
+  defer lock.close()
   let pkg = read_object(dir + "/package.json", required=true)
   let name = str(pkg, "name", "")
   let version = str(pkg, "version", "")
@@ -26,6 +29,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
       target,
     )
+    verify_receipt(dir, target, artifact_root)
   }
   // Release preparation must not hide stale declarations or changed signatures.
   ignore(generate(dir, true, check_package=false))

@@ -1,12 +1,15 @@
 # Build and watch
 
 `napi-mbt-cli doctor [directory] --json` reports and probes the native toolchain.
-`build` runs the same compile/link probe before generation. Node/npm are not
-dependencies of the native CLI.
+`build` reuses a successful probe only while tool selection, executable contents,
+SDK identity and relevant environment settings still match. Node/npm are not
+dependencies of the native CLI. `doctor` always performs a fresh probe.
 
 ```sh
 napi-mbt-cli build . --release --verbose
 napi-mbt-cli build . --watch --output-dir "native output"
+napi-mbt-cli build . --release --no-cache
+napi-mbt-cli clean . --cache
 ```
 
 `--verbose` prints executable paths, arguments, working directories, compiler
@@ -30,8 +33,29 @@ entry fields do not trigger loops. `--watch --dry-run` is rejected.
 Generation and compilation run in an isolated workspace. Only successful
 builds replace the addon, declarations, loaders and generated metadata.
 Failures leave the last successful files usable, and watch resumes when inputs
-change. Concurrent edits of package.json are detected before installation to
-avoid overwriting the user's changes. Stop watch with Ctrl+C.
+change. Concurrent edits of build inputs are detected before installation to
+avoid overwriting the previous successful artifacts. Stop watch with Ctrl+C.
+
+The persistent `.napi-mbt/cache` workspace is partitioned by target, mode, CLI,
+runtime/async adapter, compiler/SDK and configuration identity. Source digests
+do not partition it: changing one MoonBit file can reuse dependency objects.
+The CLI creates the complete generated and patched overlay in a temporary tree,
+then synchronizes only changed bytes into the cache and removes obsolete inputs.
+Unchanged files retain their timestamps. Header changes invalidate native objects.
+Corrupt cache metadata triggers reconstruction. Kernel file locks serialize
+build and clean across processes and release automatically when a process exits.
+
+`--no-cache` uses a fresh workspace and a fresh toolchain probe. Custom build hooks,
+unresolved variables and explicit external include/library paths fall back to
+this mode with a diagnostic, because their inputs cannot be tracked reliably.
+`clean --cache` removes only this project's cache, retaining successful artifacts.
+
+Each successful build records input, toolchain and output digests in
+`.napi-mbt/receipt-<target>.json`. User addon `prepublish` requires a matching receipt
+and rejects stale sources, declarations, loaders, binaries and host toolchains.
+Rebuild when a receipt is missing. When collecting native builds from multiple
+hosts, collect their receipts alongside their target artifacts; all must match
+the same source tree. Digests detect stale/corrupt files and are not signatures.
 
 The original module/package manifests, flags, stub sources, dependencies and
 link inputs remain the source of truth. Build configuration is supplemented in

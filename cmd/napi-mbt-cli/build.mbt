@@ -5,6 +5,7 @@ async fn build(
   dry_run : Bool,
   target_override : String?,
   output_directory~ : String? = None,
+  no_cache~ : Bool = false,
 ) -> Unit {
   let timer = BuildTimer::new()
   let dir = @fs.realpath(directory)
@@ -26,11 +27,13 @@ async fn build(
     )
     return
   }
-  let toolchain = detect_toolchain(dir, conf.builder)
-  defer toolchain.close()
-  timer.stage("toolchain")
-  let workspace = @fs.tmpdir(prefix="napi-mbt-build-")
-  defer @fs.rmdir(workspace, recursive=true)
+  let lock = project_lock(dir)
+  defer lock.close()
+  let conf = config(dir)
+  if !conf.targets.is_empty() && !conf.targets.contains(target) {
+    fail("Target is no longer listed in napi-mbt.json")
+  }
+  validate_builder(conf.builder, windows())
   let package_before = if @fs.exists(dir + "/package.json") {
     Some(@fs.read_file(dir + "/package.json").binary())
   } else {
@@ -45,45 +48,96 @@ async fn build(
   if excluded.contains(dir) {
     fail("Output directory must not be the project root")
   }
-  copy_build_workspace(dir, workspace, [], excluded~)
-  let generated = generate(workspace, false)
+  let inputs = input_snapshot(dir, excluded)
+  let fallback = cache_fallback(dir)
+  let cached = !no_cache && fallback is None
+  if !no_cache && fallback is Some(reason) {
+    eprintln("[napi-mbt] cache disabled: " + reason)
+  }
+  let toolchain = build_toolchain(dir, conf.builder, cached)
+  defer toolchain.close()
+  timer.stage("toolchain")
+  let staging = @fs.tmpdir(prefix="napi-mbt-build-")
+  defer @fs.rmdir(staging, recursive=true)
+  let identity = cache_identity(dir, toolchain, target, mode)
+  let partition = dir +
+    "/.napi-mbt/cache/" +
+    adapter_checksum(stable_json(identity))
+  let workspace = if cached { partition + "/workspace" } else { staging }
+  copy_build_workspace(dir, staging, [], excluded~)
+  let generated = generate(staging, false)
   timer.stage("generate")
   let uses_async = conf.features.contains("async") ||
     generated.source.features.contains("async")
   if uses_async {
-    patch_async_dependency(workspace)
+    patch_async_dependency(staging)
   }
-  mkdirp(workspace + "/.napi-mbt/include")
+  mkdirp(staging + "/.napi-mbt/include")
   for name, text in @assets.files() {
     if !name.has_prefix("template/") && !name.has_prefix("async/") {
-      write_text_file(workspace + "/.napi-mbt/" + name, text)
+      write_text_file(staging + "/.napi-mbt/" + name, text)
     }
   }
   if uses_async {
-    let definition = workspace + "/.napi-mbt/node_api.def"
+    let definition = staging + "/.napi-mbt/node_api.def"
     write_text_file(
       definition,
       read_text(definition) +
       "\nuv_handle_size\nuv_handle_get_data\nuv_handle_set_data\nuv_timer_init\nuv_timer_start\nuv_timer_stop\nuv_close\n",
     )
   }
+  prepare_package(staging, generated)
+  if !windows() {
+    guard toolchain.report
+      is { "compiler": { "path": String(compiler), .. }, .. } else {
+      fail("Missing compiler diagnostic")
+    }
+    validate_package_compilers(staging, compiler)
+    let path = staging + "/moon.pkg"
+    let pkg = read_text(path)
+    write_text_file(
+      path,
+      package_set(
+        pkg,
+        native_block(pkg),
+        "cc",
+        Json(workspace + "/.napi-mbt/cc").stringify(),
+      ),
+    )
+  }
+  if cached {
+    for path in [dir + "/.napi-mbt/cache", partition, workspace] {
+      if @fs.exists(path) && @fs.kind(path, follow_symlink=false) != Directory {
+        fail("Build cache must contain real directories")
+      }
+    }
+    mkdirp(partition)
+    sync_cache_tree(staging, workspace, partition + "/inputs.json")
+    println("[napi-mbt] cache workspace: " + workspace)
+  }
   if windows() {
     guard toolchain.librarian is Some(lib) else {
       fail("MSVC lib.exe is required")
     }
-    ignore(
-      command(
-        lib,
-        [
-          "/DEF:" + workspace + "/.napi-mbt/node_api.def",
-          "/OUT:" + workspace + "/.napi-mbt/napi.lib",
-          "/MACHINE:X64",
-        ],
-        workspace,
-      ),
-    )
+    let definition = read_text(workspace + "/.napi-mbt/node_api.def")
+    let stamp = workspace + "/.napi-mbt/napi.lib.source"
+    if !@fs.exists(workspace + "/.napi-mbt/napi.lib") ||
+      !@fs.exists(stamp) ||
+      read_text(stamp) != definition {
+      ignore(
+        command(
+          lib,
+          [
+            "/DEF:" + workspace + "/.napi-mbt/node_api.def",
+            "/OUT:" + workspace + "/.napi-mbt/napi.lib",
+            "/MACHINE:X64",
+          ],
+          workspace,
+        ),
+      )
+      write_text_file(stamp, definition)
+    }
   }
-  prepare_package(workspace, generated)
   timer.stage("prepare")
   let env : Map[String, String] = {
     "MOONBIT_NEW_NATIVE": "0",
@@ -94,7 +148,7 @@ async fn build(
       is { "compiler": { "path": String(compiler), .. }, .. } else {
       fail("Missing compiler diagnostic")
     }
-    let driver = prepare_posix_compiler(workspace, compiler)
+    let driver = prepare_posix_compiler(workspace, compiler, validated=true)
     // Moon's runtime compilation ignores package cc as well as package flags.
     env["MOON_CC"] = driver
   } else if conf.builder == "clang" {
@@ -140,9 +194,11 @@ async fn build(
   } else {
     None
   }
-  if package_before != package_after {
+  if package_before != package_after ||
+    input_snapshot(dir, excluded) != inputs ||
+    cache_identity(dir, toolchain, target, mode) != identity {
     fail(
-      "package.json changed during build; retry to preserve the new configuration",
+      "Project inputs changed during build; retry to preserve the previous artifacts",
     )
   }
   let destination = output + "/napi_mbt.node"
@@ -164,6 +220,27 @@ async fn build(
     ) +
     "\n"
   let outputs = generated.outputs.copy()
+  let output_digests : Map[String, Json] = Map([])
+  for (name, text) in generated.outputs {
+    if name != "package.json" {
+      output_digests[name] = Json(content_digest(@utf8.encode(text)))
+    }
+  }
+  let receipt : Json = {
+    "schema": 1,
+    "target": Json(target),
+    "mode": Json(mode),
+    "inputs": inputs,
+    "identity": identity,
+    "outputs": Json(output_digests),
+    "binary": Json(content_digest(@fs.read_file(destination).binary())),
+  }
+  outputs.push(
+    (
+      ".napi-mbt/receipt-" + target + ".json",
+      receipt.stringify(indent=2) + "\n",
+    ),
+  )
   outputs.push((".napi-mbt/build-output.json", location_text))
   install_outputs(dir, outputs, false, removals=generated.removals)
   if had_binary {
