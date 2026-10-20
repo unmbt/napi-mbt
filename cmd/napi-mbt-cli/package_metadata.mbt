@@ -45,6 +45,7 @@ fn node_engine(version : Int32, esm : Bool) -> String {
 ///|
 let managed_package_files : Array[String] = [
   "index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts", "napi_manifest.json",
+  "napi_workers.cjs", "napi_worker_entry.cjs",
 ]
 
 ///|
@@ -78,6 +79,9 @@ fn package_metadata(pkg : Map[String, Json], conf : Config) -> Json raise {
     files.push("licenses")
   }
   files.append(["index.d.ts", "napi_manifest.json"])
+  if !conf.worker_tasks.is_empty() {
+    files.append(["napi_workers.cjs", "napi_worker_entry.cjs"])
+  }
   if conf.cjs {
     files.append(["index.cjs", "index.d.cts"])
   }

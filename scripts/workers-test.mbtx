@@ -1,0 +1,70 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : StringView) -> String {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?))
+  if code != 0 { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn npm(args : Array[String], cwd : String) -> String {
+  if @env.get_env_var("OS") != Some("Windows_NT") { return checked("npm", args, cwd~) }
+  for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
+    let cli = dir.to_owned() + "/node_modules/npm/bin/npm-cli.js"
+    if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+  }
+  fail("Cannot find npm-cli.js")
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-workers-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  ignore(checked(binary, ["init", dir, "--name", "worker-fixture"]))
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"workerTasks\":[\"compute\",\"processId\",\"echo\",\"failure\",\"__proto__\"],\"workerPool\":{\"size\":2,\"maxQueue\":2,\"idleTimeoutMs\":500}}")
+  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/workers.mbt.txt"))
+  @fs.write_file(dir + "/tasks.c", @fs.read_file("scripts/fixtures/workers.c"))
+  let asan = @env.args().contains("--asan")
+  let flags = if !asan { "" } else if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"tasks.c\"").replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  ignore(checked(binary, ["build", dir, "--release"]))
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let saved = root + "/.napi-mbt/" + (if asan { "workers-asan" } else { "workers-smoke" })
+  @fs.mkdir(saved + "/artifacts/" + target, recursive=true, allow_exist=true)
+  for name in ["index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts", "napi_workers.cjs", "napi_worker_entry.cjs"] { @fs.write_file(saved + "/" + name, @fs.read_file(dir + "/" + name)) }
+  @fs.write_file(saved + "/artifacts/" + target + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  assert_eq(@async.with_timeout(120000, () => @process.run("node", ["--expose-gc", root + "/scripts/workers.test.cjs", dir], extra_env=environment)), 0)
+  if !asan {
+    @fs.write_file(dir + "/consumer.mts", "import a from './index.mjs';\nconst v: Promise<[number,number,number,number,number]> = a.compute(5, {signal: new AbortController().signal});\nconst parent: number = a.parentCalls();\n// @ts-expect-error worker returns Promise\nconst n: number = a.processId();\n// @ts-expect-error argument must be integer\na.compute('bad');\n")
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] { ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, dir + "/consumer.mts"])) }
+    // Consumer files are build inputs; build again before preparing a receipt-checked package.
+    ignore(checked(binary, ["build", dir, "--release"]))
+    let target = @fs.readdir(dir + "/artifacts")[0]
+    let entry = @fs.read_file(dir + "/napi_worker_entry.cjs")
+    @fs.write_file(dir + "/napi_worker_entry.cjs", entry.text() + "// stale worker\n")
+    let (stale_status, _, _) = @process.collect_output(binary, ["prepublish", dir, "--target", target])
+    assert_true(stale_status != 0, msg="Worker entry must be covered by the build receipt")
+    @fs.write_file(dir + "/napi_worker_entry.cjs", entry)
+    ignore(checked(binary, ["prepublish", dir, "--target", target]))
+    let tarballs = []
+    for package_dir in [dir + "/npm/" + target, dir] {
+      guard @json.parse(npm(["pack", package_dir, "--json", "--ignore-scripts"], temp)) is [{"filename": String(filename), ..}] else { fail("Invalid npm pack") }
+      tarballs.push(temp + "/" + filename)
+    }
+    let installed = temp + "/installed"
+    @fs.mkdir(installed)
+    @fs.write_file(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
+    ignore(npm(["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--package-lock=false"] + tarballs, installed))
+    let package_dir = installed + "/node_modules/worker-fixture"
+    assert_true(@fs.exists(package_dir + "/napi_worker_entry.cjs"))
+    assert_true(!@fs.exists(package_dir + "/artifacts"))
+    assert_eq(@process.run("node", [root + "/scripts/workers.test.cjs", package_dir]), 0)
+  }
+  println("Worker pools, owned snapshots, native teardown and package consumers passed")
+}

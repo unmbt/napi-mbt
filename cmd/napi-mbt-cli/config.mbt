@@ -100,6 +100,8 @@ struct Config {
   esm : Bool
   classes : Array[@generator.ClassConfig]
   native_tasks : Array[(String, String)]
+  worker_tasks : Array[String]
+  worker_pool : Json
 }
 
 ///|
@@ -121,7 +123,7 @@ fn parse_config(value : Json) -> Config raise {
   for key in items.keys() {
     if ![
         "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
-        "classes", "nativeTasks",
+        "classes", "nativeTasks", "workerTasks", "workerPool",
       ].contains(key) {
       fail("Unknown napi-mbt.json field: \{key}")
     }
@@ -159,6 +161,11 @@ fn parse_config(value : Json) -> Config raise {
   }
   let classes = class_configurations(items.get("classes"))
   let native_tasks = native_task_configurations(items.get("nativeTasks"))
+  let worker_tasks = unique_strings(items, "workerTasks")
+  let worker_pool = worker_pool_configuration(items.get("workerPool"))
+  if !worker_tasks.is_empty() && version < 8 {
+    fail("workerTasks requires N-API 8 for process cleanup")
+  }
   if !native_tasks.is_empty() && version < 8 {
     fail("Native tasks require N-API 8 for asynchronous environment cleanup")
   }
@@ -174,6 +181,8 @@ fn parse_config(value : Json) -> Config raise {
     esm,
     classes,
     native_tasks,
+    worker_tasks,
+    worker_pool,
   }
 }
 

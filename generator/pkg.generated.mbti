@@ -6,7 +6,7 @@ pub fn parse_source(String, String) -> ParsedSource raise
 
 pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig]) -> ParsedSource raise
 
-pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
+pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String]) -> Array[(String, String)] raise
 
 // Errors
 

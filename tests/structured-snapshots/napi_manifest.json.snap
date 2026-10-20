@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "10",
+  "runtimeTemplateVersion": "11",
   "napiVersion": 7,
   "requiredNapiVersion": 7,
   "features": [
@@ -316,5 +316,11 @@
     }
   ],
   "classes": [],
-  "nativeTasks": {}
+  "nativeTasks": {},
+  "workerTasks": [],
+  "workerPool": {
+    "size": 2,
+    "maxQueue": 64,
+    "idleTimeoutMs": 30000
+  }
 }

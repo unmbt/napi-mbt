@@ -4,6 +4,7 @@ fn loaders(
   package_name : String,
   package_version : String,
   version : Int32,
+  workers~ : Bool = false,
 ) -> (String, String) {
   let name = Json(package_name + "-").stringify()
   let expected = Json(package_version).stringify()
@@ -76,6 +77,17 @@ fn loaders(
     $|  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
     $|}
     $|
+  let body = if workers {
+    body
+    .replace_all(old="let addon;", new="let addon;\nlet nativePath = local;")
+    .replace_all(
+      old="try { addon = require(packageName); }",
+      new="try { nativePath = require.resolve(packageName); addon = require(nativePath); }",
+    ) +
+    "addon = require('./napi_workers.cjs')(addon, nativePath);\n"
+  } else {
+    body
+  }
   let cjs = body + "module.exports = addon;\n"
   let esm = "import { createRequire as $napiRequire } from 'module';\nimport { fileURLToPath as $napiFileURL } from 'url';\nimport { dirname as $napiDirname } from 'path';\nconst $napiAddon = (() => {\nconst require = $napiRequire(import.meta.url);\nconst __dirname = $napiDirname($napiFileURL(import.meta.url));\n" +
     body +

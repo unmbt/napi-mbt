@@ -80,6 +80,13 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         { "nativeTasks": { "compute": 1 }, "napiVersion": 8 },
         { "nativeTasks": { "compute": "x;evil" }, "napiVersion": 8 },
         { "nativeTasks": { "napi_mbt_reserved": "x" }, "napiVersion": 8 },
+        { "workerTasks": ["work"] },
+        { "workerTasks": ["work", "work"], "napiVersion": 8 },
+        { "workerPool": { "size": 0 } },
+        { "workerPool": { "maxQueue": -1 } },
+        { "workerPool": { "idleTimeoutMs": 0 } },
+        { "workerPool": { "size": 1.5 } },
+        { "workerPool": { "unknown": 1 } },
       ] : Array[Json]) {
     try parse_config(value) catch {
       _ => ()

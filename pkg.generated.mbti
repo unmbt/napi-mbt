@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "10"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "11"
 
 pub fn add(Int, Int) -> Int
 

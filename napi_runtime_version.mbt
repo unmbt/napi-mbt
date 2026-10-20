@@ -1,2 +1,2 @@
 ///|
-pub const NAPI_MBT_RUNTIME_VERSION : String = "10"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "11"

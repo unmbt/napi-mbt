@@ -78,7 +78,9 @@ async fn generate(
     package_version=str(pkg, "version", "0.1.0"),
     cjs=conf.cjs,
     esm=conf.esm,
+    worker_tasks=conf.worker_tasks,
   )
+  outputs.append(worker_outputs(source, conf))
   if !conf.native_tasks.is_empty() {
     for i, (name, source) in outputs {
       if name == "napi_glue.c" {
@@ -102,6 +104,8 @@ async fn generate(
     "types": source.types.map(t => t.manifest()),
     "classes": source.classes.map(c => c.manifest()),
     "nativeTasks": Map::from_array(conf.native_tasks),
+    "workerTasks": conf.worker_tasks,
+    "workerPool": conf.worker_pool,
   }
   outputs.push(("napi_manifest.json", manifest.stringify(indent=2) + "\n"))
   outputs.push(
@@ -111,6 +115,9 @@ async fn generate(
     ("package.json", package_metadata(pkg, conf).stringify(indent=2) + "\n"),
   )
   let removals = []
+  if conf.worker_tasks.is_empty() {
+    removals.append(["napi_workers.cjs", "napi_worker_entry.cjs"])
+  }
   if conf.native_tasks.is_empty() {
     removals.append(["napi_native_exports.mbt", "napi_native_tasks.mbt"])
   }

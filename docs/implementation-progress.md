@@ -57,3 +57,10 @@ and sanitizer results are reported only when actually executed.
   exposed a timer callback entering JS while Node drained native work; async
   adapter patch 4 checks execution state before opening that callback scope.
   The standalone C/MoonBit task example passed. Linux memory checks await CI.
+- Step 9: two child processes executed overlapping MoonBit computations with
+  isolated globals. Owned nested snapshots (UTF-16, bigint, Buffer, binary views),
+  queue limits/cancellation, crash recovery without replay, idle shutdown and
+  forced worker teardown with JS exit listeners removed passed. Windows ASan,
+  clean offline npm platform-package installation, CJS/ESM and both TS modes
+  passed. The standalone worker example passed; strict checks and 51 tests passed.
+  POSIX child cleanup and Linux leak validation await CI.

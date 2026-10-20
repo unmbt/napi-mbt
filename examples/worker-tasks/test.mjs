@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import addon from './index.mjs';
+import { createRequire } from 'node:module';
+const cjs = createRequire(import.meta.url)('./index.cjs');
+assert.equal(addon, cjs);
+assert.deepEqual(await Promise.all([addon.fibonacci(10), cjs.fibonacci(93)]), [55n, 12200160415121876738n]);
+const signal = new AbortController();
+const reason = new Error('stop'); signal.abort(reason);
+await assert.rejects(addon.fibonacci(10, { signal: signal.signal }), error => error === reason);
+await assert.rejects(addon.fibonacci(-1), /Expected/);
+console.log('Isolated MoonBit worker example passed');

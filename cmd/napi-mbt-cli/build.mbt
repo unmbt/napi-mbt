@@ -77,7 +77,9 @@ async fn build(
   }
   mkdirp(staging + "/.napi-mbt/include")
   for name, text in @assets.files() {
-    if !name.has_prefix("template/") && !name.has_prefix("async/") {
+    if !name.has_prefix("template/") &&
+      !name.has_prefix("async/") &&
+      !name.has_prefix("workers/") {
       write_text_file(staging + "/.napi-mbt/" + name, text)
     }
   }

@@ -25,6 +25,16 @@ fn config_schema() -> Json raise {
   })
   conditions.push({
     "if": {
+      "required": ["workerTasks"],
+      "properties": { "workerTasks": { "minItems": 1 } },
+    },
+    "then": {
+      "required": ["napiVersion"],
+      "properties": { "napiVersion": { "minimum": 8 } },
+    },
+  })
+  conditions.push({
+    "if": {
       "required": ["nativeTasks"],
       "properties": { "nativeTasks": { "minProperties": 1 } },
     },
@@ -70,6 +80,35 @@ fn config_schema() -> Json raise {
       "cjs": { "type": "boolean", "default": true },
       "esm": { "type": "boolean", "default": true },
       "classes": class_configuration_schema(),
+      "workerTasks": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": { "type": "string" },
+      },
+      "workerPool": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "size": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64,
+            "default": 2,
+          },
+          "maxQueue": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100000,
+            "default": 64,
+          },
+          "idleTimeoutMs": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647,
+            "default": 30000,
+          },
+        },
+      },
       "nativeTasks": {
         "type": "object",
         "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
