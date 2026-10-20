@@ -1,0 +1,3 @@
+import { "moonbitlang/core/encoding/utf8" }
+pkgtype(kind: "foreign_library")
+options("native-stub": ["stub.c", "napi_glue.c", "tasks.c"], link: { "native": { "cc-flags": "", "stub-cc-flags": "", "cc-link-flags": "", "exports": [] } })

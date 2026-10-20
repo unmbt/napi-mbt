@@ -47,7 +47,8 @@
           "buffer",
           "class",
           "callback",
-          "async"
+          "async",
+          "native_tasks"
         ]
       }
     },
@@ -126,6 +127,16 @@
             }
           }
         }
+      }
+    },
+    "nativeTasks": {
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
       }
     }
   },
@@ -286,6 +297,52 @@
             "contains": {
               "const": "async"
             }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "native_tasks"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "nativeTasks"
+        ],
+        "properties": {
+          "nativeTasks": {
+            "minProperties": 1
           }
         }
       },

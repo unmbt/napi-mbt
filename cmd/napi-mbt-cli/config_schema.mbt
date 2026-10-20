@@ -2,6 +2,7 @@
 fn config_schema() -> Json raise {
   let features = [
     "promise", "threadsafe_function", "bigint", "buffer", "class", "callback", "async",
+    "native_tasks",
   ]
   let conditions : Array[Json] = features.map(name => {
     let level = feature_version(name)
@@ -21,6 +22,16 @@ fn config_schema() -> Json raise {
           ({ "properties": { "napiVersion": { "minimum": level } } } : Json)
         },
       } : Json)
+  })
+  conditions.push({
+    "if": {
+      "required": ["nativeTasks"],
+      "properties": { "nativeTasks": { "minProperties": 1 } },
+    },
+    "then": {
+      "required": ["napiVersion"],
+      "properties": { "napiVersion": { "minimum": 8 } },
+    },
   })
   conditions.push({
     "if": {
@@ -59,6 +70,14 @@ fn config_schema() -> Json raise {
       "cjs": { "type": "boolean", "default": true },
       "esm": { "type": "boolean", "default": true },
       "classes": class_configuration_schema(),
+      "nativeTasks": {
+        "type": "object",
+        "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "additionalProperties": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+        },
+      },
     },
     "not": {
       "required": ["cjs", "esm"],

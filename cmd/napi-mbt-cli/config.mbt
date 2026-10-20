@@ -99,6 +99,7 @@ struct Config {
   cjs : Bool
   esm : Bool
   classes : Array[@generator.ClassConfig]
+  native_tasks : Array[(String, String)]
 }
 
 ///|
@@ -109,7 +110,7 @@ fn feature_version(name : String) -> Int32 raise {
     "bigint" => 6
     "buffer" => 7
     "class" | "callback" => 3
-    "async" => 8
+    "async" | "native_tasks" => 8
     _ => fail("Unknown N-API feature: \{name}")
   }
 }
@@ -120,7 +121,7 @@ fn parse_config(value : Json) -> Config raise {
   for key in items.keys() {
     if ![
         "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
-        "classes",
+        "classes", "nativeTasks",
       ].contains(key) {
       fail("Unknown napi-mbt.json field: \{key}")
     }
@@ -157,10 +158,23 @@ fn parse_config(value : Json) -> Config raise {
     }
   }
   let classes = class_configurations(items.get("classes"))
+  let native_tasks = native_task_configurations(items.get("nativeTasks"))
+  if !native_tasks.is_empty() && version < 8 {
+    fail("Native tasks require N-API 8 for asynchronous environment cleanup")
+  }
   if !classes.is_empty() && version < 3 {
     fail("Classes require N-API 3 for environment cleanup")
   }
-  { napi_version: version, builder, targets, features, cjs, esm, classes, }
+  {
+    napi_version: version,
+    builder,
+    targets,
+    features,
+    cjs,
+    esm,
+    classes,
+    native_tasks,
+  }
 }
 
 ///|

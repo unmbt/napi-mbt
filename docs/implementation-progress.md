@@ -51,3 +51,9 @@ and sanitizer results are reported only when actually executed.
   consumers passed. Windows ASan covered lock lifetime; strict check and 50 tests
   passed. Warm median 3.812 s versus 24.510 s without cache (84.4% reduction), with
   no project compilation/linking. POSIX cache validation awaits CI.
+- Step 8: native work, copied inputs/results, queued/cooperative cancellation,
+  original AbortSignal reason, error recovery, responsive event loop and 12
+  forced worker exits passed, including Windows ASan. The new teardown test
+  exposed a timer callback entering JS while Node drained native work; async
+  adapter patch 4 checks execution state before opening that callback scope.
+  The standalone C/MoonBit task example passed. Linux memory checks await CI.

@@ -67,8 +67,14 @@ static void napi_mbt_async_timer(uv_timer_t *timer) {
     napi_callback_scope callback_scope = NULL;
     if (!context->closing) {
         napi_status status = napi_open_handle_scope(context->owner->env, &scope);
-        napi_value resource;
+        napi_value resource, runnable;
         if (status == napi_ok) status = napi_get_reference_value(context->owner->env, context->async_resource, &resource);
+        /* Opening a callback scope does not check whether Node can still enter
+         * JS. During Worker::terminate, Node drains native async work before
+         * running cleanup hooks, so our timer can fire in that interval. Boolean
+         * coercion of our own plain resource cannot execute user code, but does
+         * perform the Node-API execution-state check before opening the scope. */
+        if (status == napi_ok) status = napi_coerce_to_bool(context->owner->env, resource, &runnable);
         if (status == napi_ok) status = napi_open_callback_scope(context->owner->env, resource, context->async_context, &callback_scope);
         if (status != napi_ok) { context->closing = true; context->owner->closing = true; }
     }

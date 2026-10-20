@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "9",
+  "runtimeTemplateVersion": "10",
   "napiVersion": 4,
   "requiredNapiVersion": 4,
   "features": [
@@ -246,5 +246,6 @@
         }
       ]
     }
-  ]
+  ],
+  "nativeTasks": {}
 }

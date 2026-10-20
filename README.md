@@ -39,7 +39,8 @@ Export functions with `#export_name("name")` on `pub fn` or `pub async fn`.
 The annotation determines the JavaScript export name. Generated declarations
 include the source documentation and error contract. See the
 [usage guide](docs/en/usage.md), [types](docs/types.md),
-[classes and callbacks](docs/classes-callbacks.md), and [async](docs/async.md).
+[classes and callbacks](docs/classes-callbacks.md), [async](docs/async.md), and
+[native background tasks](docs/native-tasks.md).
 Six [standalone examples](examples/README.md) include native behavior and
 TypeScript consumers and are built with the packed, installed CLI in CI.
 

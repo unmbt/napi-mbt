@@ -108,6 +108,9 @@ jobs:
       - run: node scripts/structured-types.test.cjs
       - run: node --expose-gc scripts/owned-binary.test.cjs
       - run: node scripts/tsfn.test.cjs
+      - run: node --expose-gc scripts/native-tasks.test.cjs
+        env:
+          UV_THREADPOOL_SIZE: '1'
       - run: node --expose-gc scripts/class.test.cjs
       - run: node --expose-gc scripts/callback.test.cjs
       - run: node scripts/lifecycle.test.cjs

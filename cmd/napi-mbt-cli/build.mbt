@@ -72,6 +72,9 @@ async fn build(
   if uses_async {
     patch_async_dependency(staging)
   }
+  if !conf.native_tasks.is_empty() {
+    prepare_native_tasks(staging)
+  }
   mkdirp(staging + "/.napi-mbt/include")
   for name, text in @assets.files() {
     if !name.has_prefix("template/") && !name.has_prefix("async/") {

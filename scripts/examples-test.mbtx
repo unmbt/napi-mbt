@@ -25,7 +25,7 @@ async fn main {
   checked(["install", source + "/cmd/napi-mbt-cli", "--bin", temp + "/bin"])
   @fs.rmdir(source, recursive=true)
   let binary = temp + "/bin/napi-mbt-cli" + (if windows { ".exe" } else { "" })
-  for name in ["hello-addon", "structured-data", "native-class", "callbacks", "async-file", "binary-processing"] {
+  for name in ["hello-addon", "structured-data", "native-class", "callbacks", "async-file", "binary-processing", "native-tasks"] {
     let destination = temp + "/" + name
     checked(["run", "examples/setup.mbtx", "examples/" + name, destination, binary])
     for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {

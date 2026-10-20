@@ -61,7 +61,8 @@ fn stable_json(value : Json) -> String {
 ///|
 let generated_input_files : Array[String] = [
   "napi_exports.mbt", "napi_glue.c", "napi_manifest.json", "napi-mbt.schema.json",
-  "index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts",
+  "index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts", "napi_native_exports.mbt",
+  "napi_native_tasks.mbt",
 ]
 
 ///|

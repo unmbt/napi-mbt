@@ -74,6 +74,12 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         },
         { "features": ["callback"], "napiVersion": 2 },
         { "features": ["async"], "napiVersion": 7 },
+        { "nativeTasks": { "compute": "my_task" } },
+        { "nativeTasks": { "compute": "my_task" }, "napiVersion": 7 },
+        { "nativeTasks": [], "napiVersion": 8 },
+        { "nativeTasks": { "compute": 1 }, "napiVersion": 8 },
+        { "nativeTasks": { "compute": "x;evil" }, "napiVersion": 8 },
+        { "nativeTasks": { "napi_mbt_reserved": "x" }, "napiVersion": 8 },
       ] : Array[Json]) {
     try parse_config(value) catch {
       _ => ()
