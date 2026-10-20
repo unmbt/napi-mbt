@@ -41,3 +41,7 @@ and sanitizer results are reported only when actually executed.
   copy, offset, detached/shared-store, nested and async snapshot consumers,
   NodeNext/Bundler and Windows ASan. Strict check, 48 tests, snapshots and a
   default N-API 4 addon passed. Node 22/24/26 consumers are configured in CI.
+- Step 6: real native-thread TSFN consumers and Windows ASan passed: 20 rounds
+  each of delivery, queue-full and abort, plus 12 worker terminations. All 72
+  finalizers ran once, C allocations returned to baseline and callback thread
+  checks passed. Strict check, 48 tests and documentation checks passed.

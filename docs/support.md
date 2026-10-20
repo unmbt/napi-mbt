@@ -22,7 +22,7 @@ checks compatibility; it is not a recommendation to deploy an EOL Node release.
 | --- | ---: |
 | Numbers, Bool, UTF-16 strings, owned structured values | 1 |
 | Class and callback lifecycle | 3 |
-| Threadsafe Function | 4 |
+| [Threadsafe Function](tsfn.md) | 4 |
 | Int64/UInt64 bigint | 6 |
 | Bytes and checked BufferView | 7 |
 | Embedded async host, Promise exports and async cleanup | 8 |
