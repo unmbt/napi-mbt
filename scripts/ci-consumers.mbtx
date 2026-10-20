@@ -15,7 +15,6 @@ async fn main {
   }
   checked("moon", ["run", "scripts/test-runtime.mbtx"])
   checked("moon", ["run", "scripts/test-runtime.mbtx", "--structured"])
-  checked("moon", ["run", "scripts/distribution-test.mbtx", binary, "--root"])
   for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
     let files = ["scripts/lifecycle.test.mts", "scripts/async-exports.test.mts"]
     if mode == "NodeNext" { files.push("scripts/lifecycle.test.cts") }

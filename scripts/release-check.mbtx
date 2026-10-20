@@ -9,15 +9,10 @@ async fn main {
     let line = line.trim()
     if line.has_prefix("version = ") { module_version = Some(line[10:].trim().to_owned()) }
   }
-  assert_eq(module_version, Some(Json(version).stringify()))
-  // prepublish adds platform dependencies to distribution metadata. They must
-  // not be required for a fresh source checkout to install its dev tools.
-  if manifest.get("optionalDependencies") is Some(Object(optional)) {
-    for target in ["win32-x64-msvc", "darwin-arm64", "linux-x64-gnu"] {
-      if optional.get("napi-mbt-" + target) is Some(value) { assert_eq(value, Json(version)) }
-    }
-  }
-  if @env.get_env_var("GITHUB_REF_TYPE") == Some("tag") && @env.get_env_var("GITHUB_REF_NAME") is Some(tag) { assert_eq(tag, "v" + version, msg="Release tag must match package version") }
+  guard module_version is Some(module_text) && @json.parse(module_text) is String(release_version) else { fail("Missing Mooncakes release version") }
+  assert_eq(manifest.get("private"), Some(Json(true)), msg="The root npm package is for development only")
+  assert_eq(manifest.get("publishConfig"), None)
+  if @env.get_env_var("GITHUB_REF_TYPE") == Some("tag") && @env.get_env_var("GITHUB_REF_NAME") is Some(tag) { assert_eq(tag, "v" + release_version, msg="Release tag must match moon.mod") }
   let path = "package-lock.json"
   let original = @fs.read_file(path).text()
   let canonical = original.replace_all(old="https://mirrors.tencent.com/npm/", new="https://registry.npmjs.org/")
@@ -34,5 +29,5 @@ async fn main {
       }
     }
   }
-  println("Release version and lockfile checks passed")
+  println("Mooncakes release version and development lockfile checks passed")
 }

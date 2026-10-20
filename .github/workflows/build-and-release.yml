@@ -74,10 +74,6 @@ jobs:
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}.tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: packages-${{ matrix.target }}
-          path: dist/npm/${{ matrix.target }}/*.tgz
 
   node:
     name: Node ${{ matrix.node }} (${{ matrix.target }})

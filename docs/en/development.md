@@ -69,21 +69,21 @@ only the manifests and verifies rejection of an incomplete lockfile.
 ```sh
 moon run scripts/release-check.mbtx
 moon run scripts/distribution-test.mbtx
-moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root
 moon run scripts/mooncake-package-test.mbtx
 ```
 
 The distribution test runs npm pack/dry-run, installs actual tarballs offline in
 a clean directory, loads CJS/ESM and checks installed TypeScript declarations.
 It also verifies that corrupt binaries, stale declarations and version mismatches
-are rejected. `--root` emits root/package tarballs to `dist/npm/<target>/`.
+are rejected. Only generated addons are packaged for npm; napi-mbt itself is
+distributed through Mooncakes. Its private npm manifest installs development tools.
 No registry publication occurs. Source digests are not currently tied to binary
 receipts; always build the checkout being packaged.
 
 The Mooncake gate packs the module, rejects accidental dependencies/binaries in
 the archive, extracts it, and strictly checks the extracted sources. It uses no
 registry publication. `moon publish --dry-run` additionally contacts the registry
-and rejects a version that already exists (including the current 0.1.1); use it
+and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
 CI pins Moon/core and CMake, builds the three release platforms, runs the Node
