@@ -27,3 +27,7 @@ publication, tag, or release-version change is part of this work.
 Baseline: strict check, 45 MoonBit tests, release CLI build, native documented
 examples and packed/unpacked Mooncake check passed on Windows x64. Platform
 and sanitizer results are reported only when actually executed.
+
+- Step 1: development lockfile/source installation and documentation checks passed.
+- Step 2: packed CLI installed without Node/npm, extracted source deleted, new
+  addon built outside the checkout; CJS/ESM and both TS resolution modes passed.

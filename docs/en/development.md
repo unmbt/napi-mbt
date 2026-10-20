@@ -81,8 +81,10 @@ No registry publication occurs. Source digests are not currently tied to binary
 receipts; always build the checkout being packaged.
 
 The Mooncake gate packs the module, rejects accidental dependencies/binaries in
-the archive, extracts it, and strictly checks the extracted sources. It uses no
-registry publication. `moon publish --dry-run` additionally contacts the registry
+the archive, extracts and checks its sources, then installs the CLI without
+Node/npm on PATH. It deletes the extracted source and uses that installed CLI
+outside the checkout to build and execute CJS/ESM and TypeScript consumers.
+It uses no registry publication. `moon publish --dry-run` additionally contacts the registry
 and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 

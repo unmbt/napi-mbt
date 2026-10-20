@@ -64,8 +64,10 @@ moon run scripts/mooncake-package-test.mbtx
 只打包临时生成的用户 addon；napi-mbt 自身仅通过 Mooncakes 发布。
 目前构件没有绑定源码摘要的 build receipt，打包前应构建当前 checkout。
 
-Mooncake 门禁使用 `moon package`，检查 ZIP 清单，在临时目录解包并执行严格检查，
-不依赖 registry 登录或版本是否已发布。`moon publish --dry-run` 还会访问 registry
+Mooncake 门禁使用 `moon package` 检查 ZIP 清单、解包并严格检查。在没有 Node/npm
+的 PATH 下安装 CLI，删除解包源码后，使用安装所得 CLI 在仓库外初始化和构建工程，
+再验证 CJS/ESM 和 TypeScript 消费者。不依赖 registry 登录或版本是否已发布。
+`moon publish --dry-run` 还会访问 registry
 检查版本可用性；已存在的版本可能返回 409，不代表解包后的源码检查失败。
 
 CI 固定 Moon/core 和 CMake，保留三个发布平台，测试 Node 22/24/26 与最低版本，
