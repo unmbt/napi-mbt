@@ -1,9 +1,30 @@
 # Implementation validation
 
-Current hosted status: [run 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
+Historical hosted status: [run 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
 passed all 18 validation jobs for commit `00503d9` on 2026-10-19.
 See [hosted CI confirmation](#hosted-ci-confirmation) for the tested matrix and
 the distinction between packaging validation and release publication.
+
+The subsequent Mooncakes/runtime expansion is recorded in
+[implementation progress](implementation-progress.md) and [platform status](platforms.md).
+That historical CI run does not validate these new commits.
+
+## Current integration evidence
+
+On Windows x64 with Node 26.4.0, the current branch passed 55 MoonBit tests,
+strict warnings, generator/runtime/async resource checks, the packed Mooncake
+CLI install outside the checkout, all nine standalone examples, and the full
+consumer set for legacy values, owned binary types, TSFN, native tasks, process
+workers, typed Promises, streams, cache races and distribution. The combined
+fixture passed cached and `--no-cache` builds, CJS/ESM, NodeNext/Bundler,
+offline npm platform/main-package installation and worker/stream recovery.
+
+Windows parser and addon ASan orchestration passed, including the combined
+fixture and the stream teardown regression. The local cache benchmark remains
+3.812 s warm median versus 24.510 s without cache (84.4% reduction), with no
+project compile/link on warm builds. The final platform matrix and Linux leak
+checks are configured in CI but were not executed on this Windows host; their
+configuration is not reported as a pass.
 
 Local execution environment (2026-10-19): Windows x64, Moon 0.1.20261012,
 moonc v0.10.15+943464bfa, Node 26.4.0, CMake 4.0.3, MSBuild 17.14.14,

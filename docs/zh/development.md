@@ -70,7 +70,7 @@ Mooncake 门禁使用 `moon package` 检查 ZIP 清单、解包并严格检查�
 `moon publish --dry-run` 还会访问 registry
 检查版本可用性；已存在的版本可能返回 409，不代表解包后的源码检查失败。
 
-CI 固定 Moon/core 和 CMake，保留三个发布平台，测试 Node 22/24/26 与最低版本，
+CI 固定 Moon/core 和 CMake，覆盖七个原生目标，测试 Node 22/24/26 与最低版本，
 通过后才生成 release 归档；新 MoonBit 兼容性独立测试。
 自动化使用 `.mbtx`；`.cjs/.mts/.cts` 是真实消费者。下载的 `napi-rs/` 仅供本地参考。
 [性能](performance.md)和[路线图](roadmap.md)记录后续优化与平台工作。

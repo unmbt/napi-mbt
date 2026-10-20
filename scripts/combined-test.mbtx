@@ -1,0 +1,70 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : StringView) -> String {
+  let environment : Map[String, String] = Map([])
+  if program == "node" && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?, extra_env=environment))
+  if code != 0 { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn npm(args : Array[String], cwd : String) -> String {
+  if @env.get_env_var("OS") != Some("Windows_NT") { return checked("npm", args, cwd~) }
+  for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
+    let cli = dir.to_owned() + "/node_modules/npm/bin/npm-cli.js"
+    if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+  }
+  fail("Cannot find npm-cli.js")
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-combined-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  ignore(checked(binary, ["init", dir, "--name", "combined-fixture"]))
+  @fs.write_file(dir + "/moon.mod", "name = \"test/combined\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  ignore(checked("moon", ["check", "--target", "native"], cwd=dir))
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"nativeTasks\":{\"uppercase\":\"uppercase_task\"},\"workerTasks\":[\"digest\"],\"workerPool\":{\"idleTimeoutMs\":100}}")
+  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/combined.mbt.txt"))
+  @fs.write_file(dir + "/tasks.c", @fs.read_file("examples/native-tasks/tasks.c"))
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"tasks.c\""))
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  ignore(checked(binary, ["build", dir, "--release"]))
+  assert_true(checked(binary, ["build", dir, "--release", "--verbose"]).contains("no work to do"))
+  println(checked("node", [root + "/scripts/combined.test.cjs", dir]))
+  if asan { println("Combined sanitizer consumer passed"); return }
+  ignore(checked(binary, ["build", dir, "--release", "--no-cache"]))
+  println(checked("node", [root + "/scripts/combined.test.cjs", dir]))
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let saved = root + "/.napi-mbt/combined-smoke"
+  @fs.mkdir(saved + "/artifacts/" + target, recursive=true, allow_exist=true)
+  for name in ["index.cjs", "index.mjs", "napi_workers.cjs", "napi_worker_entry.cjs"] { @fs.write_file(saved + "/" + name, @fs.read_file(dir + "/" + name)) }
+  @fs.write_file(saved + "/artifacts/" + target + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  ignore(checked(binary, ["prepublish", dir]))
+  let packages = []
+  for project in [dir + "/npm/" + target, dir] {
+    guard @json.parse(npm(["pack", project, "--json", "--ignore-scripts"], temp)) is [{"filename": String(file), ..}] else { fail("Invalid npm pack") }
+    packages.push(temp + "/" + file)
+  }
+  let installed = temp + "/consumer"
+  @fs.mkdir(installed)
+  @fs.write_file(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
+  ignore(npm(["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--package-lock=false"] + packages, installed))
+  let package_dir = installed + "/node_modules/combined-fixture"
+  assert_true(!@fs.exists(package_dir + "/artifacts"))
+  println(checked("node", [root + "/scripts/combined.test.cjs", package_dir]))
+  @fs.write_file(installed + "/consumer.mts", "import a from 'combined-fixture';\nconst stream: ReadableStream<Uint8Array> = a.pipeline(new ReadableStream<Buffer>()).toReadableStream();\nconst task: Promise<Record<string,[number,number]>> = a.digest(new Uint8Array());\na.settle(Promise.resolve(Buffer.from('ok')));\n// @ts-expect-error owned binary worker input required\na.digest(stream);\n// @ts-expect-error Promise resolves to Buffer\na.settle(Promise.resolve('bad'));\n")
+  for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+    ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", mode, "--moduleResolution", resolution, installed + "/consumer.mts"]))
+  }
+  println("Combined cached/uncached, offline npm CJS/ESM and TS consumers passed")
+}

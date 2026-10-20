@@ -55,6 +55,9 @@ async fn main {
   if repetitions == 3 { @fs.write_file(root + "/.napi-mbt/cache-benchmark.json", benchmark.stringify(indent=2)) }
   println(benchmark.stringify(indent=2))
   if @env.args().contains("--benchmark") { assert_true(reduction >= 0.7, msg="Hot rebuild median should improve at least 70%") }
+  // Dedicated measurements run without unrelated builds and need not repeat the
+  // full invalidation suite, which remains the default CI behavior.
+  if @env.args().contains("--measure-only") { return }
   ignore(run(binary, ["prepublish", dir, "--target", target]))
   @fs.write_file(dir + "/helper.mbt", "///|\nfn helper() -> Int { 2 }\n")
   ignore(run(binary, ["prepublish", dir, "--target", target], ok=false))

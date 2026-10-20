@@ -1,0 +1,27 @@
+///|
+let closes : Ref[Int] = Ref(0)
+///|
+#export_name("closed")
+pub fn closed() -> Int { closes.val }
+///|
+#export_name("settle")
+pub async fn settle(value : NapiJsPromise[Bytes]) -> Bytes {
+  napi_native_task("uppercase", value.wait())
+}
+///|
+#export_name("pipeline")
+pub fn pipeline(input : NapiAsyncIterator[Bytes]) -> NapiAsyncIterator[Bytes] raise {
+  NapiAsyncIterator::new(() => {
+    match input.next() {
+      Some(bytes) => Some(napi_native_task("uppercase", bytes))
+      None => None
+    }
+  }, () => { closes.val += 1; input.close() })
+}
+///|
+#export_name("digest")
+pub fn digest(input : NapiUint8Array) -> Map[String, (UInt, Float)] {
+  let mut sum = 0U
+  for byte in input.to_array() { sum += byte.to_uint() }
+  { "__proto__": (sum, input.length().to_float()) }
+}

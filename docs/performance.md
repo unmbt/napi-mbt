@@ -69,3 +69,7 @@ Three warm builds had a median of 3.812 s versus 24.510 s with `--no-cache`, an
 CI checks correct invalidation and compile counts, without a timing threshold.
 Use `scripts/build-cache-test.mbtx <cli> --benchmark` to enforce the local 70%
 median improvement target. Other platforms have not been measured for this change.
+
+The combined Promise/native-task/stream/worker fixture passed cached and
+`--no-cache` builds on Windows. It verifies consumer behavior; platform timings
+await CI.

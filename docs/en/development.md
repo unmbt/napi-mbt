@@ -88,7 +88,7 @@ It uses no registry publication. `moon publish --dry-run` additionally contacts 
 and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
-CI pins Moon/core and CMake, builds the three release platforms, runs the Node
+CI pins Moon/core and CMake, builds the seven native target profiles, runs the Node
 22/24/26 matrix and minimum consumers, and gates release archives on tests.
 A separate job checks latest MoonBit compatibility. Test orchestration uses
 `.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`

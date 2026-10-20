@@ -86,3 +86,9 @@ and sanitizer results are reported only when actually executed.
   missing/mixed/wrong libc at compiler probing, build and prepublish. Synthetic
   ELF cases and simulated seven-target loaders run locally; Alpine execution and
   Node 22/24/26 jobs remain CI pending.
+- Step 14: combined typed Promise → native task → stream → worker consumers pass
+  with cached and `--no-cache` builds, CJS/ESM, NodeNext/Bundler, offline npm
+  installation and recovery. Full Windows consumer regression passed through
+  workers, Promise, streams, cache, TSFN, native tasks and legacy fixtures;
+  Windows parser/addon ASan orchestration passed. Non-Windows seven-target and
+  Linux leak jobs are configured but await CI. No registry publication or push.

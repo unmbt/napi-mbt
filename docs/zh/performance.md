@@ -51,4 +51,5 @@ C 头文件和本地 MoonBit 依赖。三次热构建中位数为 3.812 秒，�
 [原始数据](../benchmarks/cache-windows.json) 记录命令和范围。
 CI 验证失效正确性和编译次数，不使用时间阈值；本机可用
 `scripts/build-cache-test.mbtx <cli> --benchmark` 检查中位耗时降低至少 70%。
-本次改动尚未测量其他平台。
+本次改动尚未测量其他平台。Promise/native task/stream/worker 组合样例已在 Windows
+上通过缓存和 `--no-cache` 构建；它验证组合行为，平台耗时等待 CI。
