@@ -5,6 +5,7 @@
 #include <limits.h>
 #include "napi_lifecycle.h"
 #include "napi_callbacks.h"
+#include "napi_owned_binary.h"
 
 /* Shared exception boundary for C callbacks and MoonBit adapters. Never replace
  * a JS exception already pending on the environment. Every operation is checked. */

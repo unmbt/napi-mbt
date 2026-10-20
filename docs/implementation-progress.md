@@ -37,3 +37,7 @@ and sanitizer results are reported only when actually executed.
   collection boundaries and NodeNext/Bundler types passed. Windows ASan passed
   parser, runtime, structured/collection, class, callback and async suites.
   Linux ASan/leak checks are wired into CI and have not been run locally.
+- Step 5: owned Uint8/Int32/Uint32/Float32/Float64 arrays and ArrayBuffer passed
+  copy, offset, detached/shared-store, nested and async snapshot consumers,
+  NodeNext/Bundler and Windows ASan. Strict check, 48 tests, snapshots and a
+  default N-API 4 addon passed. Node 22/24/26 consumers are configured in CI.

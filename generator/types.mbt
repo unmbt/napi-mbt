@@ -4,6 +4,7 @@ pub(all) enum ValueType {
   UIntType
   FloatType
   JsonType
+  OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
   DoubleType
@@ -28,6 +29,7 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     UIntType => "UInt"
     FloatType => "Float"
     JsonType => "Json"
+    OwnedBinaryType(kind) => "Napi" + kind.javascript()
     Int64Type => "Int64"
     UInt64Type => "UInt64"
     DoubleType => "Double"
@@ -76,6 +78,7 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
   match self {
     IntType | UIntType | FloatType | DoubleType => "number"
     JsonType => "$NapiJson"
+    OwnedBinaryType(kind) => kind.javascript()
     Int64Type | UInt64Type => "bigint"
     BoolType => "boolean"
     StringType => "string"
@@ -181,6 +184,12 @@ fn parse_value_type(
     "UInt" | "UInt32" => UIntType
     "Float" => FloatType
     "Json" => JsonType
+    "NapiUint8Array" => OwnedBinaryType(Uint8)
+    "NapiInt32Array" => OwnedBinaryType(Int32)
+    "NapiUint32Array" => OwnedBinaryType(Uint32)
+    "NapiFloat32Array" => OwnedBinaryType(Float32)
+    "NapiFloat64Array" => OwnedBinaryType(Float64)
+    "NapiArrayBuffer" => OwnedBinaryType(ArrayBuffer)
     "Int64" => Int64Type
     "UInt64" => UInt64Type
     "Double" => DoubleType

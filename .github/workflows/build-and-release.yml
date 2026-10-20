@@ -106,6 +106,7 @@ jobs:
       - run: node scripts/build-isolation.test.cjs
       - run: node scripts/runtime-boundary.test.cjs
       - run: node scripts/structured-types.test.cjs
+      - run: node --expose-gc scripts/owned-binary.test.cjs
       - run: node --expose-gc scripts/class.test.cjs
       - run: node --expose-gc scripts/callback.test.cjs
       - run: node scripts/lifecycle.test.cjs

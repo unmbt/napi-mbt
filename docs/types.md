@@ -14,6 +14,9 @@ with a source filename and line; no type falls back to Buffer.
 | String | string | Exact UTF-16 code units, including NUL and lone surrogates |
 | Bytes | Buffer | Owned copy; N-API 7 for backing-store checks |
 | NapiBufferView | Buffer | Direct synchronous borrowed parameter; invalid after the call |
+| NapiUint8Array / NapiInt32Array / NapiUint32Array | Uint8Array / Int32Array / Uint32Array | Owned copies of the exact view type; N-API 7 |
+| NapiFloat32Array / NapiFloat64Array | Float32Array / Float64Array | Owned copies preserving IEEE values; N-API 7 |
+| NapiArrayBuffer | ArrayBuffer | Owned bytes; independent output backing store; N-API 7 |
 | Option[T] / T? | T or null | Missing, undefined and null become None; None returns null |
 | Array[T] | Array | Recursive conversion; sparse slots behave as undefined |
 | Map[String, T] | Record<string, T> | Own enumerable string keys; safe data properties on output |
@@ -74,3 +77,14 @@ Run `moon run scripts/structured-types-test.mbtx`, then
 consumer coverage. The first command also checks complete artifact snapshots.
 Run `moon run scripts/collections-test.mbtx` for UInt/Float, records, tuples and
 JSON boundary tests and NodeNext/Bundler declaration checks.
+
+Owned binary wrappers copy on input and output, including zero-length arrays
+and views with a nonzero byte offset. Shared backing stores and detached buffers
+are rejected. No borrowed pointers or JavaScript handles remain after conversion,
+so these wrappers can cross async boundaries. Use `NapiInt32Array::new([1, 2])`
+(and the corresponding constructor for each typed array), `length()` and
+`to_array()` to work with MoonBit values. `NapiArrayBuffer::from_bytes(bytes)`,
+`to_bytes()` and `byte_length()` use immutable MoonBit Bytes. They do not change
+the existing Bytes or NapiBufferView APIs. Run
+`moon run scripts/owned-binary-test.mbtx` for copy isolation, offset, detached,
+shared-store, nested and asynchronous lifetime checks.

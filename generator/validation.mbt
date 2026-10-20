@@ -59,7 +59,7 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
         fail("\{location}: Unit is only supported as a return type")
       Int64Type | UInt64Type if napi_version < 6 =>
         fail("\{location}: bigint requires N-API 6")
-      BytesType | BufferViewType if napi_version < 7 =>
+      BytesType | BufferViewType | OwnedBinaryType(_) if napi_version < 7 =>
         fail("\{location}: checked Buffer access requires N-API 7")
       _ => ()
     }

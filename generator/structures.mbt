@@ -181,7 +181,7 @@ fn resolve_type(
         )
       }
     }
-    BytesType | BufferViewType =>
+    BytesType | BufferViewType | OwnedBinaryType(_) =>
       if !features.contains("buffer") {
         features.push("buffer")
       }

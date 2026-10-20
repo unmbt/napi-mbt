@@ -11,6 +11,15 @@ pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool,
 // Errors
 
 // Types and methods
+pub(all) enum BinaryKind {
+  Uint8
+  Int32
+  Uint32
+  Float32
+  Float64
+  ArrayBuffer
+}
+
 pub(all) enum BindingKind {
   FunctionBinding
   ConstructorBinding(Int)
@@ -96,6 +105,7 @@ pub(all) enum ValueType {
   UIntType
   FloatType
   JsonType
+  OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
   DoubleType

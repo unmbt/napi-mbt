@@ -13,6 +13,9 @@
 | String | string | 精确保留 UTF-16 code units，包括 NUL 和孤立 surrogate |
 | Bytes | Buffer | 拥有数据副本；backing store 检查需要 N-API 7 |
 | NapiBufferView | Buffer | 同步调用的直接借用参数，调用结束后失效 |
+| NapiUint8Array / NapiInt32Array / NapiUint32Array | Uint8Array / Int32Array / Uint32Array | 严格匹配视图类型，双向复制，需要 N-API 7 |
+| NapiFloat32Array / NapiFloat64Array | Float32Array / Float64Array | 拥有型副本，保留 IEEE 数值，需要 N-API 7 |
+| NapiArrayBuffer | ArrayBuffer | 拥有型字节序列，输出独立 backing store，需要 N-API 7 |
 | Option[T] / T? | T 或 null | missing、undefined、null 输入均为 None；None 输出 null |
 | Array[T] | Array | 递归转换；稀疏位置按 undefined 处理 |
 | Map[String, T] | Record<string, T> | 自有可枚举字符串键；输出使用安全的数据属性 |
@@ -65,3 +68,11 @@ None 对应 null。两种声明均由同一 IR 生成。
 第一条命令还检查完整生成物快照。
 运行 `moon run scripts/collections-test.mbtx` 验证 UInt/Float、Map、tuple、Json
 边界行为及 NodeNext/Bundler 类型声明。
+
+拥有型二进制包装支持空值及偏移视图，拒绝 detached 和 SharedArrayBuffer backing
+store。输入输出均复制，不保留 JS 句柄或借用指针，可以跨 async 边界。
+TypedArray 包装提供 `new(Array[T])`、`length()` 和 `to_array()`；ArrayBuffer 包装
+提供 `from_bytes()`、`to_bytes()` 和 `byte_length()`，使用不可变的 MoonBit Bytes。
+现有 Bytes 和 NapiBufferView 接口不变。
+运行 `moon run scripts/owned-binary-test.mbtx` 验证复制隔离、偏移、分离、共享存储、
+嵌套及异步生命周期。
