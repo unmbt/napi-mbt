@@ -8,7 +8,7 @@ From the napi-mbt repository root:
 moon install unmbt/napi-mbt/cmd/napi-mbt-cli
 moon run examples/setup.mbtx examples/async-file ../async-file
 cd ../async-file
-npm test
+pnpm test
 ```
 
 The destination is a standalone project; the installed CLI supplies runtime boilerplate.

@@ -21,8 +21,8 @@ async fn main {
     #|#export_name("effects")
     #|pub fn effects_count() -> Int { effects.val }
     #|///|
-    #|#export_name("uint")
-    #|pub fn uint(v : UInt) -> UInt { effects.val += 1; v }
+    #|#export_name("uint_value")
+    #|pub fn uint_value(v : UInt) -> UInt { effects.val += 1; v }
     #|///|
     #|#export_name("echo_float")
     #|pub fn float_value(v : Float) -> Float { effects.val += 1; v }

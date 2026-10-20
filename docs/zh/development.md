@@ -23,7 +23,7 @@ moon check --target native --warn-list +73 --deny-warn
 moon build --target native --release cmd/napi-mbt-cli
 moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx
@@ -59,7 +59,7 @@ CI 仍执行不带 `--write` 的 `release-check.mbtx`，版本不一致时会失
 
 源码清单包含开发依赖，不包含尚未发布的平台包。`prepublish` 为分发添加平台依赖，
 根目录分发测试结束后恢复源码清单。`source-install-test.mbtx` 在仅含清单的全新临时
-目录中执行 `npm ci`，并验证缺少条目的 lockfile 会被门禁拒绝。
+目录中执行 `pnpm install --frozen-lockfile`，并验证缺少条目的 lockfile 会被门禁拒绝。
 
 ```sh
 moon run scripts/release-check.mbtx
@@ -67,7 +67,7 @@ moon run scripts/distribution-test.mbtx
 moon run scripts/mooncake-package-test.mbtx
 ```
 
-分发测试执行 npm pack/dry-run，在干净目录离线安装真实 tarball，再加载 CJS/ESM 并
+分发测试执行 pnpm pack/dry-run，在干净目录离线安装真实 tarball，再加载 CJS/ESM 并
 检查已安装的 TypeScript 声明。也验证损坏二进制、过期声明和版本不一致会失败。
 只打包临时生成的用户 addon；napi-mbt 自身仅通过 Mooncakes 发布。
 目前构件没有绑定源码摘要的 build receipt，打包前应构建当前 checkout。
@@ -78,7 +78,9 @@ Mooncake 门禁使用 `moon package` 检查 ZIP 清单、解包并严格检查�
 `moon publish --dry-run` 还会访问 registry
 检查版本可用性；已存在的版本可能返回 409，不代表解包后的源码检查失败。
 
-CI 固定 Moon/core 和 CMake，覆盖七个原生目标，测试 Node 22/24/26 与最低版本，
+CI 固定 Moon/core 和 CMake，覆盖当前可用的原生目标，测试 Node 22/24/26 与最低版本，
 通过后才生成 release 归档；新 MoonBit 兼容性独立测试。
 自动化使用 `.mbtx`；`.cjs/.mts/.cts` 是真实消费者。下载的 `napi-rs/` 仅供本地参考。
+当前 MoonBit setup action 没有 macOS x64 编译器，GitHub Actions 也不能在 ARM64
+Alpine 容器中运行 JavaScript action；这两个目标标记为 CI 待验证。
 [性能](performance.md)和[路线图](roadmap.md)记录后续优化与平台工作。

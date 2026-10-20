@@ -2,7 +2,9 @@
 
 The CLI builds for its own host. No cross compiler or architecture emulation is
 used. All seven target names select matching loader paths and npm os/cpu/libc
-metadata. CI runs installed CLI/examples, real consumers and package installation.
+metadata. CI runs installed CLI/examples, real consumers and package installation
+for the available hosts; macOS x64 and Linux musl ARM64 remain CI-pending because
+the current MoonBit/action host combinations are unavailable.
 
 | Target | Native CI host | Current change validated locally |
 | --- | --- | --- |

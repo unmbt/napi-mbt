@@ -52,5 +52,5 @@ additional processes that outlive the managed child.
 See the [standalone example](../examples/worker-tasks/README.md).
 `scripts/workers-test.mbtx` exercises simultaneous computation, global isolation,
 input snapshots, CJS/ESM identity, errors/cancellation, idle shutdown, native
-teardown with JS exit listeners removed, npm pack/offline installation, and TS
+teardown with JS exit listeners removed, pnpm pack/offline installation, and TS
 positive/negative consumers. Platform test results are recorded only after runs.

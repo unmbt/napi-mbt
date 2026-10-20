@@ -54,7 +54,7 @@ regression. Loader CJS/ESM/ESM-only and TS consumer tests also passed. These
 native watch scenarios were executed on Windows only.
 
 Distribution gates: 39 MoonBit tests, strict checks, complete generator and
-structured snapshots, actual fixture and root npm pack/dry-run, offline clean
+structured snapshots, actual fixture and generated-addon pnpm pack/dry-run, offline clean
 installation, CJS/ESM and installed TypeScript consumers passed on Windows.
 Both packages include runtime, Node-API, async and libuv licenses. Corrupt
 binaries, stale declarations and mismatched versions are rejected. Full parser,
@@ -131,7 +131,7 @@ exposed failures hidden by local generated files and host differences. The sourc
 npm manifest no longer depends on unpublished platform packages; `prepublish`
 still adds distribution dependencies, and the root distribution test restores
 the source manifest. Clean temporary-directory installation and rejection of a
-missing lockfile entry both passed. Root npm pack/dry-run, clean consumer install
+missing lockfile entry both passed. Generated-addon pnpm pack/dry-run, clean consumer install
 and extracted Mooncake checks also passed after this change.
 
 Unit CI now explicitly selects the CLI, generator, parser and assets packages:
@@ -178,7 +178,7 @@ A fresh Fedora WSL source copy passed all main native gates and the Node 26.4.0
 consumer commands: dependency/template checks, 45 unit tests, no-Node CLI
 installation, snapshots, isolated native inputs, loaders and declarations,
 classes/callbacks, async I/O/cancellation/workers, documented examples, watch
-recovery, npm packing/dry-run/clean installation, Mooncake extraction/checking,
+recovery, pnpm packing/dry-run/clean installation, Mooncake extraction/checking,
 CLI archive packaging and consumer artifact staging. This complete run used
 the existing CMake 3.31.10 installation.
 

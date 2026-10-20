@@ -28,7 +28,7 @@ node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
 The native CLI does not require Node or npm, including during addon compilation.
-Node is needed to load an addon; npm is needed for package installation/testing.
+Node is needed to load an addon; pnpm is used for package installation/testing.
 The parser, headers, runtime templates and versioned async patch are embedded.
 
 For development, clone this repository and run `moon install ./cmd/napi-mbt-cli`.
@@ -76,7 +76,7 @@ candidate is broken. Platform package versions and metadata must match.
 ```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx

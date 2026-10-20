@@ -28,6 +28,7 @@ async fn initialize(
       },
     },
     "scripts": { "test": "node test/smoke.cjs && node test/smoke.mjs" },
+    "engines": { "pnpm": ">=10" },
   }
   let files : Map[String, String] = Map([])
   for name, text in @assets.files() {
@@ -48,7 +49,7 @@ async fn initialize(
       } : Json).stringify(indent=2) +
     "\n"
   files["bump.config.json"] = (
-      { "execute": "napi-mbt-cli build --release && npm test", "all": true } :
+      { "execute": "napi-mbt-cli build --release && pnpm test", "all": true } :
       Json).stringify(indent=2) +
     "\n"
   files["moon.mod"] = "name = " +
@@ -92,7 +93,10 @@ async fn initialize(
     #|      - run: napi-mbt-cli build --release
     #|      - uses: actions/setup-node@v4
     #|        with: { node-version: '${{ matrix.node }}' }
-    #|      - run: npm test
+    #|      - uses: pnpm/action-setup@v4
+    #|        with: { version: '10' }
+    #|      - run: pnpm install --ignore-scripts
+    #|      - run: pnpm test
     #|
   files[".github/workflows/build.yml"] = workflow
   if !force {
@@ -127,5 +131,5 @@ async fn initialize(
   }
   ignore(generate(dir, false))
   println("[napi-mbt] initialized \{dir}")
-  println("[napi-mbt] next: napi-mbt-cli build --release && npm test")
+  println("[napi-mbt] next: napi-mbt-cli build --release && pnpm test")
 }

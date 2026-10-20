@@ -6,7 +6,7 @@ From this repository, materialize a complete project in a **new** directory:
 ```sh
 moon run examples/setup.mbtx examples/hello-addon ../my-addon
 cd ../my-addon
-npm test
+pnpm test
 ```
 
 The helper obtains runtime boilerplate from the installed CLI, overlays the
@@ -29,4 +29,4 @@ CLI executable. No reference to the napi-mbt checkout remains in the project.
 
 `moon run scripts/examples-test.mbtx` packages and installs the current CLI into
 a temporary directory and builds every example, including TypeScript positive
-and negative consumers. Node/npm are consumer tools; no npm package is published.
+and negative consumers. Node/pnpm are consumer tools; no package is published for the CLI.

@@ -10,13 +10,15 @@ async fn checked(program : String, args : Array[String], cwd? : StringView) -> S
 }
 
 ///|
-async fn npm(args : Array[String], cwd : String) -> String {
-  if @env.get_env_var("OS") != Some("Windows_NT") { return checked("npm", args, cwd~) }
+async fn pnpm(args : Array[String], cwd : String) -> String {
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    return checked("pnpm", args, cwd~)
+  }
   for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
-    let cli = dir.to_owned() + "/node_modules/npm/bin/npm-cli.js"
+    let cli = dir.to_owned() + "/node_modules/pnpm/bin/pnpm.cjs"
     if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
   }
-  fail("Cannot find npm-cli.js")
+  fail("Cannot find pnpm.cjs beside Node on PATH")
 }
 
 ///|
@@ -52,13 +54,13 @@ async fn main {
   ignore(checked(binary, ["prepublish", dir]))
   let packages = []
   for project in [dir + "/npm/" + target, dir] {
-    guard @json.parse(npm(["pack", project, "--json", "--ignore-scripts"], temp)) is [{"filename": String(file), ..}] else { fail("Invalid npm pack") }
-    packages.push(temp + "/" + file)
+    guard @json.parse(pnpm(["pack", "--json", "--pack-destination", temp], project)) is {"filename": String(file), ..} else { fail("Invalid pnpm pack") }
+    packages.push(file)
   }
   let installed = temp + "/consumer"
   @fs.mkdir(installed)
   @fs.write_file(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
-  ignore(npm(["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--package-lock=false"] + packages, installed))
+  ignore(pnpm(["add", "--offline", "--ignore-scripts", "--save-prod"] + packages, installed))
   let package_dir = installed + "/node_modules/combined-fixture"
   assert_true(!@fs.exists(package_dir + "/artifacts"))
   println(checked("node", [root + "/scripts/combined.test.cjs", package_dir]))
@@ -66,5 +68,5 @@ async fn main {
   for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
     ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", mode, "--moduleResolution", resolution, installed + "/consumer.mts"]))
   }
-  println("Combined cached/uncached, offline npm CJS/ESM and TS consumers passed")
+  println("Combined cached/uncached, offline pnpm CJS/ESM and TS consumers passed")
 }

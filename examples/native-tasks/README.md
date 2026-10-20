@@ -4,7 +4,7 @@
 moon install unmbt/napi-mbt/cmd/napi-mbt-cli
 moon run examples/setup.mbtx examples/native-tasks ../native-tasks
 cd ../native-tasks
-npm test
+pnpm test
 ```
 
 The installed CLI supplies the versioned C header and runtime. `tasks.c` performs

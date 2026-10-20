@@ -25,7 +25,7 @@ node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
 原生 CLI 的所有命令（包括 addon 编译）均不依赖 Node/npm。
-Node 用于加载 addon，npm 用于包安装和验证。解析器、头文件、runtime 模板和
+Node 用于加载 addon，pnpm 用于包安装和验证。解析器、头文件、runtime 模板和
 带版本的 async 补丁均已内嵌。
 
 开发者可 clone 仓库后执行 `moon install ./cmd/napi-mbt-cli`。
@@ -65,7 +65,7 @@ CJS/ESM 默认同时启用，也可独立启用。未知配置字段、不支持
 ```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx

@@ -27,7 +27,7 @@ moon check --target native --warn-list +73 --deny-warn
 moon build --target native --release cmd/napi-mbt-cli
 moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx
@@ -73,7 +73,7 @@ fails.
 The checkout manifest contains development dependencies, without unpublished
 platform packages. `prepublish` adds the platform dependencies for distribution;
 the root distribution test restores the checkout manifest afterward.
-`source-install-test.mbtx` runs `npm ci` in a fresh temporary directory with
+`source-install-test.mbtx` runs `pnpm install --frozen-lockfile` in a fresh temporary directory with
 only the manifests and verifies rejection of an incomplete lockfile.
 
 ```sh
@@ -82,7 +82,7 @@ moon run scripts/distribution-test.mbtx
 moon run scripts/mooncake-package-test.mbtx
 ```
 
-The distribution test runs npm pack/dry-run, installs actual tarballs offline in
+The distribution test runs pnpm pack/dry-run, installs actual tarballs offline in
 a clean directory, loads CJS/ESM and checks installed TypeScript declarations.
 It also verifies that corrupt binaries, stale declarations and version mismatches
 are rejected. Only generated addons are packaged for npm; napi-mbt itself is
@@ -99,9 +99,11 @@ the registry
 and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
-CI pins Moon/core and CMake, builds the seven native target profiles, runs the Node
+CI pins Moon/core and CMake, builds the currently supported native target profiles, runs the Node
 22/24/26 matrix and minimum consumers, and gates release archives on tests.
 A separate job checks latest MoonBit compatibility. Test orchestration uses
 `.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`
-as local reference only. [Benchmarks](../performance.md) and the
+as local reference only. The MoonBit setup action currently cannot provide a
+macOS x64 compiler, and GitHub Actions cannot run JavaScript actions inside an
+ARM64 Alpine container; those two profiles remain CI-pending. [Benchmarks](../performance.md) and the
 [roadmap](../roadmap.md) describe remaining performance and platform work.

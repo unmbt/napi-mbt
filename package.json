@@ -1,6 +1,6 @@
 {
   "name": "napi-mbt",
-  "version": "0.1.1",
+  "version": "0.2.1",
   "private": true,
   "description": "MoonBit N-API bindings and native Node.js addon tooling",
   "repository": {
@@ -43,6 +43,7 @@
     "test": "node --test scripts/test.js"
   },
   "engines": {
-    "node": ">=12.20.0 <13 || >=14.13.1"
+    "node": ">=12.20.0 <13 || >=14.13.1",
+    "pnpm": ">=10"
   }
 }

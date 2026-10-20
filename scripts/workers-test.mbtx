@@ -8,13 +8,15 @@ async fn checked(program : String, args : Array[String], cwd? : StringView) -> S
 }
 
 ///|
-async fn npm(args : Array[String], cwd : String) -> String {
-  if @env.get_env_var("OS") != Some("Windows_NT") { return checked("npm", args, cwd~) }
+async fn pnpm(args : Array[String], cwd : String) -> String {
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    return checked("pnpm", args, cwd~)
+  }
   for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
-    let cli = dir.to_owned() + "/node_modules/npm/bin/npm-cli.js"
+    let cli = dir.to_owned() + "/node_modules/pnpm/bin/pnpm.cjs"
     if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
   }
-  fail("Cannot find npm-cli.js")
+  fail("Cannot find pnpm.cjs beside Node on PATH")
 }
 
 ///|
@@ -54,13 +56,13 @@ async fn main {
     ignore(checked(binary, ["prepublish", dir, "--target", target]))
     let tarballs = []
     for package_dir in [dir + "/npm/" + target, dir] {
-      guard @json.parse(npm(["pack", package_dir, "--json", "--ignore-scripts"], temp)) is [{"filename": String(filename), ..}] else { fail("Invalid npm pack") }
-      tarballs.push(temp + "/" + filename)
+      guard @json.parse(pnpm(["pack", "--json", "--pack-destination", temp], package_dir)) is {"filename": String(filename), ..} else { fail("Invalid pnpm pack") }
+      tarballs.push(filename)
     }
     let installed = temp + "/installed"
     @fs.mkdir(installed)
     @fs.write_file(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
-    ignore(npm(["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--package-lock=false"] + tarballs, installed))
+    ignore(pnpm(["add", "--offline", "--ignore-scripts", "--save-prod"] + tarballs, installed))
     let package_dir = installed + "/node_modules/worker-fixture"
     assert_true(@fs.exists(package_dir + "/napi_worker_entry.cjs"))
     assert_true(!@fs.exists(package_dir + "/artifacts"))

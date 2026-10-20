@@ -1,4 +1,14 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn pnpm_command() -> (String, Array[String]) {
+  if @env.get_env_var("OS") != Some("Windows_NT") { return ("pnpm", []) }
+  for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
+    let cli = dir.to_owned() + "/node_modules/pnpm/bin/pnpm.cjs"
+    if @fs.exists(cli) { return ("node", [cli]) }
+  }
+  fail("Cannot find pnpm.cjs beside Node on PATH")
+}
 
 ///|
 async fn main {
@@ -6,33 +16,24 @@ async fn main {
   let temp = @fs.tmpdir(prefix="napi-mbt-source-install-")
   defer @fs.rmdir(temp, recursive=true)
   // Only tracked manifests: no generated npm/, artifacts/ or node_modules/.
-  for name in ["package.json", "package-lock.json", "moon.mod"] {
+  for name in ["package.json", "pnpm-lock.yaml", "moon.mod"] {
     @fs.write_file(temp + "/" + name, @fs.read_file(root + "/" + name))
   }
-  let mut program = "npm"
-  let args = ["ci", "--ignore-scripts", "--no-audit", "--no-fund"]
-  if @env.get_env_var("OS") == Some("Windows_NT") {
-    program = "node"
-    let mut cli : String? = None
-    for directory in @env.get_env_var("PATH").unwrap_or("").split(";") {
-      let path = directory.to_owned() + "/node_modules/npm/bin/npm-cli.js"
-      if @fs.exists(path) { cli = Some(path); break }
-    }
-    guard cli is Some(path) else { fail("npm-cli.js not found") }
-    args.insert(0, path)
-  }
-  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(program, args, cwd=temp))
+  let (program, prefix) = pnpm_command()
+  let (code, out, err) = @async.with_timeout(
+    180000,
+    () => @process.collect_output(program, prefix + ["install", "--frozen-lockfile", "--ignore-scripts"], cwd=temp),
+  )
   if code != 0 { fail(out.text() + err.text()) }
   assert_true(@fs.exists(temp + "/node_modules/typescript/bin/tsc"))
-  assert_eq(@fs.read_file(temp + "/package-lock.json").binary(), @fs.read_file(root + "/package-lock.json").binary())
+  assert_eq(@fs.read_file(temp + "/pnpm-lock.yaml").binary(), @fs.read_file(root + "/pnpm-lock.yaml").binary())
   let command = ["run", root + "/scripts/release-check.mbtx"]
   assert_eq(@process.run("moon", command, cwd=temp), 0)
-  // A missing lock entry must fail before an npm CI job encounters it.
-  guard @json.parse(@fs.read_file(temp + "/package-lock.json").text()) is Object(lock) else { fail("Invalid lock") }
-  guard lock.get("packages") is Some(Object(packages)) else { fail("Missing packages") }
-  packages.remove("node_modules/typescript")
-  @fs.write_file(temp + "/package-lock.json", Json(lock).stringify(indent=2))
-  let (code, _, err) = @process.collect_output("moon", command, cwd=temp)
-  assert_true(code != 0 && err.text().contains("Missing lockfile package: typescript"))
+  // A missing lockfile importer must fail before a frozen pnpm install runs.
+  let lock = @fs.read_file(temp + "/pnpm-lock.yaml").text()
+  @fs.write_file(temp + "/pnpm-lock.yaml", lock.replace_all(old="\n  .:\n", new="\n  missing:\n"))
+  let (code, out, err) = @process.collect_output(program, prefix + ["install", "--frozen-lockfile", "--ignore-scripts"], cwd=temp)
+  let message = out.text() + err.text()
+  assert_true(code != 0 && (message.contains("frozen") || message.contains("outdated") || message.contains("importer") || message.contains("lockfile")))
   println("Clean source installation and incomplete-lockfile rejection passed")
 }

@@ -4,7 +4,7 @@
 moon install unmbt/napi-mbt/cmd/napi-mbt-cli
 moon run examples/setup.mbtx examples/worker-tasks ../worker-tasks
 cd ../worker-tasks
-npm test
+pnpm test
 ```
 
 `lib.mbt` contains an ordinary synchronous computation. `workerTasks` makes its

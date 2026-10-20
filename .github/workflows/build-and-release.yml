@@ -30,9 +30,6 @@ jobs:
           - os: ubuntu-24.04-arm
             target: linux-arm64-gnu
             asset: napi-mbt-linux-arm64
-          - os: macos-15-intel
-            target: darwin-x64
-            asset: napi-mbt-macos-amd64
           - os: macos-15
             target: darwin-arm64
             asset: napi-mbt-macos-arm64
@@ -48,12 +45,15 @@ jobs:
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: ${{ env.CMAKE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
       - uses: actions/setup-node@v4
         with:
           node-version: '26.4.0'
-          cache: npm
+          cache: pnpm
       - run: moon update
-      - run: npm ci --ignore-scripts
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: moon run scripts/toolchain-check.mbtx
       # Project checking downloads dependencies; `moon update` only updates the registry.
       - run: moon check --target native --warn-list +73 --deny-warn
@@ -92,14 +92,12 @@ jobs:
       fail-fast: false
       matrix:
         node: ['22', '24', '26']
-        target: [linux-x64-gnu, linux-arm64-gnu, darwin-x64, darwin-arm64, win32-x64-msvc]
+        target: [linux-x64-gnu, linux-arm64-gnu, darwin-arm64, win32-x64-msvc]
         include:
           - os: ubuntu-24.04
             target: linux-x64-gnu
           - os: ubuntu-24.04-arm
             target: linux-arm64-gnu
-          - os: macos-15-intel
-            target: darwin-x64
           - os: macos-15
             target: darwin-arm64
           - os: windows-2025
@@ -214,19 +212,19 @@ jobs:
           - os: ubuntu-24.04
             target: linux-x64-musl
             asset: napi-mbt-linux-amd64-musl
-          - os: ubuntu-24.04-arm
-            target: linux-arm64-musl
-            asset: napi-mbt-linux-arm64-musl
     steps:
       # gcompat hosts the pinned compiler and Actions runtime; native output is musl.
-      - run: apk add --no-cache bash curl git unzip tar gcompat libstdc++ build-base cmake ninja binutils python3
+      - run: apk add --no-cache bash curl git unzip tar gcompat libc6-compat libstdc++ build-base cmake ninja binutils python3
       - uses: actions/checkout@v4
       - uses: hustcer/setup-moonbit@v1
         with:
           version: ${{ env.MOONBIT_VERSION }}
           core-version: ${{ env.MOONBIT_VERSION }}
       - run: moon update
-      - run: npm ci --ignore-scripts
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: moon run scripts/toolchain-check.mbtx
       - run: moon check --target native --warn-list +73 --deny-warn
       - run: moon build --target native --release cmd/napi-mbt-cli
@@ -259,12 +257,10 @@ jobs:
       fail-fast: false
       matrix:
         node: ['22', '24', '26']
-        target: [linux-x64-musl, linux-arm64-musl]
+        target: [linux-x64-musl]
         include:
           - os: ubuntu-24.04
             target: linux-x64-musl
-          - os: ubuntu-24.04-arm
-            target: linux-arm64-musl
     steps:
       - run: apk add --no-cache gcompat libstdc++
       - uses: actions/checkout@v4

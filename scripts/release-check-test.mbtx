@@ -49,37 +49,39 @@ async fn main {
     "private": true,
     "description": "Keep the npm development version independent",
     "devDependencies": { "fixture-tool": "0.1.1" },
+    "engines": { "pnpm": ">=10" },
   }
-  let lock : Json = {
-    "name": "release-fixture",
-    "version": "0.1.1",
-    "lockfileVersion": 3,
-    "packages": {
-      "": {
-        "name": "release-fixture",
-        "version": "0.1.1",
-        "devDependencies": { "fixture-tool": "0.1.1" },
-      },
-      "node_modules/fixture-tool": {
-        "version": "0.1.1",
-        "resolved": "https://registry.npmjs.org/fixture-tool/-/fixture-tool-0.1.1.tgz",
-        "integrity": "unchanged",
-      },
-    },
-  }
+  let lock = #|lockfileVersion: '9.0'
+    #|settings:
+    #|  autoInstallPeers: true
+    #|  excludeLinksFromLockfile: false
+    #|
+    #|importers:
+    #|  .:
+    #|    devDependencies:
+    #|      fixture-tool:
+    #|        specifier: 0.1.1
+    #|        version: 0.1.1
+    #|
+    #|packages:
+    #|  fixture-tool@0.1.1:
+    #|    resolution: {integrity: unchanged}
+    #|
+    #|snapshots:
+    #|  fixture-tool@0.1.1: {}
   @fs.write_file(temp + "/package.json", manifest.stringify(indent=2) + "\n")
-  @fs.write_file(temp + "/package-lock.json", lock.stringify(indent=2) + "\n")
+  @fs.write_file(temp + "/pnpm-lock.yaml", lock + "\n")
   for version in ["0.2.0", "0.3.0-rc.1"] {
     @fs.write_file(
       temp + "/moon.mod",
       "name = \"test/release\"\nversion = \"\{version}\"\npreferred_target = \"native\"\n",
     )
     let before_manifest = @fs.read_file(temp + "/package.json").text()
-    let before_lock = @fs.read_file(temp + "/package-lock.json").text()
+    let before_lock = @fs.read_file(temp + "/pnpm-lock.yaml").text()
     let (code, output) = run(["run", "scripts/release-check.mbtx"], temp)
     assert_eq(code, 0, msg=output)
     assert_eq(@fs.read_file(temp + "/package.json").text(), before_manifest)
-    assert_eq(@fs.read_file(temp + "/package-lock.json").text(), before_lock)
+    assert_eq(@fs.read_file(temp + "/pnpm-lock.yaml").text(), before_lock)
     let (code, output) = run(
       ["run", "scripts/release-check.mbtx", "--write"],
       temp,
@@ -95,5 +97,5 @@ async fn main {
   }
   let (code, output) = run(["run", "scripts/release-check.mbtx"], temp)
   assert_eq(code, 0, msg=output)
-  println("Mooncakes release metadata and private npm lockfile checks passed")
+  println("Mooncakes release metadata and private pnpm lockfile checks passed")
 }

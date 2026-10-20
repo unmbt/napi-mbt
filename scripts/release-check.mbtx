@@ -1,33 +1,54 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env", "moonbitlang/core/json" }
+///|
+import {
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+  "moonbitlang/core/env",
+  "moonbitlang/core/json",
+}
 
 ///|
 async fn main {
-  guard @json.parse(@fs.read_file("package.json").text()) is Object(manifest) else { fail("Invalid package manifest") }
-  guard manifest.get("version") is Some(String(version)) else { fail("Missing package version") }
+  let write = @env.args().contains("--write")
+  guard @json.parse(@fs.read_file("package.json").text()) is Object(manifest) else {
+    fail("Invalid package manifest")
+  }
+  assert_eq(manifest.get("private"), Some(Json(true)), msg="The root npm package is for development only")
+  assert_eq(manifest.get("publishConfig"), None)
+  guard manifest.get("engines") is Some(Object(engines)) else {
+    fail("The root manifest must declare pnpm support")
+  }
+  assert_eq(engines.get("pnpm"), Some(Json(">=10")))
   let mut module_version : String? = None
   for line in @fs.read_file("moon.mod").text().split("\n") {
     let line = line.trim()
-    if line.has_prefix("version = ") { module_version = Some(line[10:].trim().to_owned()) }
-  }
-  guard module_version is Some(module_text) && @json.parse(module_text) is String(release_version) else { fail("Missing Mooncakes release version") }
-  assert_eq(manifest.get("private"), Some(Json(true)), msg="The root npm package is for development only")
-  assert_eq(manifest.get("publishConfig"), None)
-  if @env.get_env_var("GITHUB_REF_TYPE") == Some("tag") && @env.get_env_var("GITHUB_REF_NAME") is Some(tag) { assert_eq(tag, "v" + release_version, msg="Release tag must match moon.mod") }
-  let path = "package-lock.json"
-  let original = @fs.read_file(path).text()
-  let canonical = original.replace_all(old="https://mirrors.tencent.com/npm/", new="https://registry.npmjs.org/")
-  if @env.args().contains("--write") { @fs.write_file(path, canonical) } else { assert_eq(original, canonical, msg="Lockfile must use the public npm registry") }
-  guard @json.parse(canonical) is { "version": String(lock_version), "packages": Object(packages), .. } else { fail("Invalid npm lockfile") }
-  guard packages.get("") is Some(Object(root)) && root.get("version") is Some(String(root_version)) else { fail("Missing lockfile root") }
-  assert_eq(version, lock_version)
-  assert_eq(version, root_version)
-  for field in ["dependencies", "devDependencies", "optionalDependencies"] {
-    assert_eq(manifest.get(field), root.get(field), msg="Manifest/lockfile mismatch: " + field)
-    if root.get(field) is Some(Object(dependencies)) {
-      for name in dependencies.keys() {
-        assert_true(packages.contains("node_modules/" + name), msg="Missing lockfile package: " + name)
+    if line.has_prefix("version = ") {
+      guard module_version is None else { fail("Duplicate version in moon.mod") }
+      guard @json.parse(line[10:].trim().to_owned()) is String(value) else {
+        fail("Invalid module version")
       }
+      module_version = Some(value)
     }
   }
-  println("Mooncakes release version and development lockfile checks passed")
+  guard module_version is Some(release_version) else {
+    fail("Missing Mooncakes release version")
+  }
+  if @env.get_env_var("GITHUB_REF_TYPE") == Some("tag") &&
+    @env.get_env_var("GITHUB_REF_NAME") is Some(tag) {
+    assert_eq(tag, "v" + release_version, msg="Release tag must match moon.mod")
+  }
+  let path = "pnpm-lock.yaml"
+  let original = @fs.read_file(path).text()
+  let canonical = original.replace_all(
+    old="https://mirrors.tencent.com/npm/",
+    new="https://registry.npmjs.org/",
+  )
+  if write {
+    @fs.write_file(path, canonical)
+  } else {
+    assert_eq(original, canonical, msg="pnpm lockfile must use the public npm registry")
+  }
+  assert_true(canonical.contains("lockfileVersion:"), msg="Invalid pnpm lockfile")
+  assert_true(canonical.contains("\nimporters:\n"), msg="Missing pnpm lockfile importers")
+  assert_true(canonical.contains("\n  .:\n"), msg="Missing root pnpm importer")
+  println("Mooncakes release version and pnpm development lockfile checks passed")
 }

@@ -5,9 +5,9 @@ function rejected(f, code) {
   assert.throws(f, code ? { code } : undefined);
   assert.equal(addon.effects(), before);
 }
-for (const v of [0, 1, 4294967295]) assert.equal(addon.uint(v), v);
-for (const v of [-1, 1.5, 4294967296, NaN, Infinity]) rejected(() => addon.uint(v), 'ERR_NAPI_UINT_RANGE');
-rejected(() => addon.uint('1'));
+for (const v of [0, 1, 4294967295]) assert.equal(addon.uint_value(v), v);
+for (const v of [-1, 1.5, 4294967296, NaN, Infinity]) rejected(() => addon.uint_value(v), 'ERR_NAPI_UINT_RANGE');
+rejected(() => addon.uint_value('1'));
 for (const v of [-0, NaN, Infinity, -Infinity, 1 / 3, 3.5e38, 1e-46]) assert.ok(Object.is(addon.echo_float(v), Math.fround(v)));
 const record = Object.create({ inherited: [[1, 'ignore']] });
 for (const key of ['__proto__', '\0', '\ud800', '42']) Object.defineProperty(record, key, { enumerable: true, value: [[4294967295, undefined]] });
