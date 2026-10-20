@@ -80,6 +80,16 @@ async fn toolchain_signature(
       }
     }
     result["selectedCompiler"] = Json(compiler)
+    if host_target().has_prefix("linux-") {
+      for name in ["libc.so", "libc.so.6", "libm.so", "libpthread.so"] {
+        let selected = command(compiler, ["-print-file-name=" + name], dir)
+          .trim()
+          .to_owned()
+        if selected.has_prefix("/") && @fs.exists(selected) {
+          paths.push(@fs.realpath(selected))
+        }
+      }
+    }
     if host_target().has_prefix("darwin") {
       result["sdk"] = Json(
         command(

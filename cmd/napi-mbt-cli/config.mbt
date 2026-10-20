@@ -1,6 +1,7 @@
 ///|
 let supported_targets : Array[String] = [
   "win32-x64-msvc", "darwin-x64", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
+  "linux-x64-musl", "linux-arm64-musl",
 ]
 
 ///|
@@ -11,8 +12,6 @@ fn host_target() -> String {
   let host = @utf8.decode_lossy(host_raw())
   if host.has_prefix("win32") {
     host + "-msvc"
-  } else if host.has_prefix("linux") {
-    host + "-gnu"
   } else {
     host
   }

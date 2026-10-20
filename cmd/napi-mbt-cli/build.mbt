@@ -192,7 +192,12 @@ async fn build(
     "/." +
     workspace_parts[workspace_parts.length() - 1].to_owned() +
     ".node"
-  write_file(pending, @fs.read_file(artifacts + "/" + binaries[0]))
+  let binary_data = @fs.read_file(artifacts + "/" + binaries[0]).binary()
+  validate_artifact(binary_data, target)
+  if target.has_prefix("linux-") {
+    ignore(validate_linux_libc(binary_data, target))
+  }
+  write_file(pending, binary_data)
   errdefer (if @fs.exists(pending) { @fs.remove(pending) })
   let package_after = if @fs.exists(dir + "/package.json") {
     Some(@fs.read_file(dir + "/package.json").binary())

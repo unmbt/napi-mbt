@@ -4,12 +4,12 @@
 | --- | --- |
 | Native CLI | No Node/npm dependency |
 | New addon | N-API 4, CJS and ESM enabled |
-| Main Node CI | 22, 24, 26 on five native host profiles |
+| Main Node CI | 22, 24, 26 on seven native host profiles |
 | Minimum consumers | Node 10.16 CJS/N-API 4; 12.20 dual/N-API 4; 12.22 async/N-API 8 |
-| Native build gates | Windows x64 MSVC; Linux x64/ARM64 glibc; macOS x64/ARM64 |
-| New platform status | Linux ARM64 and macOS x64 gates configured; awaiting CI execution |
+| Native build gates | Windows x64 MSVC; Linux x64/ARM64 glibc and musl; macOS x64/ARM64 |
+| New platform status | Linux ARM64, macOS x64 and Alpine musl gates configured; awaiting CI execution |
 | Cross-compilation | Requires a matching host; the CLI rejects a different target |
-| libc | glibc; musl is rejected |
+| libc | glibc and musl; compiler probe and addon ELF dependencies must match the host |
 
 Generated `engines.node` is the intersection of N-API introduction versions and
 loader requirements. The default dual-mode range is
@@ -17,6 +17,10 @@ loader requirements. The default dual-mode range is
 `>=12.22.0 <13 || >=14.17.0 <15 || >=15.12.0 <16 || >=16.0.0`.
 Other configurations receive their own precise range. A minimum-version test
 checks compatibility; it is not a recommendation to deploy an EOL Node release.
+
+Web streams require Node 18. Musl builds use native Alpine x64/ARM64 toolchains;
+the compiler probe and addon ELF dynamic dependencies are checked before output
+installation and again at prepublish. See [platform validation](platforms.md).
 
 | Feature | Minimum N-API |
 | --- | ---: |

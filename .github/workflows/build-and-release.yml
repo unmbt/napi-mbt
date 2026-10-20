@@ -64,6 +64,7 @@ jobs:
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon run --target native --release cmd/napi-mbt-cli -- doctor --json
       - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
+      - run: moon run scripts/platform-check.mbtx ${{ matrix.target }}
       # The root foreign library is exercised by Node consumers, not a standalone test executable.
       - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/ci-regression-test.mbtx
@@ -200,9 +201,112 @@ jobs:
       - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/async-exports-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
 
+  musl:
+    name: Native Alpine (${{ matrix.target }})
+    runs-on: ${{ matrix.os }}
+    container: node:26.4.0-alpine
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64-musl
+            asset: napi-mbt-linux-amd64-musl
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-musl
+            asset: napi-mbt-linux-arm64-musl
+    steps:
+      # gcompat hosts the pinned compiler and Actions runtime; native output is musl.
+      - run: apk add --no-cache bash curl git unzip tar gcompat libstdc++ build-base cmake ninja binutils python3
+      - uses: actions/checkout@v4
+      - uses: hustcer/setup-moonbit@v1
+        with:
+          version: ${{ env.MOONBIT_VERSION }}
+          core-version: ${{ env.MOONBIT_VERSION }}
+      - run: moon update
+      - run: npm ci --ignore-scripts
+      - run: moon run scripts/toolchain-check.mbtx
+      - run: moon check --target native --warn-list +73 --deny-warn
+      - run: moon build --target native --release cmd/napi-mbt-cli
+      - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
+      - run: moon run scripts/platform-check.mbtx ${{ matrix.target }}
+      - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
+      - run: moon run scripts/ci-regression-test.mbtx
+      - run: moon run scripts/ci-consumers.mbtx
+      - run: moon run scripts/mooncake-package-test.mbtx
+      - run: moon run scripts/examples-test.mbtx
+      - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
+      - run: moon run scripts/ci-artifacts.mbtx
+      - uses: actions/upload-artifact@v4
+        with:
+          name: consumers-${{ matrix.target }}
+          path: dist/consumer-fixtures/
+          include-hidden-files: true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}.tar.gz
+
+  musl-node:
+    name: Alpine Node ${{ matrix.node }} (${{ matrix.target }})
+    needs: musl
+    runs-on: ${{ matrix.os }}
+    container: node:${{ matrix.node }}-alpine
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        node: ['22', '24', '26']
+        target: [linux-x64-musl, linux-arm64-musl]
+        include:
+          - os: ubuntu-24.04
+            target: linux-x64-musl
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-musl
+    steps:
+      - run: apk add --no-cache gcompat libstdc++
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: consumers-${{ matrix.target }}
+          path: .
+      - run: node scripts/test.js
+      - run: node scripts/build-isolation.test.cjs
+      - run: node scripts/runtime-boundary.test.cjs
+      - run: node scripts/structured-types.test.cjs
+      - run: node --expose-gc scripts/owned-binary.test.cjs
+      - run: node scripts/tsfn.test.cjs
+      - run: node --expose-gc scripts/native-tasks.test.cjs
+        env:
+          UV_THREADPOOL_SIZE: '1'
+      - run: node --expose-gc scripts/workers.test.cjs .napi-mbt/workers-smoke
+      - run: node --expose-gc scripts/js-promises.test.cjs
+      - run: node --expose-gc scripts/streams.test.cjs .napi-mbt/streams-smoke/napi_mbt.node
+      - run: node --expose-gc scripts/class.test.cjs
+      - run: node --expose-gc scripts/callback.test.cjs
+      - run: node scripts/lifecycle.test.cjs
+      - run: node scripts/async-runtime.test.cjs
+      - run: node --expose-gc scripts/async-exports.test.cjs ./.napi-mbt/async-exports/napi_mbt.node
+
+  stream-minimum:
+    name: Web streams Node 18
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: actions/download-artifact@v4
+        with:
+          name: consumers-linux-x64-gnu
+          path: .
+      - run: node --expose-gc scripts/streams.test.cjs .napi-mbt/streams-smoke/napi_mbt.node
+
   release:
     name: Release archives
-    needs: [build, node, minimum, memory, compatibility]
+    needs: [build, node, musl, musl-node, minimum, stream-minimum, memory, compatibility]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:

@@ -10,7 +10,7 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         { "napiVersion": 4.5 },
         { "napiVersion": 11 },
         { "builder": "unknown" },
-        { "targets": ["linux-x64-musl"] },
+        { "targets": ["linux-riscv64-musl"] },
         { "targets": ["darwin-arm64", "darwin-arm64"] },
         { "features": ["promise", "promise"] },
         { "features": ["unknown"] },

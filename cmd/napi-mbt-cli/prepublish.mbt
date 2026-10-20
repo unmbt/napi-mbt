@@ -30,6 +30,14 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       target,
     )
     verify_receipt(dir, target, artifact_root)
+    if target.has_prefix("linux-") {
+      ignore(
+        validate_linux_libc(
+          @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
+          target,
+        ),
+      )
+    }
   }
   // Release preparation must not hide stale declarations or changed signatures.
   let conf = generate(dir, true, check_package=false).config
@@ -78,7 +86,13 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       "napiTarget": target,
     })
     if parts[0] == "linux" {
-      child["libc"] = ["glibc"]
+      child["libc"] = Json([
+        if target.has_suffix("-musl") {
+          "musl"
+        } else {
+          "glibc"
+        },
+      ])
     }
     mkdirp(path, recursive=true)
     mkdirp(path + "/licenses")

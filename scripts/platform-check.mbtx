@@ -1,0 +1,28 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn output(program : String, args : Array[String]) -> String {
+  let (code, out, err) = @process.collect_output(program, args)
+  if code != 0 { fail(out.text() + err.text()) }
+  out.text()
+}
+
+///|
+async fn main {
+  guard @env.args() is [_, target, ..rest] else { fail("Expected native target") }
+  let binary = @fs.realpath(rest.get(0).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let report = output(binary, ["doctor", "--json"])
+  guard @json.parse(report) is { "ok": true, "toolchain": { "target": String(actual), .. }, .. } else { fail(report) }
+  assert_eq(actual, target, msg="CI must use a native matching host")
+  println(report)
+  if target.has_prefix("linux-") {
+    println(output("ldd", [binary]))
+    let dynamic = output("readelf", ["-d", "artifacts/" + target + "/napi_mbt.node"])
+    println(dynamic)
+    let expected = if target.has_suffix("-musl") {
+      if target.contains("arm64") { "libc.musl-aarch64.so.1" } else { "libc.musl-x86_64.so.1" }
+    } else { "libc.so.6" }
+    assert_true(dynamic.contains(expected))
+    if target.has_suffix("-musl") { assert_true(!dynamic.contains("libc.so.6")); assert_true(!output("readelf", ["--version-info", "artifacts/" + target + "/napi_mbt.node"]).contains("GLIBC_")) }
+  }
+}

@@ -70,8 +70,18 @@ MOONBIT_FFI_EXPORT moonbit_bytes_t napi_mbt_host(void) {
 #else
   const char *arch = "unsupported";
 #endif
+#if defined(__linux__)
+#if defined(__GLIBC__)
+  const char *libc = "-gnu";
+#else
+  const char *libc = "-musl";
+#endif
+#else
+  const char *libc = "";
+#endif
   size_t a = strlen(os), b = strlen(arch);
-  moonbit_bytes_t out = moonbit_make_bytes(a + b + 1, 0);
+  moonbit_bytes_t out = moonbit_make_bytes(a + b + 1 + strlen(libc), 0);
   memcpy(out, os, a); out[a] = '-'; memcpy(out + a + 1, arch, b);
+  memcpy(out + a + b + 1, libc, strlen(libc));
   return out;
 }

@@ -81,3 +81,8 @@ and sanitizer results are reported only when actually executed.
   Node 22/24/26 consumer jobs added. Local architecture-header rejection and
   simulated loader local/platform-package branches pass; these do not substitute
   for native execution. Both added platform jobs await CI.
+- Step 13: musl x64/ARM64 host detection, loader branches, npm libc metadata and
+  native Alpine CI added. Bounds-checked ELF dynamic dependency validation rejects
+  missing/mixed/wrong libc at compiler probing, build and prepublish. Synthetic
+  ELF cases and simulated seven-target loaders run locally; Alpine execution and
+  Node 22/24/26 jobs remain CI pending.

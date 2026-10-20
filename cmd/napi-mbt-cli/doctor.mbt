@@ -162,6 +162,14 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
     .text()
     .split("\n")
     .to_array()
+  if host_target().has_prefix("linux-") {
+    report["dynamicDependencies"] = Json(
+      validate_linux_libc(
+        @fs.read_file(probe + "/build/probe").binary(),
+        host_target(),
+      ),
+    )
+  }
   report["compiler"] = {
     "path": Json(details[0].trim().to_owned()),
     "version": Json(details[1].trim().to_owned()),
