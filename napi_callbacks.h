@@ -1,16 +1,19 @@
 /* Included after napi_lifecycle.h; all operations run on the owning JS thread. */
-typedef struct { napi_mbt_resource *resource; } napi_mbt_callback_ref;
+typedef struct { napi_mbt_resource *resource; bool borrowed; } napi_mbt_callback_ref;
 struct napi_mbt_arguments { size_t count; napi_value *values; };
 typedef napi_value (*napi_mbt_trampoline)(void *, napi_env, napi_mbt_arguments *);
 
 static void napi_mbt_callback_finalizer(void *data) {
     napi_mbt_callback_ref *callback = data;
-    napi_mbt_free_resource(callback->resource);
+    /* Listener pins borrow a JS-owned container. In particular their MoonBit
+     * finalizer can run while environment cleanup decrefs that very closure. */
+    if (!callback->borrowed) napi_mbt_free_resource(callback->resource);
 }
 
 MOONBIT_FFI_EXPORT void *napi_mbt_callback_empty(void) {
     napi_mbt_callback_ref *callback = moonbit_make_external_object(napi_mbt_callback_finalizer, sizeof(*callback));
     callback->resource = NULL;
+    callback->borrowed = false;
     return callback;
 }
 MOONBIT_FFI_EXPORT napi_env napi_mbt_dummy_env(void) { return NULL; }
@@ -50,13 +53,19 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_pin(napi_env env, napi_value value, napi
     /* This reference borrows the container; its JS wrapper is retained by a
      * separate NapiReference until the pin has been disposed. */
     reference->resource = resource;
+    reference->borrowed = true;
     return napi_ok;
 }
 
 MOONBIT_FFI_EXPORT int napi_mbt_closure_unpin(napi_mbt_callback_ref *reference) {
     napi_mbt_resource *resource = reference->resource;
     reference->resource = NULL;
-    return resource ? napi_mbt_dispose_resource(resource) : napi_ok;
+    if (!resource) return napi_ok;
+    /* After teardown the borrowed pointer may be stale. Compare it against the
+     * current owner's registry before touching it. */
+    napi_mbt_resource *entry = napi_mbt_active ? napi_mbt_active->resources : NULL;
+    while (entry && entry != resource) entry = entry->next;
+    return entry ? napi_mbt_dispose_resource(entry) : napi_ok;
 }
 
 /* Promise reactions cannot be removed from JS. Drop their MoonBit payload on

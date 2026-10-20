@@ -8,7 +8,8 @@ fn worker_owned(
     BufferViewType
     | CallbackType(_, _, _)
     | ClassType(_, _, _)
-    | JsPromiseType(_) => false
+    | JsPromiseType(_)
+    | AsyncIteratorType(_) => false
     OptionType(t) | ArrayType(t) | MapType(t) => worker_owned(t, types, seen)
     TupleType(items) => items.all(t => worker_owned(t, types, seen))
     NamedType(name) if !seen.contains(name) => {

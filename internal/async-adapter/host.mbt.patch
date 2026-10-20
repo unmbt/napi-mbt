@@ -26,6 +26,9 @@ pub fn Loop::current_task(self : Loop) -> Task { { owner: self, inner: @coroutin
 pub async fn suspend() -> Unit { @coroutine.suspend() }
 
 ///|
+pub async fn protect(f : async () -> Unit) -> Unit nocancel { @coroutine.protect_from_cancel(f) }
+
+///|
 pub fn Loop::cancel_all(self : Loop) -> Unit raise { self.inner.cancel_all() }
 
 ///|

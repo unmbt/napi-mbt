@@ -110,6 +110,7 @@ jobs:
       - run: node scripts/tsfn.test.cjs
       - run: node --expose-gc scripts/workers.test.cjs .napi-mbt/workers-smoke
       - run: node --expose-gc scripts/js-promises.test.cjs
+      - run: node --expose-gc scripts/streams.test.cjs .napi-mbt/streams-smoke/napi_mbt.node
       - run: node --expose-gc scripts/native-tasks.test.cjs
         env:
           UV_THREADPOOL_SIZE: '1'

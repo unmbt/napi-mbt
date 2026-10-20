@@ -70,3 +70,10 @@ and sanitizer results are reported only when actually executed.
   NodeNext/Bundler consumers, Windows ASan, existing async exports, strict check
   and 52 MoonBit tests passed. The scheduler sleeps until external notifications
   when no OS I/O or timer is pending. Linux memory checks await CI.
+- Step 11: demand-driven AsyncIterable/Web stream input and output, concurrent
+  reads, early break/return, error identity, cancellation, reference cleanup and
+  forced worker teardown passed on Windows. NodeNext/Bundler and generated
+  main/platform Node >=18 metadata passed. Windows ASan exposed and verified a
+  fix for borrowed closure pins being freed as owned resources during teardown;
+  resumed reads also guard against creating JS handles in a closing environment.
+  Strict check, 53 MoonBit tests and generator snapshots passed. Linux awaits CI.

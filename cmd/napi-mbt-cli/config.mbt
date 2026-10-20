@@ -112,7 +112,7 @@ fn feature_version(name : String) -> Int32 raise {
     "bigint" => 6
     "buffer" => 7
     "class" | "callback" => 3
-    "async" | "native_tasks" => 8
+    "async" | "native_tasks" | "streams" => 8
     _ => fail("Unknown N-API feature: \{name}")
   }
 }

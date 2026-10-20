@@ -42,6 +42,8 @@ include the source documentation and error contract. See the
 [classes and callbacks](docs/classes-callbacks.md), [async](docs/async.md), and
 [native background tasks](docs/native-tasks.md), [isolated MoonBit workers](docs/workers.md),
 and [JavaScript Promise inputs](docs/js-promises.md).
+[Async iterators and Web streams](docs/streams.md) support demand-driven data
+exchange on Node 18 or later.
 Six [standalone examples](examples/README.md) include native behavior and
 TypeScript consumers and are built with the packed, installed CLI in CI.
 

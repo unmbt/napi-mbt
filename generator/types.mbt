@@ -5,6 +5,7 @@ pub(all) enum ValueType {
   FloatType
   JsonType
   JsPromiseType(ValueType)
+  AsyncIteratorType(ValueType)
   OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
@@ -31,6 +32,8 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     FloatType => "Float"
     JsonType => "Json"
     JsPromiseType(inner) => "NapiJsPromise[" + inner.runtime_name() + "]"
+    AsyncIteratorType(inner) =>
+      "NapiAsyncIterator[" + inner.runtime_name() + "]"
     OwnedBinaryType(kind) => "Napi" + kind.javascript()
     Int64Type => "Int64"
     UInt64Type => "UInt64"
@@ -81,6 +84,20 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
     IntType | UIntType | FloatType | DoubleType => "number"
     JsonType => "$NapiJson"
     JsPromiseType(inner) => "Promise<" + inner.typescript(input~) + ">"
+    AsyncIteratorType(inner) =>
+      if input {
+        "(AsyncIterable<" +
+        inner.typescript(input~) +
+        "> | ReadableStream<" +
+        inner.typescript(input~) +
+        ">)"
+      } else {
+        "(AsyncIterableIterator<" +
+        inner.typescript() +
+        "> & { toReadableStream(options?: { signal?: AbortSignal }): ReadableStream<" +
+        inner.typescript() +
+        "> })"
+      }
     OwnedBinaryType(kind) => kind.javascript()
     Int64Type | UInt64Type => "bigint"
     BoolType => "boolean"
@@ -165,7 +182,7 @@ fn parse_value_type(
     }
     return MapType(parse_value_type(value, location, true))
   }
-  for prefix in ["Option[", "Array[", "NapiJsPromise["] {
+  for prefix in ["Option[", "Array[", "NapiJsPromise[", "NapiAsyncIterator["] {
     if text.has_prefix(prefix) && text.has_suffix("]") {
       let inner = parse_value_type(
         text[prefix.length():text.length() - 1].to_owned(),
@@ -179,6 +196,8 @@ fn parse_value_type(
         OptionType(inner)
       } else if prefix == "NapiJsPromise[" {
         JsPromiseType(inner)
+      } else if prefix == "NapiAsyncIterator[" {
+        AsyncIteratorType(inner)
       } else {
         ArrayType(inner)
       }

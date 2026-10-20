@@ -25,6 +25,7 @@ CLI executable. No reference to the napi-mbt checkout remains in the project.
 | binary-processing | Owned Bytes versus synchronous borrowed BufferView |
 | native-tasks | C worker-pool computation, cancellation and MoonBit async calls |
 | worker-tasks | Pure MoonBit computation in isolated Node processes |
+| streams | AsyncIterable/Web stream input, demand-driven output and cancellation |
 
 `moon run scripts/examples-test.mbtx` packages and installs the current CLI into
 a temporary directory and builds every example, including TypeScript positive

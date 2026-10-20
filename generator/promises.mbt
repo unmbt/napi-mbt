@@ -8,7 +8,7 @@ fn promise_direction_valid(
   match value {
     JsPromiseType(inner) =>
       read && promise_direction_valid(inner, types, true, seen)
-    OptionType(t) | ArrayType(t) | MapType(t) =>
+    OptionType(t) | ArrayType(t) | MapType(t) | AsyncIteratorType(t) =>
       promise_direction_valid(t, types, read, seen)
     TupleType(items) =>
       items.all(t => promise_direction_valid(t, types, read, seen))

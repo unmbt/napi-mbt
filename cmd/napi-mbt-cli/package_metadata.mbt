@@ -1,6 +1,9 @@
 ///|
 // Node-API introduction versions, matching napi-rs/cli/src/utils/version.ts.
-fn node_engine(version : Int32, esm : Bool) -> String {
+fn node_engine(version : Int32, esm : Bool, streams~ : Bool = false) -> String {
+  if streams && version <= 8 {
+    return ">=18.0.0"
+  }
   if esm && version <= 7 {
     return ">=12.20.0 <13 || >=14.13.1"
   }
@@ -93,7 +96,13 @@ fn package_metadata(pkg : Map[String, Json], conf : Config) -> Json raise {
     Some(value) => object(value)
     None => Map([])
   }
-  engines["node"] = Json(node_engine(conf.napi_version, conf.esm))
+  engines["node"] = Json(
+    node_engine(
+      conf.napi_version,
+      conf.esm,
+      streams=conf.features.contains("streams"),
+    ),
+  )
   pkg["engines"] = Json(engines)
   Json(pkg)
 }

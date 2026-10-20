@@ -32,7 +32,8 @@ fn conversion_types(
       OptionType(inner)
       | ArrayType(inner)
       | MapType(inner)
-      | JsPromiseType(inner) => collect(inner, read)
+      | JsPromiseType(inner)
+      | AsyncIteratorType(inner) => collect(inner, read)
       TupleType(items) =>
         for item in items {
           collect(item, read)
@@ -114,6 +115,15 @@ fn conversions(
       )
     }
     match value {
+      AsyncIteratorType(inner) =>
+        out.write_string(
+          "  " +
+          (if read { "get_" } else { "set_" }) +
+          "NapiAsyncIterator(env, value, fn(env, value) { " +
+          conversion_name(inner, types, read) +
+          (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
+          " })\n",
+        )
       JsPromiseType(inner) =>
         out.write_string(
           "  get_NapiJsPromise(env, value, fn(env, value) { " +

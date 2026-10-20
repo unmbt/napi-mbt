@@ -17,6 +17,15 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
     read : Bool,
   ) -> Unit raise {
     match value {
+      AsyncIteratorType(inner) => {
+        if napi_version < 8 {
+          fail("\{location}: streams require N-API 8")
+        }
+        if borrowed_type(inner, source.types, []) {
+          fail("\{location}: borrowed views cannot cross a stream boundary")
+        }
+        check(inner, location, true, read)
+      }
       JsPromiseType(inner) => {
         if !read {
           fail(

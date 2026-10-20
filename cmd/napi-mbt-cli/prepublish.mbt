@@ -32,7 +32,7 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
     verify_receipt(dir, target, artifact_root)
   }
   // Release preparation must not hide stale declarations or changed signatures.
-  ignore(generate(dir, true, check_package=false))
+  let conf = generate(dir, true, check_package=false).config
   let assets = @assets.files()
   mkdirp(dir + "/licenses")
   let licenses = [
@@ -67,7 +67,13 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       "main": "napi_mbt.node",
       "files": ["napi_mbt.node", "licenses"],
       "exports": { ".": "./napi_mbt.node", "./package.json": "./package.json" },
-      "engines": { "node": node_engine(conf.napi_version, false) },
+      "engines": {
+        "node": node_engine(
+          conf.napi_version,
+          false,
+          streams=conf.features.contains("streams"),
+        ),
+      },
       "napiVersion": conf.napi_version,
       "napiTarget": target,
     })

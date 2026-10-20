@@ -48,7 +48,8 @@
           "class",
           "callback",
           "async",
-          "native_tasks"
+          "native_tasks",
+          "streams"
         ]
       }
     },
@@ -351,6 +352,30 @@
           "features": {
             "contains": {
               "const": "native_tasks"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "streams"
             }
           }
         }

@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import addon from './index.mjs';
+const cjs = createRequire(import.meta.url)('./index.cjs');
+const values = [];
+for await (const value of addon.range(3)) values.push(value);
+assert.deepEqual(values, [0, 1, 2]);
+assert.equal(await cjs.sum(addon.range(4).toReadableStream()), 6);
+const controller = new AbortController();
+const reader = addon.range(100).toReadableStream({signal:controller.signal}).getReader();
+controller.abort(new Error('stop'));
+await assert.rejects(reader.read(), /stop/);
+reader.releaseLock();

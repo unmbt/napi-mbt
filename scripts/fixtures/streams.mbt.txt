@@ -1,0 +1,52 @@
+///|
+let produced : Ref[Int] = Ref(0)
+///|
+let closed : Ref[Int] = Ref(0)
+///|
+#export_name("counts")
+pub fn counts() -> (Int, Int) { (produced.val, closed.val) }
+///|
+#export_name("range")
+pub fn range(count : Int, delay : Int) -> NapiAsyncIterator[Int] raise {
+  let index = Ref(0)
+  NapiAsyncIterator::new(() => {
+    @async.sleep(delay)
+    if index.val >= count { return None }
+    let value = index.val
+    index.val += 1
+    produced.val += 1
+    Some(value)
+  }, () => { closed.val += 1 })
+}
+///|
+#export_name("sum")
+pub async fn sum(input : NapiAsyncIterator[Int]) -> Int {
+  defer input.close()
+  let mut sum = 0
+  while input.next() is Some(value) { sum += value }
+  sum
+}
+///|
+#export_name("parallel")
+pub async fn parallel(input : NapiAsyncIterator[Int]) -> Array[Int?] {
+  defer input.close()
+  @async.with_task_group(group => {
+    let a = group.spawn(() => input.next())
+    let b = group.spawn(() => input.next())
+    let c = group.spawn(() => input.next())
+    [a.wait(), b.wait(), c.wait()]
+  })
+}
+///|
+#export_name("binary")
+pub fn binary(input : NapiAsyncIterator[NapiUint8Array]) -> NapiAsyncIterator[NapiUint8Array] { input }
+///|
+#export_name("failed")
+pub fn failed(value : NapiJsPromise[Int]) -> NapiAsyncIterator[Int] raise {
+  NapiAsyncIterator::new(() => Some(value.wait()), () => { closed.val += 1; value.dispose() })
+}
+///|
+extern "c" fn resource_count() -> Int = "napi_mbt_live_resources"
+///|
+#export_name("resources")
+pub fn resources() -> Int { resource_count() }

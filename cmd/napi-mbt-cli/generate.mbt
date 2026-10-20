@@ -61,6 +61,7 @@ async fn generate(
     seen[item.export_name] = item.filename
   }
   features.sort()
+  let conf = { ..conf, features, }
   for feature in features {
     let required = feature_version(feature)
     if conf.napi_version < required {

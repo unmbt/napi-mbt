@@ -120,14 +120,20 @@ async fn main {
     resources["async/files/" + path] = Json(text)
   }
   let manifest : Json = {
-    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 5,
+    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 6,
     "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
   }
   resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")
   resources["async/LICENSE"] = Json(@fs.read_file(root + "/LICENSE").text().replace_all(old="\r\n", new="\n"))
   for (path, source) in [("napi_async.h", "napi_async.h"), ("napi_async.mbt", "napi_async.mbt.patch"), ("LIBUV-LICENSE", "LIBUV-LICENSE")] {
     let text = @fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n")
-    resources["async/" + path] = Json(if path == "napi_async.mbt" { text + "\n" + @fs.read_file("internal/async-adapter/js_promise.mbt.patch").text().replace_all(old="\r\n", new="\n") } else { text })
+    let combined = if path == "napi_async.mbt" {
+      text + "\n" + @fs.read_file("internal/async-adapter/js_promise.mbt.patch").text().replace_all(old="\r\n", new="\n") + "\n" + @fs.read_file("internal/async-adapter/streams.mbt.patch").text().replace_all(old="\r\n", new="\n")
+    } else if path == "napi_async.h" {
+      let factory = @fs.read_file("internal/async-adapter/streams.js").text().replace_all(old="\r\n", new="\n")
+      text + "\nMOONBIT_FFI_EXPORT int napi_mbt_stream_factory(napi_env env, int input, napi_value a, napi_value b, napi_value *result) {\n  napi_value source, factory, receiver, flag;\n  napi_status status = napi_create_string_utf8(env, " + Json(factory).stringify() + ", NAPI_AUTO_LENGTH, &source);\n  if (status == napi_ok) status = napi_run_script(env, source, &factory);\n  if (status == napi_ok) status = napi_get_undefined(env, &receiver);\n  if (status == napi_ok) status = napi_get_boolean(env, input != 0, &flag);\n  napi_value args[] = { flag, a, b };\n  if (status == napi_ok) status = napi_call_function(env, receiver, factory, 3, args, result);\n  return (int)status;\n}\n"
+    } else { text }
+    resources["async/" + path] = Json(combined)
   }
   let output = Json(resources).stringify(indent=2) + "\n"
   if @env.args().contains("--check") {

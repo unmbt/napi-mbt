@@ -114,6 +114,8 @@ test "Node engines follow NAPI and module requirements" {
     ">=12.22.0 <13 || >=14.17.0 <15 || >=15.12.0 <16 || >=16.0.0",
   )
   assert_eq(node_engine(10, false), ">=22.14.0 <23 || >=23.6.0")
+  assert_eq(node_engine(8, true, streams=true), ">=18.0.0")
+  assert_eq(node_engine(10, true, streams=true), ">=22.14.0 <23 || >=23.6.0")
 }
 
 ///|

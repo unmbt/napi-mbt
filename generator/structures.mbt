@@ -137,6 +137,14 @@ fn resolve_type(
   classes : Array[ClassConfig],
 ) -> Unit raise {
   match value {
+    AsyncIteratorType(inner) => {
+      for feature in ["async", "streams"] {
+        if !features.contains(feature) {
+          features.push(feature)
+        }
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
     JsPromiseType(inner) => {
       if !features.contains("async") {
         features.push("async")
