@@ -298,3 +298,53 @@ MOONBIT_FFI_EXPORT int moonbit_napi_field_set(napi_env env, napi_value value, co
     descriptor.attributes = (napi_property_attributes)(napi_writable | napi_enumerable | napi_configurable);
     return (int)napi_define_properties(env, value, 1, &descriptor);
 }
+
+MOONBIT_FFI_EXPORT int moonbit_napi_is_array(napi_env env, napi_value value, int *result) {
+    bool array = false;
+    napi_status status = napi_is_array(env, value, &array);
+    *result = array ? 1 : 0;
+    return (int)status;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_keys(napi_env env, napi_value value, napi_value *result) {
+    napi_valuetype type;
+    napi_status status = napi_typeof(env, value, &type);
+    if (status != napi_ok) return (int)status;
+    if (type != napi_object) return (int)napi_object_expected;
+    bool array = false;
+    status = napi_is_array(env, value, &array);
+    if (status != napi_ok) return (int)status;
+    if (array) return (int)napi_object_expected;
+    napi_value keys;
+    status = napi_get_property_names(env, value, &keys);
+    if (status != napi_ok) return (int)status;
+    uint32_t length;
+    status = napi_get_array_length(env, keys, &length);
+    if (status != napi_ok) return (int)status;
+    status = napi_create_array(env, result);
+    if (status != napi_ok) return (int)status;
+    uint32_t output = 0;
+    for (uint32_t i = 0; i < length; ++i) {
+        napi_value key;
+        bool own;
+        status = napi_get_element(env, keys, i, &key);
+        if (status != napi_ok) return (int)status;
+        status = napi_coerce_to_string(env, key, &key);
+        if (status != napi_ok) return (int)status;
+        status = napi_has_own_property(env, value, key, &own);
+        if (status != napi_ok) return (int)status;
+        if (own) {
+            status = napi_set_element(env, *result, output++, key);
+            if (status != napi_ok) return (int)status;
+        }
+    }
+    return (int)napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_key_set(napi_env env, napi_value value, napi_value key, napi_value field) {
+    napi_property_descriptor descriptor = {0};
+    descriptor.name = key;
+    descriptor.value = field;
+    descriptor.attributes = (napi_property_attributes)(napi_writable | napi_enumerable | napi_configurable);
+    return (int)napi_define_properties(env, value, 1, &descriptor);
+}

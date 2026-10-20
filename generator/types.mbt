@@ -1,6 +1,9 @@
 ///|
 pub(all) enum ValueType {
   IntType
+  UIntType
+  FloatType
+  JsonType
   Int64Type
   UInt64Type
   DoubleType
@@ -11,6 +14,8 @@ pub(all) enum ValueType {
   UnitType
   OptionType(ValueType)
   ArrayType(ValueType)
+  MapType(ValueType)
+  TupleType(Array[ValueType])
   NamedType(String)
   ClassType(String, String, Int32)
   CallbackType(Array[ValueType], ValueType, Bool)
@@ -20,6 +25,9 @@ pub(all) enum ValueType {
 pub fn ValueType::runtime_name(self : ValueType) -> String {
   match self {
     IntType => "Int"
+    UIntType => "UInt"
+    FloatType => "Float"
+    JsonType => "Json"
     Int64Type => "Int64"
     UInt64Type => "UInt64"
     DoubleType => "Double"
@@ -30,6 +38,8 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     UnitType => "Unit"
     OptionType(inner) => "Option[" + inner.runtime_name() + "]"
     ArrayType(inner) => "Array[" + inner.runtime_name() + "]"
+    MapType(inner) => "Map[String," + inner.runtime_name() + "]"
+    TupleType(items) => "(" + items.map(t => t.runtime_name()).join(",") + ")"
     NamedType(name) => name
     ClassType(name, _, _) => name
     CallbackType(params, ret, throws) =>
@@ -48,6 +58,8 @@ fn ValueType::moonbit(self : ValueType) -> String {
     IntType => "Int32"
     OptionType(inner) => "Option[" + inner.moonbit() + "]"
     ArrayType(inner) => "Array[" + inner.moonbit() + "]"
+    MapType(inner) => "Map[String, " + inner.moonbit() + "]"
+    TupleType(items) => "(" + items.map(t => t.moonbit()).join(", ") + ")"
     CallbackType(params, ret, throws) =>
       "((" +
       params.map(p => p.moonbit()).join(", ") +
@@ -62,7 +74,8 @@ fn ValueType::moonbit(self : ValueType) -> String {
 ///|
 fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
   match self {
-    IntType | DoubleType => "number"
+    IntType | UIntType | FloatType | DoubleType => "number"
+    JsonType => "$NapiJson"
     Int64Type | UInt64Type => "bigint"
     BoolType => "boolean"
     StringType => "string"
@@ -75,6 +88,9 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
       (if input { " | undefined" } else { "" }) +
       ")"
     ArrayType(inner) => "Array<" + inner.typescript(input~) + ">"
+    MapType(inner) => "Record<string, " + inner.typescript(input~) + ">"
+    TupleType(items) =>
+      "[" + items.map(t => t.typescript(input~)).join(", ") + "]"
     NamedType(name) => name + (if input { "$Input" } else { "" })
     ClassType(_, name, _) => name
     CallbackType(params, ret, _) => {
@@ -100,6 +116,10 @@ fn parse_value_type(
 ) -> ValueType raise {
   let mut text = text.replace_all(old=" ", new="")
   while text.has_prefix("(") && matching_paren(text) == text.length() - 1 {
+    let items = split_type_arguments(text[1:text.length() - 1].to_owned())
+    if items.length() > 1 {
+      return TupleType(items.map(t => parse_value_type(t, location, true)))
+    }
     text = text[1:text.length() - 1].to_owned()
   }
   if text.has_prefix("(") {
@@ -132,6 +152,13 @@ fn parse_value_type(
     }
     return OptionType(inner)
   }
+  if text.has_prefix("Map[") && text.has_suffix("]") {
+    let args = split_type_arguments(text[4:text.length() - 1].to_owned())
+    guard args is ["String", value] else {
+      fail("\{location}: exported Map keys must be String")
+    }
+    return MapType(parse_value_type(value, location, true))
+  }
   for prefix in ["Option[", "Array["] {
     if text.has_prefix(prefix) && text.has_suffix("]") {
       let inner = parse_value_type(
@@ -151,6 +178,9 @@ fn parse_value_type(
   }
   match text {
     "Int" | "Int32" => IntType
+    "UInt" | "UInt32" => UIntType
+    "Float" => FloatType
+    "Json" => JsonType
     "Int64" => Int64Type
     "UInt64" => UInt64Type
     "Double" => DoubleType

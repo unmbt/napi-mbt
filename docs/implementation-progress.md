@@ -33,3 +33,7 @@ and sanitizer results are reported only when actually executed.
   addon built outside the checkout; CJS/ESM and both TS resolution modes passed.
 - Step 3: all six standalone examples passed native builds, CJS/ESM smoke tests
   and positive/negative NodeNext/Bundler consumers using the packed, installed CLI.
+- Step 4: strict native check, 47 MoonBit tests, generator snapshots, real Node
+  collection boundaries and NodeNext/Bundler types passed. Windows ASan passed
+  parser, runtime, structured/collection, class, callback and async suites.
+  Linux ASan/leak checks are wired into CI and have not been run locally.

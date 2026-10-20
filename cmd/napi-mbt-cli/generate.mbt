@@ -22,7 +22,7 @@ async fn generate(
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
     "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt",
-    "napi_callbacks.mbt", "napi_reference.mbt",
+    "napi_callbacks.mbt", "napi_reference.mbt", "napi_collections.mbt",
   ]
   let features = conf.features.copy()
   let seen : Map[String, String] = Map([])

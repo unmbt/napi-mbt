@@ -146,8 +146,12 @@ fn resolve_type(
       }
       resolve_type(ret, declarations, types, features, location, classes)
     }
-    OptionType(inner) | ArrayType(inner) =>
+    OptionType(inner) | ArrayType(inner) | MapType(inner) =>
       resolve_type(inner, declarations, types, features, location, classes)
+    TupleType(items) =>
+      for item in items {
+        resolve_type(item, declarations, types, features, location, classes)
+      }
     NamedType(name) => {
       if types.any(t => t.name == name) {
         return

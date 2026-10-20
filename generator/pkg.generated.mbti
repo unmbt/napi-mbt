@@ -93,6 +93,9 @@ pub(all) enum TypeShape {
 
 pub(all) enum ValueType {
   IntType
+  UIntType
+  FloatType
+  JsonType
   Int64Type
   UInt64Type
   DoubleType
@@ -103,6 +106,8 @@ pub(all) enum ValueType {
   UnitType
   OptionType(ValueType)
   ArrayType(ValueType)
+  MapType(ValueType)
+  TupleType(Array[ValueType])
   NamedType(String)
   ClassType(String, String, Int)
   CallbackType(Array[ValueType], ValueType, Bool)

@@ -7,7 +7,7 @@
 | --- | --- |
 | 生成器 | 单一 AST/类型 IR；整体校验后生成 adapter、C、TS、loader 和元数据 |
 | 错误 | 可传播 NapiError；转换失败短路；保留原 JS 异常身份 |
-| 类型 | 严格 Int、IEEE Double、bigint、UTF-16、Buffer、Option/Array、struct/enum |
+| 类型 | 严格 Int/UInt、IEEE Float/Double、bigint、UTF-16、Buffer、Option/Array、Map、Json、tuple、struct/enum |
 | 生命周期 | 显式 class、receiver 验证、dispose、callback 引用、重入和 worker 清理 |
 | 异步 | 固定 async 0.22.4 的隔离补丁，Node 驱动调度，Promise 和 AbortSignal |
 | 开发体验 | doctor、严格 schema、独立 CJS/ESM、watch、计时和明确加载错误 |

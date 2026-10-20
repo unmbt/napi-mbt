@@ -31,7 +31,12 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
           check(ret, location, true, read)
         }
       }
-      OptionType(inner) | ArrayType(inner) => check(inner, location, true, read)
+      OptionType(inner) | ArrayType(inner) | MapType(inner) =>
+        check(inner, location, true, read)
+      TupleType(items) =>
+        for item in items {
+          check(item, location, true, read)
+        }
       NamedType(name) =>
         if !definitions.contains(name) {
           fail("\{location}: unresolved exported type \{name}")

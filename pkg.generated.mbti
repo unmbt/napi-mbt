@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "7"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "8"
 
 pub fn add(Int, Int) -> Int
 
@@ -18,6 +18,8 @@ pub fn get_Bytes(NapiEnv, NapiValue) -> Bytes raise NapiError
 
 pub fn get_Double(NapiEnv, NapiValue) -> Double raise NapiError
 
+pub fn get_Float(NapiEnv, NapiValue) -> Float raise NapiError
+
 pub fn get_Int(NapiEnv, NapiValue) -> Int raise NapiError
 
 pub fn get_Int64(NapiEnv, NapiValue) -> Int64 raise NapiError
@@ -25,6 +27,8 @@ pub fn get_Int64(NapiEnv, NapiValue) -> Int64 raise NapiError
 pub fn get_NapiBufferView(NapiEnv, NapiValue) -> NapiBufferView raise NapiError
 
 pub fn get_String(NapiEnv, NapiValue) -> String raise NapiError
+
+pub fn get_UInt(NapiEnv, NapiValue) -> UInt raise NapiError
 
 pub fn get_UInt64(NapiEnv, NapiValue) -> UInt64 raise NapiError
 
@@ -64,6 +68,10 @@ pub fn napi_field_set(NapiEnv, NapiValue, String, NapiValue) -> Unit raise NapiE
 
 pub fn napi_is_nullish(NapiEnv, NapiValue) -> Bool raise NapiError
 
+pub fn napi_key_get(NapiEnv, NapiValue, String) -> NapiValue raise NapiError
+
+pub fn napi_key_set(NapiEnv, NapiValue, String, NapiValue) -> Unit raise NapiError
+
 pub fn napi_mbt_adapter_add(NapiEnv, NapiValue, NapiValue) -> NapiValue
 
 pub fn napi_mbt_adapter_check_bool(NapiEnv, NapiValue) -> NapiValue
@@ -78,6 +86,8 @@ pub fn napi_mbt_adapter_roundtrip_bytes(NapiEnv, NapiValue) -> NapiValue
 
 pub fn napi_null(NapiEnv) -> NapiValue raise NapiError
 
+pub fn napi_object_keys(NapiEnv, NapiValue) -> Array[String] raise NapiError
+
 pub fn napi_object_new(NapiEnv) -> NapiValue raise NapiError
 
 pub fn napi_promise_is(NapiEnv, NapiValue) -> Bool raise NapiError
@@ -87,6 +97,8 @@ pub fn napi_promise_new(NapiEnv) -> NapiPromise raise NapiError
 pub fn napi_promise_reject(NapiEnv, NapiPromise, NapiValue) -> Unit raise NapiError
 
 pub fn napi_promise_resolve(NapiEnv, NapiPromise, NapiValue) -> Unit raise NapiError
+
+pub fn napi_read_json(NapiEnv, NapiValue, Array[NapiValue]) -> Json raise NapiError
 
 pub fn napi_require_object(NapiEnv, NapiValue) -> Unit raise NapiError
 
@@ -98,6 +110,8 @@ pub fn napi_threadsafe_function_create(NapiEnv, NapiValue, NapiValue, NapiValue,
 
 pub fn napi_threadsafe_function_release(NapiThreadsafeFunction, NapiTsfnReleaseMode) -> NapiTsfnStatus raise NapiError
 
+pub fn napi_write_json(NapiEnv, Json, Int) -> NapiValue raise NapiError
+
 pub fn roundtrip_bytes(Bytes) -> Bytes
 
 pub fn set_Bool(NapiEnv, Bool) -> NapiValue raise NapiError
@@ -106,11 +120,15 @@ pub fn set_Bytes(NapiEnv, Bytes) -> NapiValue raise NapiError
 
 pub fn set_Double(NapiEnv, Double) -> NapiValue raise NapiError
 
+pub fn set_Float(NapiEnv, Float) -> NapiValue raise NapiError
+
 pub fn set_Int(NapiEnv, Int) -> NapiValue raise NapiError
 
 pub fn set_Int64(NapiEnv, Int64) -> NapiValue raise NapiError
 
 pub fn set_String(NapiEnv, String) -> NapiValue raise NapiError
+
+pub fn set_UInt(NapiEnv, UInt) -> NapiValue raise NapiError
 
 pub fn set_UInt64(NapiEnv, UInt64) -> NapiValue raise NapiError
 

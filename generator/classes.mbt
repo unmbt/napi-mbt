@@ -76,6 +76,8 @@ fn class_type(value : ValueType, configs : Array[ClassConfig]) -> ValueType {
     }
     OptionType(inner) => OptionType(class_type(inner, configs))
     ArrayType(inner) => ArrayType(class_type(inner, configs))
+    MapType(inner) => MapType(class_type(inner, configs))
+    TupleType(items) => TupleType(items.map(item => class_type(item, configs)))
     CallbackType(params, ret, throws) =>
       CallbackType(
         params.map(p => class_type(p, configs)),

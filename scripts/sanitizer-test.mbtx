@@ -42,7 +42,7 @@ async fn main {
   }
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
   run(["run", "scripts/parser-asan-test.mbtx"], environment)
-  for fixture in ["runtime-boundary", "structured-types", "class", "callback", "async-exports"] {
+  for fixture in ["runtime-boundary", "structured-types", "collections", "class", "callback", "async-exports"] {
     run(["run", "scripts/" + fixture + "-test.mbtx", binary, "--asan"], environment)
     if fixture == "runtime-boundary" { run(["run", "scripts/test-runtime.mbtx", "--asan"], environment) }
     if fixture == "structured-types" { run(["run", "scripts/test-runtime.mbtx", "--structured", "--asan"], environment) }

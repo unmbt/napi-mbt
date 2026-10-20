@@ -168,6 +168,11 @@ fn declarations(
   } else {
     ""
   }) +
+  (if body.contains("$NapiJson") {
+    "export type $NapiJson = null | boolean | number | string | $NapiJson[] | { [key: string]: $NapiJson };\n"
+  } else {
+    ""
+  }) +
   "\n" +
   body
 }
