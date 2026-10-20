@@ -183,6 +183,17 @@ MOONBIT_FFI_EXPORT int napi_mbt_async_promise_create(napi_env env, napi_value ex
 MOONBIT_FFI_EXPORT napi_env napi_mbt_current_env(void) {
     return napi_mbt_active ? napi_mbt_active->env : NULL;
 }
+MOONBIT_FFI_EXPORT int napi_mbt_async_owns(napi_env env) {
+    return napi_mbt_active && napi_mbt_active->env == env;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_promise_then(napi_env env, napi_value promise, napi_value resolve, napi_value reject) {
+    napi_value then, result;
+    napi_status status = napi_get_named_property(env, promise, "then", &then);
+    napi_value args[] = { resolve, reject };
+    if (status == napi_ok) status = napi_call_function(env, promise, then, 2, args, &result);
+    return (int)status;
+}
 
 MOONBIT_FFI_EXPORT int napi_mbt_signal_get(napi_env env, napi_value object, const char *name, napi_value *result) {
     return (int)napi_get_named_property(env, object, name, result);

@@ -41,7 +41,7 @@ async fn main {
     run(["run", "scripts/lsan-host-check.mbtx"], environment)
   }
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
-  let fixtures = ["lock", "runtime-boundary", "structured-types", "collections", "owned-binary", "tsfn", "native-tasks", "workers", "class", "callback", "async-exports"]
+  let fixtures = ["lock", "runtime-boundary", "structured-types", "collections", "owned-binary", "tsfn", "native-tasks", "workers", "js-promises", "class", "callback", "async-exports"]
   let selected = if @env.args().contains("--fixture") {
     guard @env.args().last() is Some(name) && fixtures.contains(name) else { fail("Expected a known fixture after --fixture") }
     Some(name)

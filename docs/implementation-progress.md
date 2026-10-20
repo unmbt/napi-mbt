@@ -64,3 +64,9 @@ and sanitizer results are reported only when actually executed.
   clean offline npm platform-package installation, CJS/ESM and both TS modes
   passed. The standalone worker example passed; strict checks and 51 tests passed.
   POSIX child cleanup and Linux leak validation await CI.
+- Step 10: typed Promise resolution (including nested and binary values), repeated
+  waits, object/primitive rejection identity, throwing getters, cancellation with
+  late reactions, disposal, cross-environment ownership and worker teardown passed.
+  NodeNext/Bundler consumers, Windows ASan, existing async exports, strict check
+  and 52 MoonBit tests passed. The scheduler sleeps until external notifications
+  when no OS I/O or timer is pending. Linux memory checks await CI.

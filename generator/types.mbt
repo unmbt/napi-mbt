@@ -4,6 +4,7 @@ pub(all) enum ValueType {
   UIntType
   FloatType
   JsonType
+  JsPromiseType(ValueType)
   OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
@@ -29,6 +30,7 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     UIntType => "UInt"
     FloatType => "Float"
     JsonType => "Json"
+    JsPromiseType(inner) => "NapiJsPromise[" + inner.runtime_name() + "]"
     OwnedBinaryType(kind) => "Napi" + kind.javascript()
     Int64Type => "Int64"
     UInt64Type => "UInt64"
@@ -78,6 +80,7 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
   match self {
     IntType | UIntType | FloatType | DoubleType => "number"
     JsonType => "$NapiJson"
+    JsPromiseType(inner) => "Promise<" + inner.typescript(input~) + ">"
     OwnedBinaryType(kind) => kind.javascript()
     Int64Type | UInt64Type => "bigint"
     BoolType => "boolean"
@@ -162,7 +165,7 @@ fn parse_value_type(
     }
     return MapType(parse_value_type(value, location, true))
   }
-  for prefix in ["Option[", "Array["] {
+  for prefix in ["Option[", "Array[", "NapiJsPromise["] {
     if text.has_prefix(prefix) && text.has_suffix("]") {
       let inner = parse_value_type(
         text[prefix.length():text.length() - 1].to_owned(),
@@ -174,6 +177,8 @@ fn parse_value_type(
       }
       return if prefix == "Option[" {
         OptionType(inner)
+      } else if prefix == "NapiJsPromise[" {
+        JsPromiseType(inner)
       } else {
         ArrayType(inner)
       }

@@ -5,7 +5,10 @@ fn worker_owned(
   seen : Array[String],
 ) -> Bool {
   match value {
-    BufferViewType | CallbackType(_, _, _) | ClassType(_, _, _) => false
+    BufferViewType
+    | CallbackType(_, _, _)
+    | ClassType(_, _, _)
+    | JsPromiseType(_) => false
     OptionType(t) | ArrayType(t) | MapType(t) => worker_owned(t, types, seen)
     TupleType(items) => items.all(t => worker_owned(t, types, seen))
     NamedType(name) if !seen.contains(name) => {

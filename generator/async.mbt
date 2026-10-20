@@ -6,8 +6,10 @@ fn borrowed_type(
 ) -> Bool {
   match value {
     BufferViewType => true
-    OptionType(inner) | ArrayType(inner) | MapType(inner) =>
-      borrowed_type(inner, types, seen)
+    OptionType(inner)
+    | ArrayType(inner)
+    | MapType(inner)
+    | JsPromiseType(inner) => borrowed_type(inner, types, seen)
     TupleType(items) => items.any(item => borrowed_type(item, types, seen))
     CallbackType(params, ret, _) =>
       params.any(p => borrowed_type(p, types, seen)) ||

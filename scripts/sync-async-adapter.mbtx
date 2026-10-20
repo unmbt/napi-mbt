@@ -120,13 +120,14 @@ async fn main {
     resources["async/files/" + path] = Json(text)
   }
   let manifest : Json = {
-    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 4,
+    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 5,
     "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
   }
   resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")
   resources["async/LICENSE"] = Json(@fs.read_file(root + "/LICENSE").text().replace_all(old="\r\n", new="\n"))
   for (path, source) in [("napi_async.h", "napi_async.h"), ("napi_async.mbt", "napi_async.mbt.patch"), ("LIBUV-LICENSE", "LIBUV-LICENSE")] {
-    resources["async/" + path] = Json(@fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n"))
+    let text = @fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n")
+    resources["async/" + path] = Json(if path == "napi_async.mbt" { text + "\n" + @fs.read_file("internal/async-adapter/js_promise.mbt.patch").text().replace_all(old="\r\n", new="\n") } else { text })
   }
   let output = Json(resources).stringify(indent=2) + "\n"
   if @env.args().contains("--check") {

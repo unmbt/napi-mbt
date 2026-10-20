@@ -1,0 +1,40 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : StringView) -> Unit {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-js-promises-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  checked(binary, ["init", dir])
+  @fs.write_file(dir + "/moon.mod", "name = \"test/js-promises\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
+  checked("moon", ["check", "--target", "native"], cwd=dir)
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
+  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/js-promises.mbt.txt"))
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let saved = root + "/.napi-mbt/" + (if asan { "js-promises-asan" } else { "js-promises-smoke" })
+  @fs.mkdir(saved, recursive=true, allow_exist=true)
+  @fs.write_file(saved + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  assert_eq(@async.with_timeout(120000, () => @process.run("node", ["--expose-gc", root + "/scripts/js-promises.test.cjs", saved + "/napi_mbt.node"], extra_env=environment)), 0)
+  if !asan {
+    @fs.write_file(dir + "/consumer.mts", "import a from './index.mjs';\nconst n: Promise<number> = a.twice(Promise.resolve(2));\nconst b: Promise<Int32Array> = a.binary(Promise.resolve(new Int32Array()));\n// @ts-expect-error actual Promise required\na.twice(1);\n// @ts-expect-error wrong resolved type\na.twice(Promise.resolve('bad'));\n")
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] { checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, dir + "/consumer.mts"]) }
+  }
+  println("Typed Promise input, cancellation, identity, references and TS consumers passed")
+}

@@ -17,6 +17,15 @@ pub fn Loop::submit(self : Loop, f : async () -> Unit) -> Task raise {
 pub fn Task::cancel(self : Task) -> Unit raise { self.owner.inner.cancel(self.inner) }
 
 ///|
+pub fn Task::wake(self : Task) -> Unit raise { self.owner.inner.wake(self.inner) }
+
+///|
+pub fn Loop::current_task(self : Loop) -> Task { { owner: self, inner: @coroutine.current_coroutine() } }
+
+///|
+pub async fn suspend() -> Unit { @coroutine.suspend() }
+
+///|
 pub fn Loop::cancel_all(self : Loop) -> Unit raise { self.inner.cancel_all() }
 
 ///|

@@ -59,6 +59,19 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_unpin(napi_mbt_callback_ref *reference) 
     return resource ? napi_mbt_dispose_resource(resource) : napi_ok;
 }
 
+/* Promise reactions cannot be removed from JS. Drop their MoonBit payload on
+ * completion/cancellation, and let a later reaction return undefined safely. */
+MOONBIT_FFI_EXPORT int napi_mbt_closure_inert(napi_env env, napi_value value) {
+    void *pointer = NULL;
+    int status = napi_unwrap(env, value, &pointer);
+    if (status != napi_ok) return status;
+    napi_mbt_resource *resource = napi_mbt_active->resources;
+    while (resource && resource != pointer) resource = resource->next;
+    if (!resource || resource->kind != 2) return 1007;
+    resource->inert_on_dispose = true;
+    return napi_ok;
+}
+
 MOONBIT_FFI_EXPORT int napi_mbt_owned_reference_dispose(napi_mbt_callback_ref *reference) {
     if (!reference->resource || reference->resource->disposed) return napi_ok;
     if (reference->resource->owner != napi_mbt_active) return 1005;
@@ -154,6 +167,10 @@ static napi_value napi_mbt_closure_call(napi_env env, napi_callback_info info) {
     checked = napi_get_cb_info(env, info, &args.count, NULL, NULL, (void **)&resource);
     if (checked != napi_ok) goto done;
     checked = napi_mbt_check_resource(resource, env);
+    if (checked == 1006 && resource->inert_on_dispose) {
+        checked = napi_get_undefined(env, &result);
+        goto done;
+    }
     if (checked != napi_ok) goto done;
     if (args.count > INT32_MAX || args.count > SIZE_MAX / sizeof(napi_value)) { checked = napi_invalid_arg; goto done; }
     args.values = args.count ? malloc(sizeof(napi_value) * args.count) : NULL;

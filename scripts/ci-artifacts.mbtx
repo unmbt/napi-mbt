@@ -12,7 +12,7 @@ async fn copy(source : String, destination : String) -> Unit {
 async fn main {
   let destination = @env.args().get(1).unwrap_or("dist/consumer-fixtures")
   @fs.mkdir(destination + "/.napi-mbt", recursive=true, allow_exist=true)
-  for name in ["native-smoke", "isolation-smoke", "boundary-smoke", "structured-smoke", "owned-binary-smoke", "tsfn-smoke", "native-tasks-smoke", "workers-smoke", "class-smoke", "callback-smoke", "lifecycle-smoke", "async-smoke", "async-exports", "minimum-cjs", "minimum-dual", "minimum-async"] {
+  for name in ["native-smoke", "isolation-smoke", "boundary-smoke", "structured-smoke", "owned-binary-smoke", "tsfn-smoke", "native-tasks-smoke", "workers-smoke", "js-promises-smoke", "class-smoke", "callback-smoke", "lifecycle-smoke", "async-smoke", "async-exports", "minimum-cjs", "minimum-dual", "minimum-async"] {
     copy(".napi-mbt/" + name, destination + "/.napi-mbt/" + name)
   }
   copy("artifacts", destination + "/artifacts")

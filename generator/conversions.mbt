@@ -29,8 +29,10 @@ fn conversion_types(
     }
     types.push(value)
     match value {
-      OptionType(inner) | ArrayType(inner) | MapType(inner) =>
-        collect(inner, read)
+      OptionType(inner)
+      | ArrayType(inner)
+      | MapType(inner)
+      | JsPromiseType(inner) => collect(inner, read)
       TupleType(items) =>
         for item in items {
           collect(item, read)
@@ -112,6 +114,12 @@ fn conversions(
       )
     }
     match value {
+      JsPromiseType(inner) =>
+        out.write_string(
+          "  get_NapiJsPromise(env, value, fn(env, value) { " +
+          conversion_name(inner, types, true) +
+          "(env, value, []) })\n",
+        )
       CallbackType(params, ret, _) =>
         out.write_string(
           callback_conversion(

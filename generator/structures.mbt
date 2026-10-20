@@ -137,6 +137,12 @@ fn resolve_type(
   classes : Array[ClassConfig],
 ) -> Unit raise {
   match value {
+    JsPromiseType(inner) => {
+      if !features.contains("async") {
+        features.push("async")
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
     CallbackType(params, ret, _) => {
       if !features.contains("callback") {
         features.push("callback")

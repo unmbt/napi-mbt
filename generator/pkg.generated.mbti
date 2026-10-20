@@ -105,6 +105,7 @@ pub(all) enum ValueType {
   UIntType
   FloatType
   JsonType
+  JsPromiseType(ValueType)
   OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
