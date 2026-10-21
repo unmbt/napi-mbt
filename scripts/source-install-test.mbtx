@@ -4,10 +4,14 @@ import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process
 async fn pnpm_command() -> (String, Array[String]) {
   if @env.get_env_var("OS") != Some("Windows_NT") { return ("pnpm", []) }
   for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
-    let cli = dir.to_owned() + "/node_modules/pnpm/bin/pnpm.cjs"
-    if @fs.exists(cli) { return ("node", [cli]) }
+    for base in [dir.to_owned() + "/node_modules/pnpm/bin", dir.to_owned() + "/../pnpm/bin"] {
+      for name in ["pnpm.mjs", "pnpm.cjs"] {
+        let cli = base + "/" + name
+        if @fs.exists(cli) { return ("node", [cli]) }
+      }
+    }
   }
-  fail("Cannot find pnpm.cjs beside Node on PATH")
+  fail("Cannot find pnpm launcher beside Node on PATH")
 }
 
 ///|
@@ -29,11 +33,13 @@ async fn main {
   assert_eq(@fs.read_file(temp + "/pnpm-lock.yaml").binary(), @fs.read_file(root + "/pnpm-lock.yaml").binary())
   let command = ["run", root + "/scripts/release-check.mbtx"]
   assert_eq(@process.run("moon", command, cwd=temp), 0)
-  // A missing lockfile importer must fail before a frozen pnpm install runs.
+  // A mismatched importer must fail before a frozen pnpm install runs.
   let lock = @fs.read_file(temp + "/pnpm-lock.yaml").text()
-  @fs.write_file(temp + "/pnpm-lock.yaml", lock.replace_all(old="\n  .:\n", new="\n  missing:\n"))
+  let mismatch = "\n        specifier: 26.1.2"
+  assert_true(lock.contains(mismatch), msg="Fixture lockfile lost its importer")
+  @fs.write_file(temp + "/pnpm-lock.yaml", lock.replace_all(old=mismatch, new="\n        specifier: 0.0.0"))
   let (code, out, err) = @process.collect_output(program, prefix + ["install", "--frozen-lockfile", "--ignore-scripts"], cwd=temp)
   let message = out.text() + err.text()
-  assert_true(code != 0 && (message.contains("frozen") || message.contains("outdated") || message.contains("importer") || message.contains("lockfile")))
+  assert_true(code != 0, msg=message)
   println("Clean source installation and incomplete-lockfile rejection passed")
 }

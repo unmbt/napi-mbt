@@ -22,7 +22,7 @@ async fn main {
     #|#export_name("start")
     #|pub fn start(mode : Int) -> Int { start_raw(mode) }
     #|///|
-    #|#export_name("stat")
+    #|#export_name("threadStats")
     #|pub fn stat(index : Int) -> Int { stat_raw(index) }
     #|
   @fs.write_file(dir + "/lib.mbt", source)

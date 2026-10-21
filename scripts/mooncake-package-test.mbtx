@@ -24,7 +24,7 @@ async fn native_path(temp : String, original : String, windows : Bool) -> String
   }
   let bin = temp + "/toolchain"
   @fs.mkdir(bin)
-  for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
+  for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "nm", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
     for path in paths {
       if @fs.exists(path + "/" + name) && @fs.can_execute(path + "/" + name) {
         @fs.symlink(bin + "/" + name, target=@fs.realpath(path + "/" + name))

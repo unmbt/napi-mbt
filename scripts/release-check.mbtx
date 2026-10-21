@@ -38,14 +38,15 @@ async fn main {
   }
   let path = "pnpm-lock.yaml"
   let original = @fs.read_file(path).text()
-  let canonical = original.replace_all(
+  let normalized = original.replace_all(old="\r\n", new="\n")
+  let canonical = normalized.replace_all(
     old="https://mirrors.tencent.com/npm/",
     new="https://registry.npmjs.org/",
   )
   if write {
     @fs.write_file(path, canonical)
   } else {
-    assert_eq(original, canonical, msg="pnpm lockfile must use the public npm registry")
+    assert_eq(normalized, canonical, msg="pnpm lockfile must use the public npm registry")
   }
   assert_true(canonical.contains("lockfileVersion:"), msg="Invalid pnpm lockfile")
   assert_true(canonical.contains("\nimporters:\n"), msg="Missing pnpm lockfile importers")

@@ -15,10 +15,14 @@ async fn pnpm(args : Array[String], cwd : String) -> String {
     return checked("pnpm", args, cwd~)
   }
   for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
-    let cli = dir.to_owned() + "/node_modules/pnpm/bin/pnpm.cjs"
-    if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+    for base in [dir.to_owned() + "/node_modules/pnpm/bin", dir.to_owned() + "/../pnpm/bin"] {
+      for name in ["pnpm.mjs", "pnpm.cjs"] {
+        let cli = base + "/" + name
+        if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+      }
+    }
   }
-  fail("Cannot find pnpm.cjs beside Node on PATH")
+  fail("Cannot find pnpm launcher beside Node on PATH")
 }
 
 ///|

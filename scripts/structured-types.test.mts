@@ -1,4 +1,4 @@
-import addon, { person, shape, color, echo_i64, echo_u64, optional, arrays, nested, link, type Person, type Person$Input } from '../.napi-mbt/structured-smoke/index.mjs';
+import addon, { person, shape, color, echo_i64, echo_u64, optional, arrays, nested, linkValue, type Person, type Person$Input } from '../.napi-mbt/structured-smoke/index.mjs';
 const input: Person$Input = { name: 'Moon', rows: [[1n, undefined, null]], address: { city: '月' }, __proto__: 42 };
 const result: Person = person(input);
 const age: number | null = result.age;
@@ -10,7 +10,7 @@ optional(null, 2, undefined);
 shape({ tag: 'Point', args: [1, 2] });
 shape({ tag: 'Chain', args: [[{ tag: 'Empty', args: [] }]] });
 color('Blue');
-link({ value: 1 });
+linkValue({ value: 1 });
 addon.person(input);
 // @ts-expect-error bigint does not accept number
 echo_i64(1);

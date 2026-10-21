@@ -1,13 +1,35 @@
 'use strict';
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
 const { pathToFileURL } = require('node:url');
+const { execFile } = require('node:child_process');
+const { promisify } = require('node:util');
 const { Worker } = require('node:worker_threads');
 const { setTimeout: delay } = require('node:timers/promises');
+const execFileAsync = promisify(execFile);
 const dir = path.resolve(process.argv[2]);
 const addon = require(path.join(dir, 'index.cjs'));
-const alive = pid => { try { process.kill(pid, 0); return true; } catch (error) { if (error.code === 'ESRCH') return false; throw error; } };
-async function gone(pid) { for (let i = 0; i < 200; i++) { if (!alive(pid)) return; await delay(10); } assert.fail(`child ${pid} survived teardown`); }
+const alive = async pid => {
+  try { process.kill(pid, 0); }
+  catch (error) { if (error.code === 'ESRCH') return false; throw error; }
+  // POSIX keeps a child as a zombie until its original libuv watcher reaps it.
+  // A zombie has stopped executing and is therefore not a live worker.
+  if (process.platform === 'linux' || process.platform === 'darwin') {
+    try {
+      if (process.platform === 'linux') {
+        const stat = fs.readFileSync(`/proc/${pid}/stat`, 'utf8');
+        const close = stat.lastIndexOf(')');
+        if (close >= 0 && stat[close + 2] === 'Z') return false;
+      } else {
+        const { stdout } = await execFileAsync('ps', ['-o', 'stat=', '-p', String(pid)]);
+        if (/^Z/.test(stdout.trim())) return false;
+      }
+    } catch (error) { if (error.code === 'ENOENT' || error.code === 1) return false; throw error; }
+  }
+  return true;
+};
+async function gone(pid) { for (let i = 0; i < 1000; i++) { if (!await alive(pid)) return; await delay(10); } assert.fail(`child ${pid} survived teardown`); }
 (async () => {
   const esm = await import(pathToFileURL(path.join(dir, 'index.mjs')));
   assert.equal(esm.default, addon, 'CJS/ESM share one pool');

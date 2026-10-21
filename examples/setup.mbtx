@@ -3,7 +3,12 @@ import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process
 ///|
 async fn checked(program : String, args : Array[String], cwd : String) -> Unit {
   let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args, cwd~))
-  if code != 0 { fail(out.text() + err.text()) }
+  if code != 0 {
+    fail(
+      program + " " + args.join(" ") + " exited with status " + code.to_string() +
+        ":\n" + out.text() + err.text(),
+    )
+  }
   println(out.text())
 }
 

@@ -81,6 +81,6 @@ Mooncake 门禁使用 `moon package` 检查 ZIP 清单、解包并严格检查�
 CI 固定 Moon/core 和 CMake，覆盖当前可用的原生目标，测试 Node 22/24/26 与最低版本，
 通过后才生成 release 归档；新 MoonBit 兼容性独立测试。
 自动化使用 `.mbtx`；`.cjs/.mts/.cts` 是真实消费者。下载的 `napi-rs/` 仅供本地参考。
-当前 MoonBit setup action 没有 macOS x64 编译器，GitHub Actions 也不能在 ARM64
-Alpine 容器中运行 JavaScript action；这两个目标标记为 CI 待验证。
+当前 MoonBit setup action 没有 macOS x64 编译器，固定工具链也无法在 Alpine
+musl 镜像中启动；macOS x64 和两个 musl 目标标记为 CI 待验证。
 [性能](performance.md)和[路线图](roadmap.md)记录后续优化与平台工作。

@@ -34,7 +34,7 @@ assert.throws(() => addon.shape({ tag: 'Point', args: [1] }), e => e.code === 'E
 assert.throws(() => addon.shape({ tag: 'Empty', args: [1] }), e => e.code === 'ERR_NAPI_ENUM_ARGS');
 const link = { value: 1 }; link.next = link;
 const effectCount = addon.effects();
-assert.throws(() => addon.link(link), e => e.code === 'ERR_NAPI_CYCLE');
+assert.throws(() => addon.linkValue(link), e => e.code === 'ERR_NAPI_CYCLE');
 assert.strictEqual(addon.effects(), effectCount);
 const shape = { tag: 'Chain', args: [] }; shape.args.push([shape]);
 assert.throws(() => addon.shape(shape), e => e.code === 'ERR_NAPI_CYCLE');
@@ -43,9 +43,9 @@ assert.throws(() => addon.person({ ...person, rows: [[1n, 4]] }), TypeError);
 assert.strictEqual(addon.effects(), effectCount);
 const shared = { tag: 'Point', args: [1, 2] };
 assert.deepStrictEqual(addon.shape({ tag: 'Chain', args: [[shared, shared]] }), { tag: 'Chain', args: [[shared, shared]] });
-assert.deepStrictEqual(addon.link({ value: 1 }), { value: 1, next: null });
+assert.deepStrictEqual(addon.linkValue({ value: 1 }), { value: 1, next: null });
 for (let i = 0; i < 10000; i++) {
   assert.deepStrictEqual(addon.person(person), expected);
-  assert.throws(() => addon.link(link), e => e.code === 'ERR_NAPI_CYCLE');
+  assert.throws(() => addon.linkValue(link), e => e.code === 'ERR_NAPI_CYCLE');
 }
 console.log('Structured types, bigint ranges, cycles and repeated allocation tests passed');

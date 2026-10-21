@@ -104,6 +104,7 @@ CI pins Moon/core and CMake, builds the currently supported native target profil
 A separate job checks latest MoonBit compatibility. Test orchestration uses
 `.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`
 as local reference only. The MoonBit setup action currently cannot provide a
-macOS x64 compiler, and GitHub Actions cannot run JavaScript actions inside an
-ARM64 Alpine container; those two profiles remain CI-pending. [Benchmarks](../performance.md) and the
+macOS x64 compiler, and the pinned MoonBit toolchain currently cannot start in
+the Alpine musl image; macOS x64 and both musl profiles remain CI-pending.
+[Benchmarks](../performance.md) and the
 [roadmap](../roadmap.md) describe remaining performance and platform work.

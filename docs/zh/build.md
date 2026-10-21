@@ -53,4 +53,7 @@ flags 传递给这些对象。Driver 委托给 probe 已验证的编译器，保
 
 显式配置的编译器冲突和 `-fno-PIC` 会报错。Linux 隐藏运行时及依赖的内部符号，
 并将内部符号引用绑定到 addon 自身，避免与 Node 的 simdutf 冲突；Node-API 注册入口
-和用户在包配置中声明的导出保持可见。
+和用户在包配置中声明的导出保持可见。Unix 构建还会用 `nm` 读取宿主 libc 的动态
+符号表，在调用原生编译器前拒绝包配置中显式声明、可能 interpose libc 的原生导出名，
+例如 `read` 或 `write`。JavaScript 导出名会生成带 `napi_mbt_adapter_` 前缀的原生适配器，
+因此单独把 JS API 命名为 `read` 不会被误判为 libc 符号。

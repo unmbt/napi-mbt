@@ -45,7 +45,7 @@ function loadVirtual(source, options = {}) {
     const addon = await import(pathToFileURL(path.join(dir, 'index.mjs')).href);
     assert.strictEqual(addon.mbt_add(2, 3), 5);
     assert.strictEqual(addon.default.mbt_add, addon.mbt_add);
-    for (const name of ['failure', 'addon', 'path', 'fs', 'require', 'createRequire', 'fileURLToPath', 'dirname', 'target', 'requiredNapi']) assert.strictEqual(addon[name](), 42);
+    for (const name of ['failure', 'addon', 'path', 'fs', 'require', 'createRequire', 'fileURLToPath', 'directoryName', 'target', 'requiredNapi']) assert.strictEqual(addon[name](), 42);
   }
   // Existing broken local builds must never silently fall through to a package.
   if (cjs) {

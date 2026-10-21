@@ -42,7 +42,9 @@ async fn initialize(
         "$schema": "./napi-mbt.schema.json",
         "napiVersion": 4,
         "builder": "auto",
-        "targets": ["win32-x64-msvc", "darwin-arm64", "linux-x64-gnu"],
+        "targets": [
+          "win32-x64-msvc", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
+        ],
         "features": [],
         "cjs": true,
         "esm": true,
@@ -94,7 +96,7 @@ async fn initialize(
     #|      - uses: actions/setup-node@v4
     #|        with: { node-version: '${{ matrix.node }}' }
     #|      - uses: pnpm/action-setup@v4
-    #|        with: { version: '10' }
+    #|        with: { version: '>=10' }
     #|      - run: pnpm install --ignore-scripts
     #|      - run: pnpm test
     #|

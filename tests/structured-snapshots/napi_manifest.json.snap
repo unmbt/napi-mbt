@@ -101,7 +101,7 @@
     },
     {
       "sourceName": "link",
-      "exportName": "link",
+      "exportName": "linkValue",
       "params": [
         {
           "name": "value",

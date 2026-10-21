@@ -91,6 +91,23 @@ async fn build(
       "\nuv_handle_size\nuv_handle_get_data\nuv_handle_set_data\nuv_timer_init\nuv_timer_start\nuv_timer_stop\nuv_close\n",
     )
   }
+  if !windows() {
+    guard toolchain.report
+      is { "compiler": { "path": String(compiler), .. }, .. } else {
+      fail("Missing compiler diagnostic")
+    }
+    let package_text = read_text(staging + "/moon.pkg")
+    let configured_exports = package_strings(
+      package_value(package_text, native_block(package_text), "exports"),
+    )
+    // The ELF/Mach-O dynamic symbol table contains generated adapter names,
+    // not the JavaScript property names. A JS export called `read` is backed by
+    // `napi_mbt_adapter_read` and cannot interpose libc's `read`; only explicit
+    // native-link exports and generated native symbols belong in this check.
+    let native_exports = generated.source.native_exports()
+    native_exports.append(configured_exports)
+    validate_unix_export_symbols(compiler, dir, native_exports)
+  }
   prepare_package(staging, generated)
   if !windows() {
     guard toolchain.report

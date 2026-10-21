@@ -72,4 +72,9 @@ untouched.
 Conflicting package compiler choices and explicit `-fno-PIC` flags fail rather
 than being discarded. Linux also hides bundled runtime/dependency symbols and
 binds internal references locally, preventing simdutf collisions with Node.
-The Node-API registration and user-configured exports remain visible.
+The Node-API registration and user-configured exports remain visible. On Unix,
+the CLI reads the host libc dynamic symbol table with `nm` and rejects an
+explicit native-link export whose symbol would interpose a libc symbol, such as
+`read` or `write`, before invoking the native compiler. JavaScript export names
+are adapter-prefixed (`napi_mbt_adapter_<name>`) and are therefore not treated
+as libc symbols.

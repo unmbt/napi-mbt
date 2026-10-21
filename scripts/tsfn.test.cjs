@@ -14,23 +14,23 @@ async function until(predicate) {
 }
 async function main() {
   for (let round = 0; round < 20; round++) {
-    const finalized = addon.stat(4), delivered = seen.length;
+    const finalized = addon.threadStats(4), delivered = seen.length;
     assert.equal(addon.start(0), 0);
-    await until(() => addon.stat(4) === finalized + 1);
+    await until(() => addon.threadStats(4) === finalized + 1);
     assert.deepEqual(seen.slice(delivered), Array.from({ length: 16 }, (_, i) => i));
-    const full = addon.stat(5);
+    const full = addon.threadStats(5);
     assert.equal(addon.start(1), 0);
-    await until(() => addon.stat(4) === finalized + 2);
-    assert.equal(addon.stat(5), full + 1);
-    const closing = addon.stat(6);
+    await until(() => addon.threadStats(4) === finalized + 2);
+    assert.equal(addon.threadStats(5), full + 1);
+    const closing = addon.threadStats(6);
     assert.equal(addon.start(2), 0);
-    await until(() => addon.stat(4) === finalized + 3);
-    assert.equal(addon.stat(6), closing + 1);
-    assert.equal(addon.stat(0), addon.stat(1), 'every C payload freed exactly once');
-    assert.equal(addon.stat(8), 0);
+    await until(() => addon.threadStats(4) === finalized + 3);
+    assert.equal(addon.threadStats(6), closing + 1);
+    assert.equal(addon.threadStats(0), addon.threadStats(1), 'every C payload freed exactly once');
+    assert.equal(addon.threadStats(8), 0);
   }
   for (let round = 0; round < 12; round++) {
-    const finalized = addon.stat(4);
+    const finalized = addon.threadStats(4);
     const worker = new Worker(`
       const { parentPort, workerData } = require('node:worker_threads');
       global.__napiTsfnTest = () => {};
@@ -41,12 +41,12 @@ async function main() {
     `, { eval: true, workerData: binary });
     await new Promise((resolve, reject) => { worker.once('message', resolve); worker.once('error', reject); });
     await worker.terminate();
-    await until(() => addon.stat(4) === finalized + 1 && addon.stat(8) === 0);
-    assert.equal(addon.stat(0), addon.stat(1));
+    await until(() => addon.threadStats(4) === finalized + 1 && addon.threadStats(8) === 0);
+    assert.equal(addon.threadStats(0), addon.threadStats(1));
   }
-  console.log('TSFN counters:', Array.from({length: 13}, (_, i) => addon.stat(i)));
-  assert.equal(addon.stat(7), 0, 'no unexpected Node-API status');
-  assert.equal(addon.stat(9), 0, 'callbacks run on their owner Node thread');
+  console.log('TSFN counters:', Array.from({length: 13}, (_, i) => addon.threadStats(i)));
+  assert.equal(addon.threadStats(7), 0, 'no unexpected Node-API status');
+  assert.equal(addon.threadStats(9), 0, 'callbacks run on their owner Node thread');
   console.log('C-thread TSFN delivery, queue full, acquire/release, abort and shutdown passed');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

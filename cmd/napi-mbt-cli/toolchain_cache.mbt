@@ -70,7 +70,7 @@ async fn toolchain_signature(
       require_command("cc"),
     )
     paths.push(compiler)
-    for name in ["ar", "ld", "cc1"] {
+    for name in ["ar", "ld", "cc1", "nm"] {
       let selected = command(compiler, ["-print-prog-name=" + name], dir)
         .trim()
         .to_owned()

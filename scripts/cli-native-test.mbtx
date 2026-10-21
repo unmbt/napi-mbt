@@ -35,7 +35,7 @@ async fn no_node_environment(temp : String) -> Map[String, String] {
     @fs.mkdir(bin)
     // Unix often installs node beside cc in /usr/bin. Expose only the native
     // toolchain rather than inheriting that whole directory.
-    for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
+    for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "nm", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
       for dir in paths {
         let path = dir + "/" + name
         if @fs.exists(path) && @fs.can_execute(path) {
