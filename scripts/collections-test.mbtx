@@ -1,0 +1,61 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-collections-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  checked(binary, ["init", dir, "--name", "collections-fixture"])
+  let source =
+    #|///|
+    #|let effects : Ref[Int] = Ref(0)
+    #|///|
+    #|#export_name("effects")
+    #|pub fn effects_count() -> Int { effects.val }
+    #|///|
+    #|#export_name("uint_value")
+    #|pub fn uint_value(v : UInt) -> UInt { effects.val += 1; v }
+    #|///|
+    #|#export_name("echo_float")
+    #|pub fn float_value(v : Float) -> Float { effects.val += 1; v }
+    #|///|
+    #|#export_name("record")
+    #|pub fn record(v : Map[String, Array[(UInt, String?)]]) -> Map[String, Array[(UInt, String?)]] { effects.val += 1; v }
+    #|///|
+    #|#export_name("tuple")
+    #|pub fn tuple(v : (Int, String?)) -> (Int, String?) { effects.val += 1; v }
+    #|///|
+    #|#export_name("json")
+    #|pub fn json(v : Json) -> Json { effects.val += 1; v }
+    #|///|
+    #|#export_name("bad_json")
+    #|pub fn bad_json() -> Json { Json::number(0.0 / 0.0) }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  let code = @process.run("node", ["scripts/collections.test.cjs", dir + "/artifacts/" + target + "/napi_mbt.node"], extra_env=environment)
+  assert_eq(code, 0)
+  if !asan {
+    @fs.write_file(dir + "/consumer.mts", "import addon from './index.mjs';\nconst r: Record<string, [number, string | null][]> = addon.record({ x: [[1, undefined]] });\naddon.json({ nested: [1, null] });\n// @ts-expect-error bigint is not JSON\naddon.json(1n);\n// @ts-expect-error incorrect tuple length\naddon.tuple([1]);\n")
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, dir + "/consumer.mts"])
+    }
+  }
+  println("Scalar, map, tuple and JSON native and TypeScript consumers passed")
+}

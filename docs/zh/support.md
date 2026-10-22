@@ -4,12 +4,12 @@
 | --- | --- |
 | 原生 CLI | 不依赖 Node/npm |
 | 新 addon | 默认 N-API 4，同时开启 CJS/ESM |
-| 主 Node CI | 三个发布平台上的 22、24、26 |
+| 主 Node CI | 七种原生宿主上的 22、24、26 |
 | 最低版本消费者 | Node 10.16：CJS/N-API 4；12.20：双入口/N-API 4；12.22：async/N-API 8 |
-| 发布平台 | Windows x64 MSVC、Linux x64 glibc、macOS ARM64 |
-| 其他已识别宿主 | Linux ARM64 glibc、macOS x64；没有预编译发布门禁 |
+| 原生构建门禁 | Windows x64 MSVC、Linux x64/ARM64 glibc 与 musl、macOS x64/ARM64 |
+| 新平台验证状态 | Linux ARM64、macOS x64 与 Alpine musl 已配置门禁，等待 CI 实际执行 |
 | 交叉编译 | CLI 要求匹配宿主，拒绝不同目标 |
-| libc | glibc；拒绝 musl |
+| libc | glibc 与 musl；工具链探测及 addon 的 ELF 动态依赖必须与宿主一致 |
 
 生成的 `engines.node` 是 N-API 引入版本与 loader 要求的交集。默认双入口为
 `>=12.20.0 <13 || >=14.13.1`。N-API 8 为

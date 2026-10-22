@@ -1,0 +1,61 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : String) -> Unit {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?=cwd.map(s => s[:])))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-native-tasks-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  checked(binary, ["init", dir, "--name", "native-tasks-fixture"])
+  @fs.write_file(dir + "/moon.mod", "name = \"test/native-tasks\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  checked("moon", ["check", "--target", "native"], cwd=dir)
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"nativeTasks\":{\"compute\":\"fixture_task\"}}")
+  @fs.write_file(dir + "/tasks.c", @fs.read_file("scripts/fixtures/native_tasks.c"))
+  let source =
+    #|///|
+    #|#export_name("wrapped")
+    #|pub async fn wrapped(input : Bytes) -> Bytes { napi_native_task("compute", input) }
+    #|///|
+    #|#export_name("unknown")
+    #|pub async fn unknown(input : Bytes) -> Bytes { napi_native_task("missing", input) }
+    #|///|
+    #|extern "c" fn native_started() -> Int = "native_task_started"
+    #|///|
+    #|extern "c" fn native_finished() -> Int = "native_task_finished"
+    #|///|
+    #|#export_name("started")
+    #|pub fn started() -> Int { native_started() }
+    #|///|
+    #|#export_name("finished")
+    #|pub fn finished() -> Int { native_finished() }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  let asan = @env.args().contains("--asan")
+  let flags = if !asan { "" } else if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"tasks.c\"").replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = root + "/.napi-mbt/" + (if asan { "native-tasks-asan" } else { "native-tasks-smoke" })
+  @fs.mkdir(output, recursive=true, allow_exist=true)
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  let environment : Map[String, String] = { "UV_THREADPOOL_SIZE": "1" }
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  let code = @async.with_timeout(120000, () => @process.run("node", ["--expose-gc", "scripts/native-tasks.test.cjs", output + "/napi_mbt.node"], extra_env=environment))
+  assert_eq(code, 0)
+  if !asan {
+    @fs.write_file(dir + "/consumer.mts", "import addon from './index.mjs';\nimport { Buffer } from 'node:buffer';\nconst a: Promise<Buffer> = addon.compute(Buffer.alloc(0), { signal: new AbortController().signal });\nconst b: Promise<Buffer> = addon.wrapped(Buffer.alloc(0));\n// @ts-expect-error native input is a Buffer\naddon.compute(42);\n// @ts-expect-error invalid options\naddon.compute(Buffer.alloc(0), {signal: 1});\n")
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, dir + "/consumer.mts"])
+    }
+    checked("node", ["--input-type=module", "-e", "import a from './index.mjs'; import assert from 'node:assert/strict'; assert.deepEqual(await a.compute(Buffer.from([0, 7])), Buffer.from([0, 7]));"], cwd=dir)
+    checked("node", ["-e", "const a = require('./index.cjs'); require('node:assert/strict').equal(typeof a.compute, 'function');"], cwd=dir)
+  }
+  println("Native task cancellation, ownership, responsiveness and shutdown passed")
+}

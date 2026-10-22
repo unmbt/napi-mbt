@@ -1,6 +1,7 @@
 # 使用指南
 
-从仓库执行 `moon install ./cmd/napi-mbt-cli` 安装。
+通过 `moon install unmbt/napi-mbt/cmd/napi-mbt-cli` 从 Mooncakes 安装。
+开发者在源码仓库中也可执行 `moon install ./cmd/napi-mbt-cli`。
 `napi-mbt-cli --help` 和各子命令的 `--help` 列出实际接受的参数。
 
 | 命令 | 行为 |

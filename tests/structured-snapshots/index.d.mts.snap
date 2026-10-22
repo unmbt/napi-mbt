@@ -70,7 +70,7 @@ export function effects(): number;
  * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
  * @throws Argument conversion failure prevents business execution.
  */
-export function link(value: Link$Input): Link;
+export function linkValue(value: Link$Input): Link;
 /**
  * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
  * @throws Argument conversion failure prevents business execution.
@@ -98,7 +98,7 @@ declare const $napiAddon: {
   echo_i64: typeof echo_i64;
   echo_u64: typeof echo_u64;
   effects: typeof effects;
-  link: typeof link;
+  linkValue: typeof linkValue;
   nested: typeof nested;
   optional: typeof optional;
   person: typeof person;

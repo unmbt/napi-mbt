@@ -10,7 +10,7 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         { "napiVersion": 4.5 },
         { "napiVersion": 11 },
         { "builder": "unknown" },
-        { "targets": ["linux-x64-musl"] },
+        { "targets": ["linux-riscv64-musl"] },
         { "targets": ["darwin-arm64", "darwin-arm64"] },
         { "features": ["promise", "promise"] },
         { "features": ["unknown"] },
@@ -74,6 +74,19 @@ test "configuration rejects silent mistakes and invalid feature levels" {
         },
         { "features": ["callback"], "napiVersion": 2 },
         { "features": ["async"], "napiVersion": 7 },
+        { "nativeTasks": { "compute": "my_task" } },
+        { "nativeTasks": { "compute": "my_task" }, "napiVersion": 7 },
+        { "nativeTasks": [], "napiVersion": 8 },
+        { "nativeTasks": { "compute": 1 }, "napiVersion": 8 },
+        { "nativeTasks": { "compute": "x;evil" }, "napiVersion": 8 },
+        { "nativeTasks": { "napi_mbt_reserved": "x" }, "napiVersion": 8 },
+        { "workerTasks": ["work"] },
+        { "workerTasks": ["work", "work"], "napiVersion": 8 },
+        { "workerPool": { "size": 0 } },
+        { "workerPool": { "maxQueue": -1 } },
+        { "workerPool": { "idleTimeoutMs": 0 } },
+        { "workerPool": { "size": 1.5 } },
+        { "workerPool": { "unknown": 1 } },
       ] : Array[Json]) {
     try parse_config(value) catch {
       _ => ()
@@ -101,6 +114,8 @@ test "Node engines follow NAPI and module requirements" {
     ">=12.22.0 <13 || >=14.17.0 <15 || >=15.12.0 <16 || >=16.0.0",
   )
   assert_eq(node_engine(10, false), ">=22.14.0 <23 || >=23.6.0")
+  assert_eq(node_engine(8, true, streams=true), ">=18.0.0")
+  assert_eq(node_engine(10, true, streams=true), ">=22.14.0 <23 || >=23.6.0")
 }
 
 ///|

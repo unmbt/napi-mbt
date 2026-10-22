@@ -1,0 +1,106 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+
+///|
+async fn run(binary : String, args : Array[String], ok~ : Bool = true) -> (String, UInt64) {
+  let begin = @env.now()
+  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(binary, args))
+  if (code == 0) != ok { fail(args.join(" ") + "\n" + out.text() + err.text()) }
+  (out.text() + err.text(), @env.now() - begin)
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-cache-test-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  ignore(run(binary, ["init", dir, "--name", "cache-fixture"]))
+  @fs.write_file(dir + "/moon.mod", "name = \"test/cache-fixture\"\npreferred_target = \"native\"\n")
+  let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"test/cache-fixture/dependency\" @dep,").replace_all(old="\"stub.c\"", new="\"stub.c\", \"extra.c\"")
+  @fs.write_file(dir + "/moon.pkg", pkg)
+  let source = "///|\nextern \"c\" fn header_value() -> Int = \"fixture_header_value\"\n///|\n#export_name(\"answer\")\npub fn answer() -> Int { header_value() + helper() + @dep.value() }\n"
+  @fs.write_file(dir + "/lib.mbt", source)
+  @fs.write_file(dir + "/helper.mbt", "///|\nfn helper() -> Int { 1 }\n")
+  @fs.write_file(dir + "/extra.c", "#include <moonbit.h>\n#include \"value.h\"\nMOONBIT_FFI_EXPORT int fixture_header_value(void) { return VALUE; }\n")
+  @fs.write_file(dir + "/value.h", "#define VALUE 10\n")
+  @fs.mkdir(dir + "/dependency")
+  @fs.write_file(dir + "/dependency/moon.pkg", "")
+  @fs.write_file(dir + "/dependency/value.mbt", "///|\npub fn value() -> Int { 5 }\n")
+  let build = ["build", dir, "--release", "--verbose"]
+  ignore(run(binary, build))
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
+  async fn answer(value : Int) -> Unit { ignore(run("node", [root + "/scripts/build-cache.test.cjs", artifact, value.to_string()])) }
+  answer(16)
+  let cache = dir + "/.napi-mbt/cache"
+  let keys = @fs.readdir(cache).filter(name => name != "toolchain.json")
+  assert_eq(keys.length(), 1)
+  let workspace = cache + "/" + keys[0] + "/workspace"
+  let stamp = @fs.mtime(workspace + "/napi_runtime.mbt")
+  let warm : Array[UInt64] = []
+  let cold : Array[UInt64] = []
+  let repetitions = if @env.args().contains("--quick") { 1 } else { 3 }
+  for _ in 0..<repetitions {
+    let (log, elapsed) = run(binary, build)
+    assert_true(log.contains("no work to do"), msg=log)
+    warm.push(elapsed)
+  }
+  assert_eq(@fs.mtime(workspace + "/napi_runtime.mbt"), stamp)
+  for _ in 0..<repetitions { cold.push(run(binary, build + ["--no-cache"]).1); answer(16) }
+  warm.sort(); cold.sort()
+  let reduction = 1.0 - warm[repetitions / 2].to_double() / cold[repetitions / 2].to_double()
+  let benchmark : Json = { "warmMs": Json(warm.map(n => n.to_double())), "noCacheMs": Json(cold.map(n => n.to_double())), "reduction": Json(reduction), "target": Json(target), "cli": "debug", "project": "native header plus local dependency" }
+  @fs.mkdir(root + "/.napi-mbt", allow_exist=true)
+  if repetitions == 3 { @fs.write_file(root + "/.napi-mbt/cache-benchmark.json", benchmark.stringify(indent=2)) }
+  println(benchmark.stringify(indent=2))
+  if @env.args().contains("--benchmark") { assert_true(reduction >= 0.7, msg="Hot rebuild median should improve at least 70%") }
+  // Dedicated measurements run without unrelated builds and need not repeat the
+  // full invalidation suite, which remains the default CI behavior.
+  if @env.args().contains("--measure-only") { return }
+  ignore(run(binary, ["prepublish", dir, "--target", target]))
+  @fs.write_file(dir + "/helper.mbt", "///|\nfn helper() -> Int { 2 }\n")
+  ignore(run(binary, ["prepublish", dir, "--target", target], ok=false))
+  ignore(run(binary, build)); answer(17)
+  assert_eq(@fs.mtime(workspace + "/napi_runtime.mbt"), stamp)
+  @fs.write_file(dir + "/value.h", "#define VALUE 20\n")
+  ignore(run(binary, build)); answer(27)
+  @fs.write_file(dir + "/dependency/value.mbt", "///|\npub fn value() -> Int { 6 }\n")
+  ignore(run(binary, build)); answer(28)
+  @fs.rename(dir + "/helper.mbt", dir + "/renamed.mbt")
+  ignore(run(binary, build)); answer(28)
+  assert_true(!@fs.exists(workspace + "/helper.mbt"))
+  let previous = @fs.read_file(artifact).binary()
+  @fs.write_file(dir + "/lib.mbt", source + "invalid !!!")
+  ignore(run(binary, build, ok=false))
+  assert_eq(@fs.read_file(artifact).binary(), previous)
+  @fs.write_file(dir + "/lib.mbt", source)
+  ignore(run(binary, build)); answer(28)
+  @fs.write_file(cache + "/" + keys[0] + "/inputs.json", "{ corrupt")
+  ignore(run(binary, build)); answer(28)
+  @async.with_task_group(group => {
+    let a = group.spawn(() => run(binary, build))
+    let b = group.spawn(() => run(binary, build))
+    ignore(a.wait()); ignore(b.wait())
+  })
+  answer(28)
+  @fs.write_file(dir + "/extra.c", "#include <moonbit.h>\n#include \"value.h\"\n#ifndef EXTRA\n#define EXTRA 0\n#endif\nMOONBIT_FFI_EXPORT int fixture_header_value(void) { return VALUE + 1 + EXTRA; }\n")
+  ignore(run(binary, build)); answer(29)
+  let flag = if @env.get_env_var("OS") == Some("Windows_NT") { "/DEXTRA=3" } else { "-DEXTRA=3" }
+  @fs.write_file(dir + "/moon.pkg", pkg.replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flag + "\""))
+  ignore(run(binary, build)); answer(32)
+  let partition_count = @fs.readdir(cache).length()
+  let (environment_code, environment_out, environment_err) = @process.collect_output(binary, build, extra_env={ "CFLAGS": "-DNAPI_MBT_CACHE_IDENTITY_TEST=1" })
+  assert_eq(environment_code, 0, msg=environment_out.text() + environment_err.text())
+  assert_true(@fs.readdir(cache).length() > partition_count, msg="Toolchain environment must partition cached objects")
+  ignore(run(binary, ["prepublish", dir, "--target", target], ok=false))
+  ignore(run(binary, build)); answer(32)
+  ignore(run(binary, ["prepublish", dir, "--target", target]))
+  @fs.remove(dir + "/.napi-mbt/receipt-" + target + ".json")
+  ignore(run(binary, ["prepublish", dir, "--target", target], ok=false))
+  let before_clean = @fs.read_file(artifact).binary()
+  ignore(run(binary, ["clean", dir, "--cache"]))
+  assert_true(!@fs.exists(cache)); assert_eq(@fs.read_file(artifact).binary(), before_clean)
+  answer(32)
+  println("Cache correctness, receipts, concurrent builds, recovery and cleanup passed")
+}

@@ -137,6 +137,20 @@ fn resolve_type(
   classes : Array[ClassConfig],
 ) -> Unit raise {
   match value {
+    AsyncIteratorType(inner) => {
+      for feature in ["async", "streams"] {
+        if !features.contains(feature) {
+          features.push(feature)
+        }
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
+    JsPromiseType(inner) => {
+      if !features.contains("async") {
+        features.push("async")
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
     CallbackType(params, ret, _) => {
       if !features.contains("callback") {
         features.push("callback")
@@ -146,8 +160,12 @@ fn resolve_type(
       }
       resolve_type(ret, declarations, types, features, location, classes)
     }
-    OptionType(inner) | ArrayType(inner) =>
+    OptionType(inner) | ArrayType(inner) | MapType(inner) =>
       resolve_type(inner, declarations, types, features, location, classes)
+    TupleType(items) =>
+      for item in items {
+        resolve_type(item, declarations, types, features, location, classes)
+      }
     NamedType(name) => {
       if types.any(t => t.name == name) {
         return
@@ -177,7 +195,7 @@ fn resolve_type(
         )
       }
     }
-    BytesType | BufferViewType =>
+    BytesType | BufferViewType | OwnedBinaryType(_) =>
       if !features.contains("buffer") {
         features.push("buffer")
       }

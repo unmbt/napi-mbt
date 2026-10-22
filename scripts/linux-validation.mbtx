@@ -60,7 +60,7 @@ async fn main {
   for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "run", "scripts/toolchain-check.mbtx"], ["-C", linux_root, "build", "--target", "native", "cmd/napi-mbt-cli"]] {
     println(checked(distro, environment + [toolchain + "/bin/moon"] + args))
   }
-  println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + ["npm", "ci", "--ignore-scripts", "--no-audit", "--no-fund"]))
+  println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"]))
   for args in [["test", "--target", "native", "cmd/napi-mbt-cli", "generator", "internal/syntax", "internal/assets"]] {
     println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + [toolchain + "/bin/moon"] + args))
   }

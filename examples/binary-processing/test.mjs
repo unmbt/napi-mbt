@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import addon from './index.mjs';
+import { createRequire } from 'node:module';
+const cjs = createRequire(import.meta.url)('./index.cjs');
+for (const name of Object.keys(addon)) assert.equal(cjs[name], addon[name]);
+const original = Buffer.from([1, 2]); const copy = addon.copy(original);
+addon.increment(copy);
+assert.deepEqual(original, Buffer.from([1, 2]));
+assert.deepEqual(copy, Buffer.from([2, 2]));
+assert.deepEqual(addon.copy(Buffer.alloc(0)), Buffer.alloc(0));
+assert.throws(() => addon.copy('not binary data'));
+console.log('binary-processing passed');

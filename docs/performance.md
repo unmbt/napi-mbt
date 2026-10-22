@@ -34,7 +34,8 @@ are retained in [baseline.json](benchmarks/baseline.json) and
 A fresh project built in 29.884 s; three subsequent builds took 29.573, 30.526
 and 30.087 s. “Cold” means a fresh project, with an already installed toolchain.
 “Warm” reuses that project. Each build still compiles in a new isolated workspace;
-there is currently no incremental object cache. These numbers expose that cost.
+there was no incremental object cache at that revision. These historical numbers
+expose that cost.
 
 Build the root addon and `scripts/async-exports-test.mbtx` fixture, then capture
 binaries before and after an optimization. The captures remain independent of
@@ -59,3 +60,16 @@ The later async adapter patch 3 replaces deferred handles with owned resolver
 callbacks for leak-free worker teardown; its extra Promise setup is outside
 these recorded before/after measurements. Rerun the benchmark against captured
 current binaries when evaluating async scheduling performance.
+
+The persistent-workspace implementation was measured on Windows on 2026-10-20
+using a debug CLI and release addon with a C header and local MoonBit dependency.
+Three warm builds had a median of 3.812 s versus 24.510 s with `--no-cache`, an
+84.4% reduction. Warm builds reported no project compilation or linking.
+[Raw samples](benchmarks/cache-windows.json) include the command and scope.
+CI checks correct invalidation and compile counts, without a timing threshold.
+Use `scripts/build-cache-test.mbtx <cli> --benchmark` to enforce the local 70%
+median improvement target. Other platforms have not been measured for this change.
+
+The combined Promise/native-task/stream/worker fixture passed cached and
+`--no-cache` builds on Windows. It verifies consumer behavior; platform timings
+await CI.

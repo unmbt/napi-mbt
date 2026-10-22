@@ -8,7 +8,20 @@ async fn main {
   let license = @fs.read_file("LICENSE").text().replace_all(old="\r\n", new="\n")
   if check && files.get("RUNTIME-LICENSE") != Some(Json(license)) { fail("Runtime license is stale") }
   files["RUNTIME-LICENSE"] = Json(license)
-  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
+  let task_runtime = @fs.read_file("internal/async-adapter/native_tasks.mbt.patch").text().replace_all(old="\r\n", new="\n")
+  if check && files.get("async/native_tasks.mbt") != Some(Json(task_runtime)) { fail("Native task wrapper is stale") }
+  files["async/native_tasks.mbt"] = Json(task_runtime)
+  for name in ["napi_native_task.h", "napi_native_task_runtime.h", "napi_worker_lifecycle.h"] {
+    let text = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
+    if check && files.get("template/" + name) != Some(Json(text)) { fail("Native task header is stale") }
+    files["template/" + name] = Json(text)
+  }
+  for name in ["pool.cjs", "entry.cjs"] {
+    let text = @fs.read_file("internal/workers/" + name).text().replace_all(old="\r\n", new="\n")
+    if check && files.get("workers/" + name) != Some(Json(text)) { fail("Worker runtime is stale") }
+    files["workers/" + name] = Json(text)
+  }
+  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_collections.mbt", "napi_owned_binary.mbt", "napi_arraybuffer.mbt", "napi_owned_binary.h", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
     let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
     let (target, source) = if name == "lib.mbt" {
       ("napi_runtime.mbt", source)

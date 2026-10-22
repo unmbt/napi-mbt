@@ -6,18 +6,27 @@ pub fn parse_source(String, String) -> ParsedSource raise
 
 pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig]) -> ParsedSource raise
 
-pub fn render(ParsedSource, String, Int32, package_version~ : String, cjs? : Bool, esm? : Bool) -> Array[(String, String)] raise
+pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String]) -> Array[(String, String)] raise
 
 // Errors
 
 // Types and methods
+pub(all) enum BinaryKind {
+  Uint8
+  Int32
+  Uint32
+  Float32
+  Float64
+  ArrayBuffer
+}
+
 pub(all) enum BindingKind {
   FunctionBinding
-  ConstructorBinding(Int32)
-  MethodBinding(Int32)
-  StaticBinding(Int32)
-  GetterBinding(Int32)
-  SetterBinding(Int32)
+  ConstructorBinding(Int)
+  MethodBinding(Int)
+  StaticBinding(Int)
+  GetterBinding(Int)
+  SetterBinding(Int)
 }
 
 pub(all) struct ClassConfig {
@@ -46,7 +55,7 @@ pub(all) struct Parameter {
 }
 
 pub(all) struct ParsedClass {
-  id : Int32
+  id : Int
   name : String
   type_name : String
   construct : ParsedExport
@@ -62,7 +71,7 @@ pub(all) struct ParsedExport {
   throws : Bool
   is_async : Bool
   filename : String
-  line : Int32
+  line : Int
   binding : BindingKind
   documentation : Array[String]
 }
@@ -81,7 +90,7 @@ pub(all) struct TypeDefinition {
   name : String
   shape : TypeShape
   filename : String
-  line : Int32
+  line : Int
   documentation : Array[String]
 }
 pub fn TypeDefinition::manifest(Self) -> Json
@@ -93,6 +102,12 @@ pub(all) enum TypeShape {
 
 pub(all) enum ValueType {
   IntType
+  UIntType
+  FloatType
+  JsonType
+  JsPromiseType(ValueType)
+  AsyncIteratorType(ValueType)
+  OwnedBinaryType(BinaryKind)
   Int64Type
   UInt64Type
   DoubleType
@@ -103,8 +118,10 @@ pub(all) enum ValueType {
   UnitType
   OptionType(ValueType)
   ArrayType(ValueType)
+  MapType(ValueType)
+  TupleType(Array[ValueType])
   NamedType(String)
-  ClassType(String, String, Int32)
+  ClassType(String, String, Int)
   CallbackType(Array[ValueType], ValueType, Bool)
 }
 pub fn ValueType::runtime_name(Self) -> String

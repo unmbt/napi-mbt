@@ -41,8 +41,14 @@ async fn main {
     run(["run", "scripts/lsan-host-check.mbtx"], environment)
   }
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
-  run(["run", "scripts/parser-asan-test.mbtx"], environment)
-  for fixture in ["runtime-boundary", "structured-types", "class", "callback", "async-exports"] {
+  let fixtures = ["lock", "runtime-boundary", "structured-types", "collections", "owned-binary", "tsfn", "native-tasks", "workers", "js-promises", "streams", "combined", "class", "callback", "async-exports"]
+  let selected = if @env.args().contains("--fixture") {
+    guard @env.args().last() is Some(name) && fixtures.contains(name) else { fail("Expected a known fixture after --fixture") }
+    Some(name)
+  } else { None }
+  if selected is None { run(["run", "scripts/parser-asan-test.mbtx"], environment) }
+  for fixture in fixtures {
+    if selected is Some(name) && fixture != name { continue }
     run(["run", "scripts/" + fixture + "-test.mbtx", binary, "--asan"], environment)
     if fixture == "runtime-boundary" { run(["run", "scripts/test-runtime.mbtx", "--asan"], environment) }
     if fixture == "structured-types" { run(["run", "scripts/test-runtime.mbtx", "--structured", "--asan"], environment) }

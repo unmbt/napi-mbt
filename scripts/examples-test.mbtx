@@ -1,0 +1,37 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(args : Array[String]) -> Unit {
+  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output("moon", args))
+  if code != 0 { fail(out.text() + err.text()) }
+  println(out.text())
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let temp = @fs.tmpdir(prefix="napi-mbt-examples-")
+  defer @fs.rmdir(temp, recursive=true)
+  // Install from a packed source tree, not a previously built checkout CLI.
+  checked(["package", "--target-dir", temp + "/package"])
+  let archives = @fs.readdir(temp + "/package/publish").filter(n => n.has_suffix(".zip"))
+  assert_eq(archives.length(), 1)
+  let source = temp + "/source"
+  @fs.mkdir(source)
+  let archive = temp + "/package/publish/" + archives[0]
+  let windows = @env.get_env_var("OS") == Some("Windows_NT")
+  let status = if windows { @process.run("tar", ["-xf", archive, "-C", source]) } else { @process.run("unzip", ["-q", archive, "-d", source]) }
+  assert_eq(status, 0)
+  checked(["install", source + "/cmd/napi-mbt-cli", "--bin", temp + "/bin"])
+  @fs.rmdir(source, recursive=true)
+  let binary = temp + "/bin/napi-mbt-cli" + (if windows { ".exe" } else { "" })
+  for name in ["hello-addon", "structured-data", "native-class", "callbacks", "async-file", "binary-processing", "native-tasks", "worker-tasks", "streams"] {
+    let destination = temp + "/" + name
+    checked(["run", "examples/setup.mbtx", "examples/" + name, destination, binary])
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      let code = @process.run("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, "--types", "node", "--typeRoots", root + "/node_modules/@types", destination + "/consumer.mts"])
+      assert_eq(code, 0, msg=name + " TypeScript " + mode)
+    }
+  }
+  println("All standalone examples passed using the packed and installed CLI")
+}

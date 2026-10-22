@@ -43,7 +43,11 @@ jobs:
         with:
           node-version: '26.4.0'
 
-      - run: npm ci --ignore-scripts
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '>=10'
+
+      - run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Update MoonBit dependencies
         run: |

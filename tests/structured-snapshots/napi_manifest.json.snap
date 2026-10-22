@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "7",
+  "runtimeTemplateVersion": "13",
   "napiVersion": 7,
   "requiredNapiVersion": 7,
   "features": [
@@ -101,7 +101,7 @@
     },
     {
       "sourceName": "link",
-      "exportName": "link",
+      "exportName": "linkValue",
       "params": [
         {
           "name": "value",
@@ -315,5 +315,12 @@
       ]
     }
   ],
-  "classes": []
+  "classes": [],
+  "nativeTasks": {},
+  "workerTasks": [],
+  "workerPool": {
+    "size": 2,
+    "maxQueue": 64,
+    "idleTimeoutMs": 30000
+  }
 }

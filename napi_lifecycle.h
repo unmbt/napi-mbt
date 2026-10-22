@@ -60,6 +60,7 @@ struct napi_mbt_resource {
     bool disposed;
     bool pending_free;
     bool disposing;
+    bool inert_on_dispose;
 };
 struct napi_mbt_environment {
     napi_env env;

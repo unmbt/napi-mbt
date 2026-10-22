@@ -17,6 +17,29 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
     read : Bool,
   ) -> Unit raise {
     match value {
+      AsyncIteratorType(inner) => {
+        if napi_version < 8 {
+          fail("\{location}: streams require N-API 8")
+        }
+        if borrowed_type(inner, source.types, []) {
+          fail("\{location}: borrowed views cannot cross a stream boundary")
+        }
+        check(inner, location, true, read)
+      }
+      JsPromiseType(inner) => {
+        if !read {
+          fail(
+            "\{location}: NapiJsPromise is an input type; export async fn for Promise output",
+          )
+        }
+        if napi_version < 8 {
+          fail("\{location}: NapiJsPromise requires N-API 8")
+        }
+        if borrowed_type(inner, source.types, []) {
+          fail("\{location}: borrowed views cannot cross a Promise boundary")
+        }
+        check(inner, location, true, true)
+      }
       CallbackType(params, ret, throws) => {
         if napi_version < 3 {
           fail("\{location}: callbacks require N-API 3")
@@ -31,7 +54,12 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
           check(ret, location, true, read)
         }
       }
-      OptionType(inner) | ArrayType(inner) => check(inner, location, true, read)
+      OptionType(inner) | ArrayType(inner) | MapType(inner) =>
+        check(inner, location, true, read)
+      TupleType(items) =>
+        for item in items {
+          check(item, location, true, read)
+        }
       NamedType(name) =>
         if !definitions.contains(name) {
           fail("\{location}: unresolved exported type \{name}")
@@ -54,7 +82,7 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
         fail("\{location}: Unit is only supported as a return type")
       Int64Type | UInt64Type if napi_version < 6 =>
         fail("\{location}: bigint requires N-API 6")
-      BytesType | BufferViewType if napi_version < 7 =>
+      BytesType | BufferViewType | OwnedBinaryType(_) if napi_version < 7 =>
         fail("\{location}: checked Buffer access requires N-API 7")
       _ => ()
     }
@@ -84,6 +112,14 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
   let adapters : Map[String, Bool] = Map([])
   for item in source.all_functions() {
     let location = "\{item.filename}:\{item.line}"
+    if !promise_direction_valid(item.return_type, source.types, false, []) ||
+      !item.parameters.all(p => {
+        promise_direction_valid(p.value_type, source.types, true, [])
+      }) {
+      fail(
+        "\{location}: NapiJsPromise is an input type; export async fn for Promise output",
+      )
+    }
     if item.is_async {
       if napi_version < 8 {
         fail("\{location}: async requires N-API 8")

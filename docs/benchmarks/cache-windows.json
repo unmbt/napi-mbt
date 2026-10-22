@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-20",
+  "target": "win32-x64-msvc",
+  "cliMode": "debug",
+  "addonMode": "release",
+  "fixture": "native header plus local MoonBit dependency",
+  "warmMs": [3465, 3812, 5010],
+  "noCacheMs": [24082, 24510, 26675],
+  "warmMedianMs": 3812,
+  "noCacheMedianMs": 24510,
+  "reduction": 0.8444716442268462,
+  "warmProjectCompileOrLink": false,
+  "command": "moon run scripts/build-cache-test.mbtx _build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --benchmark",
+  "scope": "Local Windows measurement during stage 7; other hosts await CI. Timing is not a CI gate."
+}

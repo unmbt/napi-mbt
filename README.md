@@ -5,22 +5,21 @@
 Build native Node.js addons in MoonBit. A standalone native CLI parses MoonBit
 with Tree-sitter, validates one type IR, and generates MoonBit adapters, C glue,
 TypeScript declarations and independent CJS/ESM loaders. The project is under
-active development; start from this checkout.
+active development and distributed through Mooncakes.
 
 Supported exports include strict numeric conversions, bigint, exact UTF-16
 strings, owned and borrowed Buffers, nested Option/Array, structs/enums, explicit
 classes, callbacks and `async fn` returning cancellable Promises. Runtime errors
 stop the current call. JavaScript exceptions retain their identity.
 
-## Start from source
+## Install from Mooncakes
 
 Install MoonBit and a native C toolchain. The verified versions and Node policy
 are in the [support matrix](docs/support.md). Build requires CMake and GCC/Clang,
 or Visual Studio C++ Build Tools, MSBuild and a Windows SDK.
 
 ```sh
-moon update
-moon install ./cmd/napi-mbt-cli
+moon install unmbt/napi-mbt/cmd/napi-mbt-cli
 napi-mbt-cli init my-addon
 cd my-addon
 napi-mbt-cli doctor --json
@@ -29,14 +28,24 @@ node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
 The native CLI does not require Node or npm, including during addon compilation.
-Node is needed to load an addon; npm is needed for package installation/testing.
+Node is needed to load an addon; pnpm is used for package installation/testing.
 The parser, headers, runtime templates and versioned async patch are embedded.
+
+For development, clone this repository and run `moon install ./cmd/napi-mbt-cli`.
+The root npm package is private and only installs development tools. Addons
+created with the CLI retain npm facade/platform packages and `prepublish`.
 
 Export functions with `#export_name("name")` on `pub fn` or `pub async fn`.
 The annotation determines the JavaScript export name. Generated declarations
 include the source documentation and error contract. See the
 [usage guide](docs/en/usage.md), [types](docs/types.md),
-[classes and callbacks](docs/classes-callbacks.md), and [async](docs/async.md).
+[classes and callbacks](docs/classes-callbacks.md), [async](docs/async.md), and
+[native background tasks](docs/native-tasks.md), [isolated MoonBit workers](docs/workers.md),
+and [JavaScript Promise inputs](docs/js-promises.md).
+[Async iterators and Web streams](docs/streams.md) support demand-driven data
+exchange on Node 18 or later.
+Six [standalone examples](examples/README.md) include native behavior and
+TypeScript consumers and are built with the packed, installed CLI in CI.
 
 ## Commands
 
@@ -67,13 +76,13 @@ candidate is broken. Platform package versions and metadata must match.
 ```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx
 ```
 
-Release gates package, dry-run and install facade/platform tarballs into a clean
+Mooncakes gates package and validate the CLI source. Addon gates package, dry-run and install facade/platform tarballs into a clean
 directory, then load CJS/ESM and type-check the installed declarations. CLI
 archives target Windows x64, Linux x64 glibc and macOS ARM64. No registry publish
 is performed by these tests. See [engineering](docs/en/development.md),

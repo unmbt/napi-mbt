@@ -1,0 +1,38 @@
+const assert = require('node:assert/strict');
+const addon = require(require('node:path').resolve(process.argv[2]));
+function rejected(f, code) {
+  const before = addon.effects();
+  assert.throws(f, code ? { code } : undefined);
+  assert.equal(addon.effects(), before);
+}
+for (const v of [0, 1, 4294967295]) assert.equal(addon.uint_value(v), v);
+for (const v of [-1, 1.5, 4294967296, NaN, Infinity]) rejected(() => addon.uint_value(v), 'ERR_NAPI_UINT_RANGE');
+rejected(() => addon.uint_value('1'));
+for (const v of [-0, NaN, Infinity, -Infinity, 1 / 3, 3.5e38, 1e-46]) assert.ok(Object.is(addon.echo_float(v), Math.fround(v)));
+const record = Object.create({ inherited: [[1, 'ignore']] });
+for (const key of ['__proto__', '\0', '\ud800', '42']) Object.defineProperty(record, key, { enumerable: true, value: [[4294967295, undefined]] });
+record[Symbol('ignored')] = 3;
+Object.defineProperty(record, 'hidden', { value: 1 });
+const result = addon.record(record);
+assert.deepEqual(Object.keys(result).sort(), Object.keys(record).sort());
+for (const key of Object.keys(record)) assert.deepEqual(result[key], [[4294967295, null]]);
+assert.equal(Object.getPrototypeOf(result), Object.prototype);
+assert.deepEqual(addon.tuple([2, undefined]), [2, null]);
+for (const v of [[1], [1, null, 2], {}, null]) rejected(() => addon.tuple(v));
+rejected(() => addon.record([]));
+const original = new Error('getter');
+assert.throws(() => addon.record({ get value() { throw original; } }), e => e === original);
+assert.throws(() => addon.json({ get value() { throw original; } }), e => e === original);
+assert.throws(() => addon.tuple([1, { toString() { throw original; } }]), TypeError);
+const tupleGetter = [1, 'text']; Object.defineProperty(tupleGetter, 1, { get() { throw original; } });
+assert.throws(() => addon.tuple(tupleGetter), e => e === original);
+for (const value of [null, true, false, 42, 'a\0\ud800', [1, null], { nested: [true, { a: 'b' }] }]) assert.deepEqual(addon.json(value), value);
+for (const value of [undefined, NaN, Infinity, 1n, Symbol(), () => {}, { missing: undefined }, new Array(2)]) rejected(() => addon.json(value), 'ERR_NAPI_JSON');
+const cycle = {}; cycle.self = cycle;
+rejected(() => addon.json(cycle), 'ERR_NAPI_CYCLE');
+let deep = {}; for (let i = 0; i < 260; i++) deep = { deep };
+rejected(() => addon.json(deep), 'ERR_NAPI_DEPTH');
+assert.throws(() => addon.bad_json(), { code: 'ERR_NAPI_JSON' });
+const shared = { a: 1 }; assert.deepEqual(addon.json([shared, shared]), [shared, shared]);
+for (let i = 0; i < 1000; i++) assert.deepEqual(addon.record({ x: [[i, 'ok']] }), { x: [[i, 'ok']] });
+console.log('Collection conversion and failure boundaries passed');

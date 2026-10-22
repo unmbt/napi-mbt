@@ -27,6 +27,9 @@ jobs:
           - os: ubuntu-24.04
             target: linux-x64-gnu
             asset: napi-mbt-linux-amd64
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-gnu
+            asset: napi-mbt-linux-arm64
           - os: macos-15
             target: darwin-arm64
             asset: napi-mbt-macos-arm64
@@ -42,12 +45,15 @@ jobs:
       - uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: ${{ env.CMAKE_VERSION }}
+      - uses: pnpm/action-setup@v4
+        with:
+          version: '>=10'
       - uses: actions/setup-node@v4
         with:
           node-version: '26.4.0'
-          cache: npm
+          cache: pnpm
       - run: moon update
-      - run: npm ci --ignore-scripts
+      - run: pnpm install --frozen-lockfile --ignore-scripts
       - run: moon run scripts/toolchain-check.mbtx
       # Project checking downloads dependencies; `moon update` only updates the registry.
       - run: moon check --target native --warn-list +73 --deny-warn
@@ -58,12 +64,14 @@ jobs:
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon run --target native --release cmd/napi-mbt-cli -- doctor --json
       - run: moon run --target native --release cmd/napi-mbt-cli -- build --release --verbose
+      - run: moon run scripts/platform-check.mbtx ${{ matrix.target }}
       # The root foreign library is exercised by Node consumers, not a standalone test executable.
       - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/ci-regression-test.mbtx
       - run: moon run scripts/ci-consumers.mbtx
       - run: moon run scripts/package-cli.mbtx ${{ matrix.asset }}
       - run: moon run scripts/mooncake-package-test.mbtx
+      - run: moon run scripts/examples-test.mbtx
       - run: moon run scripts/ci-artifacts.mbtx
       - uses: actions/upload-artifact@v4
         with:
@@ -74,10 +82,6 @@ jobs:
         with:
           name: ${{ matrix.asset }}
           path: ${{ matrix.asset }}.tar.gz
-      - uses: actions/upload-artifact@v4
-        with:
-          name: packages-${{ matrix.target }}
-          path: dist/npm/${{ matrix.target }}/*.tgz
 
   node:
     name: Node ${{ matrix.node }} (${{ matrix.target }})
@@ -88,10 +92,12 @@ jobs:
       fail-fast: false
       matrix:
         node: ['22', '24', '26']
-        target: [linux-x64-gnu, darwin-arm64, win32-x64-msvc]
+        target: [linux-x64-gnu, linux-arm64-gnu, darwin-arm64, win32-x64-msvc]
         include:
           - os: ubuntu-24.04
             target: linux-x64-gnu
+          - os: ubuntu-24.04-arm
+            target: linux-arm64-gnu
           - os: macos-15
             target: darwin-arm64
           - os: windows-2025
@@ -109,6 +115,15 @@ jobs:
       - run: node scripts/build-isolation.test.cjs
       - run: node scripts/runtime-boundary.test.cjs
       - run: node scripts/structured-types.test.cjs
+      - run: node --expose-gc scripts/owned-binary.test.cjs
+      - run: node scripts/tsfn.test.cjs
+      - run: node --expose-gc scripts/workers.test.cjs .napi-mbt/workers-smoke
+      - run: node --expose-gc scripts/js-promises.test.cjs
+      - run: node --expose-gc scripts/streams.test.cjs .napi-mbt/streams-smoke/napi_mbt.node
+      - run: node scripts/combined.test.cjs
+      - run: node --expose-gc scripts/native-tasks.test.cjs
+        env:
+          UV_THREADPOOL_SIZE: '1'
       - run: node --expose-gc scripts/class.test.cjs
       - run: node --expose-gc scripts/callback.test.cjs
       - run: node scripts/lifecycle.test.cjs
@@ -185,9 +200,24 @@ jobs:
       - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
       - run: moon run scripts/async-exports-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe
 
+  stream-minimum:
+    name: Web streams Node 18
+    needs: build
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+      - uses: actions/download-artifact@v4
+        with:
+          name: consumers-linux-x64-gnu
+          path: .
+      - run: node --expose-gc scripts/streams.test.cjs .napi-mbt/streams-smoke/napi_mbt.node
+
   release:
     name: Release archives
-    needs: [build, node, minimum, memory, compatibility]
+    needs: [build, node, minimum, stream-minimum, memory, compatibility]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
     permissions:

@@ -20,7 +20,7 @@ extern napi_value napi_mbt_adapter_color(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_echo_i64(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_echo_u64(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_effects(napi_env env);
-extern napi_value napi_mbt_adapter_link(napi_env env, napi_value);
+extern napi_value napi_mbt_adapter_linkValue(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_nested(napi_env env, napi_value);
 extern napi_value napi_mbt_adapter_optional(napi_env env, napi_value, napi_value, napi_value);
 extern napi_value napi_mbt_adapter_person(napi_env env, napi_value);
@@ -116,7 +116,7 @@ static napi_value napi_mbt_callback_effects(napi_env env, napi_callback_info inf
   return result;
 }
 
-static napi_value napi_mbt_callback_link(napi_env env, napi_callback_info info) {
+static napi_value napi_mbt_callback_linkValue(napi_env env, napi_callback_info info) {
   size_t argc = 1;
   napi_value argv[1];
   napi_status status = napi_get_cb_info(env, info, &argc, argv, NULL, NULL);
@@ -129,7 +129,7 @@ static napi_value napi_mbt_callback_link(napi_env env, napi_callback_info info) 
   void *previous;
   int enter_status = napi_mbt_enter(env, &previous);
   if (enter_status != napi_ok) return napi_mbt_error(env, enter_status, 0, "ERR_NAPI_ENVIRONMENT", "Entering MoonBit environment");
-  napi_value result = napi_mbt_adapter_link(env, argv[0]);
+  napi_value result = napi_mbt_adapter_linkValue(env, argv[0]);
   napi_mbt_leave(previous);
   return result;
 }
@@ -241,11 +241,11 @@ NAPI_MBT_EXPORT napi_value napi_register_module_v1(napi_env env, napi_value expo
   if (status_effects != napi_ok) return napi_mbt_registration_error(env, status_effects, previous, "Creating export effects");
   status_effects = moonbit_napi_field_set(env, exports, "effects", fn_effects);
   if (status_effects != napi_ok) return napi_mbt_registration_error(env, status_effects, previous, "Setting export effects");
-  napi_value fn_link;
-  int status_link = napi_create_function(env, "link", NAPI_AUTO_LENGTH, napi_mbt_callback_link, NULL, &fn_link);
-  if (status_link != napi_ok) return napi_mbt_registration_error(env, status_link, previous, "Creating export link");
-  status_link = moonbit_napi_field_set(env, exports, "link", fn_link);
-  if (status_link != napi_ok) return napi_mbt_registration_error(env, status_link, previous, "Setting export link");
+  napi_value fn_linkValue;
+  int status_linkValue = napi_create_function(env, "linkValue", NAPI_AUTO_LENGTH, napi_mbt_callback_linkValue, NULL, &fn_linkValue);
+  if (status_linkValue != napi_ok) return napi_mbt_registration_error(env, status_linkValue, previous, "Creating export linkValue");
+  status_linkValue = moonbit_napi_field_set(env, exports, "linkValue", fn_linkValue);
+  if (status_linkValue != napi_ok) return napi_mbt_registration_error(env, status_linkValue, previous, "Setting export linkValue");
   napi_value fn_nested;
   int status_nested = napi_create_function(env, "nested", NAPI_AUTO_LENGTH, napi_mbt_callback_nested, NULL, &fn_nested);
   if (status_nested != napi_ok) return napi_mbt_registration_error(env, status_nested, previous, "Creating export nested");

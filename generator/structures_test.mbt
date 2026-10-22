@@ -23,7 +23,7 @@ test "type resolution spans files and infers nested feature requirements" {
 test "unsupported unresolved generic and nested borrow types fail with a location" {
   for
     text in [
-      "Unknown", "Array[Unknown]", "Map[String,Int]", "NapiBufferView?", "Array[NapiBufferView]",
+      "Unknown", "Array[Unknown]", "Map[Int,Int]", "NapiBufferView?", "Array[NapiBufferView]",
       "Array[Unit]",
     ] {
     try

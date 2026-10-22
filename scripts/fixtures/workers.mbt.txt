@@ -1,0 +1,51 @@
+///|
+let calls : Ref[Int] = Ref(0)
+
+///|
+extern "c" fn process_id() -> Int = "fixture_process_id"
+
+///|
+extern "c" fn monotonic_ms() -> Double = "fixture_monotonic_ms"
+
+///|
+#export_name("compute")
+pub fn compute(duration : Int) -> (Int, Int, Double, Double, Int) {
+  if duration < 0 { abort("intentional isolated worker failure") }
+  calls.val += 1
+  let start = monotonic_ms()
+  let mut value = 1
+  while monotonic_ms() - start < duration.to_double() {
+    for _ in 0..<10000 { value = value * 1664525 + 1013904223 }
+  }
+  (process_id(), calls.val, start, monotonic_ms(), value)
+}
+
+///|
+#export_name("parentCalls")
+pub fn parent_calls() -> Int { calls.val }
+
+///|
+#export_name("processId")
+pub fn task_pid() -> Int { process_id() }
+
+///|
+pub struct Payload {
+  text : String
+  integers : (Int64, UInt)
+  binary : Bytes
+  floats : NapiFloat64Array
+  buffer : NapiArrayBuffer
+  json : Json
+}
+
+///|
+#export_name("echo")
+pub fn echo(value : Payload) -> Payload { value }
+
+///|
+#export_name("failure")
+pub fn failure() -> Int raise { fail("worker business failure") }
+
+///|
+#export_name("__proto__")
+pub fn prototype_name() -> Int { 7 }

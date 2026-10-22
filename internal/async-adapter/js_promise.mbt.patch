@@ -1,0 +1,112 @@
+///|
+/// A typed Promise owned by the creating Node environment. Waiting is cancellable;
+/// JS rejection values retain identity. A completed value may be awaited again.
+pub struct NapiJsPromise[T] {
+  priv env : NapiEnv
+  priv mut result : Result[T, Error]?
+  priv mut promise : NapiReference?
+  priv mut handlers : Array[(NapiReference, NapiReference)]
+  priv mut waiters : Array[(Int, @napi_mbt_async.Task)]
+  priv mut next_id : Int
+  priv mut closed : Bool
+}
+
+///|
+extern "c" fn napi_promise_then(env : NapiEnv, promise : NapiValue, resolve : NapiValue, reject : NapiValue) -> Int = "napi_mbt_promise_then"
+
+///|
+extern "c" fn napi_reaction_inert(env : NapiEnv, value : NapiValue) -> Int = "napi_mbt_closure_inert"
+
+///|
+extern "c" fn napi_async_owns(env : NapiEnv) -> Bool = "napi_mbt_async_owns"
+
+///|
+fn[T] NapiJsPromise::release_handlers(self : NapiJsPromise[T]) -> Unit {
+  let handlers = self.handlers
+  let promise = self.promise
+  self.handlers = []
+  self.promise = None
+  for (pin, reference) in handlers {
+    ignore(napi_listener_unpin(pin))
+    reference.dispose() catch { _ => () }
+  }
+  if promise is Some(reference) { reference.dispose() catch { _ => () } }
+}
+
+///|
+fn[T] NapiJsPromise::wake(self : NapiJsPromise[T]) -> Unit {
+  let waiters = self.waiters
+  self.waiters = []
+  for (_, task) in waiters { task.wake() catch { _ => () } }
+  if napi_async_has(self.env) && !napi_async_closing(self.env) { ignore(napi_async_schedule(self.env)) }
+}
+
+///|
+/// Release a pending subscription; late JS reactions become inert. Idempotent.
+pub fn[T] NapiJsPromise::dispose(self : NapiJsPromise[T]) -> Unit raise NapiError {
+  if !napi_async_owns(self.env) { raise napi_failure(1005, Error, "ERR_NAPI_ENVIRONMENT", "Disposing a Promise outside its owning environment") }
+  self.close_owned()
+}
+
+///|
+fn[T] NapiJsPromise::close_owned(self : NapiJsPromise[T]) -> Unit {
+  if self.closed { return }
+  self.closed = true
+  self.result = None
+  self.release_handlers()
+  self.wake()
+}
+
+///|
+pub async fn[T] NapiJsPromise::wait(self : NapiJsPromise[T]) -> T {
+  if napi_async_closing(self.env) { raise napi_failure(1005, Error, "ERR_NAPI_ENVIRONMENT", "Promise belongs to another or closed environment") }
+  if self.closed { raise napi_failure(1006, Error, "ERR_NAPI_DISPOSED", "Promise subscription is closed") }
+  let id = self.next_id
+  self.next_id += 1
+  if self.result is None {
+    self.waiters.push((id, napi_async_get(self.env).scheduler.current_task()))
+  }
+  defer {
+    self.waiters = self.waiters.filter(waiter => waiter.0 != id)
+    if self.result is None && self.waiters.is_empty() { self.close_owned() }
+  }
+  while self.result is None && !self.closed { @napi_mbt_async.suspend() }
+  match self.result {
+    Some(Ok(value)) => value
+    Some(Err(error)) => raise error
+    None => raise napi_failure(1006, Error, "ERR_NAPI_DISPOSED", "Promise subscription is closed")
+  }
+}
+
+///|
+fn[T] get_NapiJsPromise(env : NapiEnv, value : NapiValue, convert : (NapiEnv, NapiValue) -> T raise) -> NapiJsPromise[T] raise {
+  let valid = Ref(false)
+  result_from_status(env, napi_is_promise(env, value, valid), b"Reading JavaScript Promise")
+  if !valid.val { raise napi_failure(1, TypeError, "ERR_NAPI_PROMISE", "Expected JavaScript Promise") }
+  let state : NapiJsPromise[T] = { env, result: None, promise: Some(NapiReference::new(env, value)), handlers: [], waiters: [], next_id: 0, closed: false }
+  errdefer state.close_owned()
+  fn reaction(reject : Bool) -> NapiValue raise {
+    let callback = napi_closure_new(env, fn(env, args) {
+      if !state.closed && state.result is None {
+        state.result = Some(try {
+          let value = args.get(env, 0)
+          if reject { raise NapiError::JavaScriptException(NapiReference::new(env, value)) }
+          Ok(convert(env, value))
+        } catch { error => Err(error) })
+        state.release_handlers()
+        state.wake()
+      }
+      set_Unit(env, ()) catch { _ => moonbit_dummy_napi_value() }
+    })
+    let reference = NapiReference::new(env, callback)
+    let pin = napi_reference_empty()
+    result_from_status(env, napi_reaction_inert(env, callback), b"Preparing Promise reaction")
+    result_from_status(env, napi_listener_pin(env, callback, pin), b"Retaining Promise reaction")
+    state.handlers.push((pin, reference))
+    callback
+  }
+  let resolve = reaction(false)
+  let reject = reaction(true)
+  result_from_status(env, napi_promise_then(env, value, resolve, reject), b"Subscribing to JavaScript Promise")
+  state
+}

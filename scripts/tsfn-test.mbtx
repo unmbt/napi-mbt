@@ -1,0 +1,45 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(binary, args))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-tsfn-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  checked(binary, ["init", dir, "--name", "tsfn-fixture"])
+  let source =
+    #|///|
+    #|extern "c" fn start_raw(mode : Int) -> Int = "napi_mbt_test_tsfn_start"
+    #|///|
+    #|extern "c" fn stat_raw(index : Int) -> Int = "napi_mbt_test_tsfn_stat"
+    #|///|
+    #|#export_name("start")
+    #|pub fn start(mode : Int) -> Int { start_raw(mode) }
+    #|///|
+    #|#export_name("threadStats")
+    #|pub fn stat(index : Int) -> Int { stat_raw(index) }
+    #|
+  @fs.write_file(dir + "/lib.mbt", source)
+  @fs.write_file(dir + "/tsfn_threads.h", @fs.read_file("scripts/fixtures/tsfn_threads.h"))
+  @fs.write_file(dir + "/stub.c", @fs.read_file(dir + "/stub.c").text() + "\n#include \"tsfn_threads.h\"\n")
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = ".napi-mbt/" + (if asan { "tsfn-asan" } else { "tsfn-smoke" })
+  @fs.mkdir(output, recursive=true, allow_exist=true)
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  let code = @async.with_timeout(60000, () => @process.run("node", ["scripts/tsfn.test.cjs", @fs.realpath(output + "/napi_mbt.node")], extra_env=environment))
+  assert_eq(code, 0)
+}

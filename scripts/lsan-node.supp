@@ -6,3 +6,6 @@ leak:ossl_load_builtin_compressions
 # Node 26.4.0 also retains one 32-byte cppgc wrapper per evaluated script,
 # reproducible with a bare `new Worker('0', { eval: true })` and no addon.
 leak:node::CppgcMixin::Wrap<node::contextify::ContextifyScript>
+# Node 26.4.0 also retains the matching ContextifyContext wrapper when the
+# embedded stream factory is evaluated through napi_run_script.
+leak:node::CppgcMixin::Wrap<node::contextify::ContextifyContext>

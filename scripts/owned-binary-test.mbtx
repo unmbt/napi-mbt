@@ -1,0 +1,56 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : String) -> Unit {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?=cwd.map(s => s[:])))
+  if code != 0 { fail(out.text() + err.text()) }
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-owned-binary-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/project"
+  checked(binary, ["init", dir, "--name", "owned-binary-fixture"])
+  @fs.write_file(dir + "/moon.mod", "name = \"test/owned-binary\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
+  checked("moon", ["check", "--target", "native"], cwd=dir)
+  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
+  let source = StringBuilder()
+  for tag in ["Uint8Array", "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "ArrayBuffer"] {
+    let name = "Napi" + tag
+    source.write_string("///|\n#export_name(\"echo_\{tag}\")\npub fn echo_\{tag}(v : \{name}) -> \{name} { v }\n")
+    source.write_string("///|\n#export_name(\"async_\{tag}\")\npub async fn async_\{tag}(v : \{name}) -> \{name} { @async.sleep(5); v }\n")
+  }
+  source.write_string("///|\n#export_name(\"nested\")\npub fn nested(v : Map[String, (NapiInt32Array, NapiArrayBuffer?)]) -> Map[String, (NapiInt32Array, NapiArrayBuffer?)] { v }\n")
+  source.write_string("///|\n#export_name(\"construct\")\npub fn construct() -> NapiInt32Array { let values = NapiInt32Array::new([-1, 2]); if values.length() != 2 { abort(\"length\") }; NapiInt32Array::new(values.to_array()) }\n")
+  @fs.write_file(dir + "/lib.mbt", source.to_string())
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let (warm_code, warm_out, warm_err) = @async.with_timeout(180000, () => @process.collect_output(binary, ["build", dir, "--release", "--verbose"]))
+  assert_eq(warm_code, 0, msg=warm_out.text() + warm_err.text())
+  assert_true((warm_out.text() + warm_err.text()).contains("no work to do"), msg="Async patches and generated configuration must preserve cache timestamps")
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  let output = root + "/.napi-mbt/" + (if asan { "owned-binary-asan" } else { "owned-binary-smoke" })
+  @fs.mkdir(output, recursive=true, allow_exist=true)
+  for name in ["index.d.ts", "index.d.mts", "index.d.cts"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  let code = @process.run("node", ["--expose-gc", "scripts/owned-binary.test.cjs", output + "/napi_mbt.node"], extra_env=environment)
+  assert_eq(code, 0)
+  if !asan {
+    let types = "import addon from './index.mjs';\nconst typed: Int32Array = addon.echo_Int32Array(new Int32Array([1]));\nconst pending: Promise<Uint8Array> = addon.async_Uint8Array(new Uint8Array());\nconst buffer: ArrayBuffer = addon.echo_ArrayBuffer(new ArrayBuffer(0));\n// @ts-expect-error wrong element type\naddon.echo_Int32Array(new Float32Array());\n// @ts-expect-error raw buffer is not a view\naddon.echo_Uint8Array(new ArrayBuffer(0));\n"
+    @fs.write_file(dir + "/consumer.mts", types)
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, dir + "/consumer.mts"])
+    }
+  }
+  println("Owned typed arrays and ArrayBuffer consumers passed")
+}

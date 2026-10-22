@@ -1,0 +1,42 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn main {
+  let temp = @fs.tmpdir(prefix="napi-mbt-lock-ffi-")
+  defer @fs.rmdir(temp, recursive=true)
+  @fs.write_file(temp + "/moon.mod", "name = \"test/lock\"\npreferred_target = \"native\"\n")
+  @fs.write_file(temp + "/host.c", @fs.read_file("cmd/napi-mbt-cli/host.c"))
+  let asan = @env.args().contains("--asan")
+  let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/utf-8" + (if asan { " /fsanitize=address /Z7" } else { "" }) } else if asan { "-fsanitize=address -g -fno-omit-frame-pointer" } else { "" }
+  @fs.write_file(temp + "/moon.pkg", "import { \"moonbitlang/core/encoding/utf8\" }\noptions(\"native-stub\": [\"host.c\"], link: {\"native\": {\"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\"}})\n")
+  let source =
+    #|///|
+    #|type Lock
+    #|///|
+    #|#borrow(path, status)
+    #|extern "c" fn acquire(path : Bytes, status : Ref[Int]) -> Lock = "napi_mbt_lock_file"
+    #|///|
+    #|#borrow(lock)
+    #|extern "c" fn close(lock : Lock) -> Unit = "napi_mbt_unlock_file"
+    #|///|
+    #|fn finalize_scope(path : Bytes) -> Unit { ignore(acquire(path, Ref(0))) }
+    #|///|
+    #|test "OS lock explicit close, finalizer and failed-open ownership" {
+    #|  let path = @utf8.encode("LOCK_PATH")
+    #|  for _ in 0..<200 {
+    #|    let status = Ref(0)
+    #|    let lock = acquire(path, status)
+    #|    assert_eq(status.val, 0)
+    #|    close(lock); close(lock)
+    #|    finalize_scope(path)
+    #|  }
+    #|  let status = Ref(0)
+    #|  let invalid = acquire(@utf8.encode("INVALID_PATH"), status)
+    #|  assert_true(status.val != 0)
+    #|  close(invalid)
+    #|}
+    #|
+  @fs.write_file(temp + "/lock_wbtest.mbt", source.replace_all(old="\"LOCK_PATH\"", new=Json(temp + "/lock 空格").stringify()).replace_all(old="\"INVALID_PATH\"", new=Json(temp + "/missing/lock").stringify()))
+  let code = @async.with_timeout(120000, () => @process.run("moon", ["test", "--target", "native"], cwd=temp))
+  assert_eq(code, 0)
+}

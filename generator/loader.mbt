@@ -4,6 +4,7 @@ fn loaders(
   package_name : String,
   package_version : String,
   version : Int32,
+  workers~ : Bool = false,
 ) -> (String, String) {
   let name = Json(package_name + "-").stringify()
   let expected = Json(package_version).stringify()
@@ -29,18 +30,27 @@ fn loaders(
     $|} else if (process.platform === 'darwin' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
     $|  // Both Darwin architectures use the system C library.
     $|} else if (process.platform === 'linux' && ['x64', 'arm64'].indexOf(process.arch) !== -1) {
-    $|  let glibc = false;
+    $|  let libc;
     $|  try {
     $|    if (process.report && process.report.getReport) {
-    $|      glibc = Boolean(process.report.getReport().header.glibcVersionRuntime);
+    $|      const report = process.report.getReport();
+    $|      if (report.header && report.header.glibcVersionRuntime) libc = 'gnu';
+    $|      else if ((report.sharedObjects || []).some(file => /(?:ld-|libc[.])musl-/.test(file))) libc = 'musl';
     $|    } else {
-    $|      glibc = /GNU C Library|GNU libc|GLIBC/.test(fs.readFileSync('/usr/bin/ldd', 'utf8'));
+    $|      const ldd = fs.readFileSync('/usr/bin/ldd', 'utf8');
+    $|      if (/GNU C Library|GNU libc|GLIBC/.test(ldd)) libc = 'gnu';
+    $|      else if (/musl/.test(ldd)) libc = 'musl';
+    $|    }
+    $|    if (!libc) {
+    $|      const maps = fs.readFileSync('/proc/self/maps', 'utf8');
+    $|      if (/(?:ld-|libc[.])musl-/.test(maps)) libc = 'musl';
+    $|      else if (/libc(?:-[0-9.]+)?[.]so[.]6/.test(maps)) libc = 'gnu';
     $|    }
     $|  } catch (cause) {
     $|    throw failure('ERR_NAPI_PLATFORM', 'Cannot identify Linux libc', cause);
     $|  }
-    $|  if (!glibc) throw failure('ERR_NAPI_PLATFORM', 'Unsupported Linux libc; glibc is required');
-    $|  target += '-gnu';
+    $|  if (!libc) throw failure('ERR_NAPI_PLATFORM', 'Cannot identify Linux libc');
+    $|  target += '-' + libc;
     $|} else {
     $|  throw failure('ERR_NAPI_PLATFORM', 'Unsupported OS or CPU');
     $|}
@@ -76,6 +86,17 @@ fn loaders(
     $|  catch (cause) { throw failure('ERR_NAPI_LOAD', 'Cannot load platform addon', cause); }
     $|}
     $|
+  let body = if workers {
+    body
+    .replace_all(old="let addon;", new="let addon;\nlet nativePath = local;")
+    .replace_all(
+      old="try { addon = require(packageName); }",
+      new="try { nativePath = require.resolve(packageName); addon = require(nativePath); }",
+    ) +
+    "addon = require('./napi_workers.cjs')(addon, nativePath);\n"
+  } else {
+    body
+  }
   let cjs = body + "module.exports = addon;\n"
   let esm = "import { createRequire as $napiRequire } from 'module';\nimport { fileURLToPath as $napiFileURL } from 'url';\nimport { dirname as $napiDirname } from 'path';\nconst $napiAddon = (() => {\nconst require = $napiRequire(import.meta.url);\nconst __dirname = $napiDirname($napiFileURL(import.meta.url));\n" +
     body +

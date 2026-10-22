@@ -25,7 +25,7 @@ moonc v0.10.15+943464bfa、MSVC 19.44.35211 上比较 runtime 6 与 7。
 
 新工程首次构建 29.884 秒，重复构建分别 29.573、30.526、30.087 秒。
 这里的“冷”指新工程，工具链已经安装；“热”指重复构建同一工程。
-每次仍使用新的隔离工作区，目前没有增量对象缓存。
+该历史版本每次使用新的隔离工作区，没有增量对象缓存。
 
 ```sh
 moon run scripts/benchmark.mbtx before --capture
@@ -44,3 +44,12 @@ callback 和异步调用。
 为避免 worker 关闭时的泄漏，将 deferred 句柄改为拥有 resolve/reject callback 引用。
 它新增的 Promise 构造成本不在这组历史对比中；评估当前异步调度性能时，应重新捕获
 当前二进制运行基准。
+
+2026-10-20 的持久工作区实现使用 Windows debug CLI、release addon 测量，样例包含
+C 头文件和本地 MoonBit 依赖。三次热构建中位数为 3.812 秒，无缓存为 24.510 秒，
+降低 84.4%；热构建没有重新编译或链接项目。
+[原始数据](../benchmarks/cache-windows.json) 记录命令和范围。
+CI 验证失效正确性和编译次数，不使用时间阈值；本机可用
+`scripts/build-cache-test.mbtx <cli> --benchmark` 检查中位耗时降低至少 70%。
+本次改动尚未测量其他平台。Promise/native task/stream/worker 组合样例已在 Windows
+上通过缓存和 `--no-cache` 构建；它验证组合行为，平台耗时等待 CI。

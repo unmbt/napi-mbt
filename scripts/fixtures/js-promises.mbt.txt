@@ -1,0 +1,49 @@
+///|
+#export_name("twice")
+pub async fn twice(value : NapiJsPromise[Int]) -> Int { value.wait() + value.wait() }
+
+///|
+#export_name("parallel")
+pub async fn parallel(value : NapiJsPromise[Int]) -> Int {
+  @async.with_task_group(group => {
+    let a = group.spawn(() => value.wait())
+    let b = group.spawn(() => value.wait())
+    a.wait() + b.wait()
+  })
+}
+
+///|
+#export_name("binary")
+pub async fn binary(value : NapiJsPromise[NapiInt32Array]) -> NapiInt32Array { value.wait() }
+
+///|
+#export_name("nested")
+pub async fn nested(value : NapiJsPromise[Map[String, (Int64, Json)]]) -> Map[String, (Int64, Json)] { value.wait() }
+
+///|
+#export_name("dispose")
+pub async fn disposed(value : NapiJsPromise[Int]) -> Int { value.dispose(); value.wait() }
+
+///|
+extern "c" fn resource_count() -> Int = "napi_mbt_live_resources"
+
+///|
+#export_name("resources")
+pub fn resources() -> Int { resource_count() }
+
+///|
+let stored : Ref[NapiJsPromise[Int]?] = Ref(None)
+
+///|
+#export_name("store")
+pub fn store(value : NapiJsPromise[Int]) -> Unit { stored.val = Some(value) }
+
+///|
+#export_name("storedWait")
+pub async fn stored_wait() -> Int { stored.val.unwrap().wait() }
+
+///|
+#export_name("disposeStored")
+pub fn dispose_stored() -> Unit raise {
+  if stored.val is Some(value) { value.dispose(); stored.val = None }
+}

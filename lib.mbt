@@ -107,6 +107,36 @@ pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue raise NapiError {
 }
 
 ///|
+pub fn get_UInt(env : NapiEnv, value : NapiValue) -> UInt32 raise NapiError {
+  let number = get_Double(env, value)
+  if !(number >= 0.0 && number <= 4294967295.0) ||
+    UInt32::trunc_double(number).to_double() != number {
+    raise napi_failure(
+      1,
+      RangeError,
+      "ERR_NAPI_UINT_RANGE",
+      "UInt requires a finite integer in [0, 4294967295]",
+    )
+  }
+  UInt32::trunc_double(number)
+}
+
+///|
+pub fn set_UInt(env : NapiEnv, value : UInt32) -> NapiValue raise NapiError {
+  set_Double(env, value.to_double())
+}
+
+///|
+pub fn get_Float(env : NapiEnv, value : NapiValue) -> Float raise NapiError {
+  Float::from_double(get_Double(env, value))
+}
+
+///|
+pub fn set_Float(env : NapiEnv, value : Float) -> NapiValue raise NapiError {
+  set_Double(env, value.to_double())
+}
+
+///|
 pub fn get_Double(env : NapiEnv, val : NapiValue) -> Double raise NapiError {
   let res = Ref(0.0)
   let status = napi_get_value_double(env, val, res)

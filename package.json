@@ -1,13 +1,11 @@
 {
   "name": "napi-mbt",
   "version": "0.2.1",
+  "private": true,
   "description": "MoonBit N-API bindings and native Node.js addon tooling",
   "repository": {
     "type": "git",
     "url": "https://github.com/unmbt/napi-mbt.git"
-  },
-  "publishConfig": {
-    "access": "public"
   },
   "main": "index.cjs",
   "module": "index.mjs",
@@ -42,10 +40,10 @@
     "typescript": "7.0.2"
   },
   "scripts": {
-    "test": "node --test scripts/test.js",
-    "publish:dry-run": "moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root"
+    "test": "node --test scripts/test.js"
   },
   "engines": {
-    "node": ">=12.20.0 <13 || >=14.13.1"
+    "node": ">=12.20.0 <13 || >=14.13.1",
+    "pnpm": ">=10"
   }
 }

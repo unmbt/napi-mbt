@@ -21,14 +21,15 @@ function loadVirtual(source, options = {}) {
   const context = {
     __dirname: dir, module: { exports: {} },
     process: { platform: options.platform || 'win32', arch: options.arch || 'x64', versions: { napi: options.napi || '4' },
-      report: { getReport: () => ({ header: options.musl ? {} : { glibcVersionRuntime: '2.36' } }) } },
+      report: { getReport: () => ({ header: options.musl || options.unknown ? {} : { glibcVersionRuntime: '2.36' }, sharedObjects: options.musl ? ['/lib/ld-musl-' + (options.arch === 'arm64' ? 'aarch64' : 'x86_64') + '.so.1'] : [] }) } },
     require(name) {
       if (name === 'path') return path;
       if (name === 'fs') return { existsSync: file => !file.endsWith('build-output.json') && Boolean(options.local) };
       loads.push(name);
       if (name.endsWith('/package.json')) {
         if (options.missing) throw cause;
-        return { name: 'loader-fixture-win32-x64-msvc', version: options.wrongVersion ? '9.0.0' : '0.1.0', napiVersion: 4, napiTarget: 'win32-x64-msvc' };
+        const target = (options.platform || 'win32') + '-' + (options.arch || 'x64') + ((options.platform || 'win32') === 'win32' ? '-msvc' : options.platform === 'linux' ? (options.musl ? '-musl' : '-gnu') : '');
+        return { name: 'loader-fixture-' + target, version: options.wrongVersion ? '9.0.0' : '0.1.0', napiVersion: 4, napiTarget: target };
       }
       if (options.broken) throw cause;
       return addon;
@@ -44,7 +45,7 @@ function loadVirtual(source, options = {}) {
     const addon = await import(pathToFileURL(path.join(dir, 'index.mjs')).href);
     assert.strictEqual(addon.mbt_add(2, 3), 5);
     assert.strictEqual(addon.default.mbt_add, addon.mbt_add);
-    for (const name of ['failure', 'addon', 'path', 'fs', 'require', 'createRequire', 'fileURLToPath', 'dirname', 'target', 'requiredNapi']) assert.strictEqual(addon[name](), 42);
+    for (const name of ['failure', 'addon', 'path', 'fs', 'require', 'createRequire', 'fileURLToPath', 'directoryName', 'target', 'requiredNapi']) assert.strictEqual(addon[name](), 42);
   }
   // Existing broken local builds must never silently fall through to a package.
   if (cjs) {
@@ -63,9 +64,21 @@ function loadVirtual(source, options = {}) {
     assert.strictEqual(loadVirtual(source, { napi: '3' }).error.code, 'ERR_NAPI_VERSION');
     assert.strictEqual(loadVirtual(source, { platform: 'freebsd' }).error.code, 'ERR_NAPI_PLATFORM');
     assert.strictEqual(loadVirtual(source, { arch: 'ia32' }).error.code, 'ERR_NAPI_PLATFORM');
-    assert.strictEqual(loadVirtual(source, { platform: 'linux', musl: true }).error.code, 'ERR_NAPI_PLATFORM');
+    assert.strictEqual(loadVirtual(source, { platform: 'linux', unknown: true }).error.code, 'ERR_NAPI_PLATFORM');
+    for (const arch of ['x64','arm64']) for (const local of [true,false]) {
+      const loaded = loadVirtual(source, {platform:'linux',arch,musl:true,local});
+      assert.strictEqual(loaded.result,loaded.addon);
+      assert.ok(loaded.loads.some(name=>name.includes('linux-' + arch + '-musl')));
+    }
     const linux = loadVirtual(source, { platform: 'linux', local: true });
     assert.strictEqual(linux.result, linux.addon);
+    for (const platform of ['linux', 'darwin']) for (const arch of ['x64', 'arm64']) {
+      for (const local of [true, false]) {
+        const loaded = loadVirtual(source, {platform, arch, local});
+        assert.strictEqual(loaded.result, loaded.addon);
+        assert.ok(loaded.loads.some(name => name.includes(platform + '-' + arch)));
+      }
+    }
   }
   // Exercise package metadata resolution and the real native entry with no local artifact.
   const child = path.join(dir, 'node_modules', 'loader-fixture-' + target);

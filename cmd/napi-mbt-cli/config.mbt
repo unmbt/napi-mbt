@@ -1,6 +1,7 @@
 ///|
 let supported_targets : Array[String] = [
   "win32-x64-msvc", "darwin-x64", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
+  "linux-x64-musl", "linux-arm64-musl",
 ]
 
 ///|
@@ -11,8 +12,6 @@ fn host_target() -> String {
   let host = @utf8.decode_lossy(host_raw())
   if host.has_prefix("win32") {
     host + "-msvc"
-  } else if host.has_prefix("linux") {
-    host + "-gnu"
   } else {
     host
   }
@@ -99,6 +98,9 @@ struct Config {
   cjs : Bool
   esm : Bool
   classes : Array[@generator.ClassConfig]
+  native_tasks : Array[(String, String)]
+  worker_tasks : Array[String]
+  worker_pool : Json
 }
 
 ///|
@@ -109,7 +111,7 @@ fn feature_version(name : String) -> Int32 raise {
     "bigint" => 6
     "buffer" => 7
     "class" | "callback" => 3
-    "async" => 8
+    "async" | "native_tasks" | "streams" => 8
     _ => fail("Unknown N-API feature: \{name}")
   }
 }
@@ -120,7 +122,7 @@ fn parse_config(value : Json) -> Config raise {
   for key in items.keys() {
     if ![
         "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
-        "classes",
+        "classes", "nativeTasks", "workerTasks", "workerPool",
       ].contains(key) {
       fail("Unknown napi-mbt.json field: \{key}")
     }
@@ -157,10 +159,30 @@ fn parse_config(value : Json) -> Config raise {
     }
   }
   let classes = class_configurations(items.get("classes"))
+  let native_tasks = native_task_configurations(items.get("nativeTasks"))
+  let worker_tasks = unique_strings(items, "workerTasks")
+  let worker_pool = worker_pool_configuration(items.get("workerPool"))
+  if !worker_tasks.is_empty() && version < 8 {
+    fail("workerTasks requires N-API 8 for process cleanup")
+  }
+  if !native_tasks.is_empty() && version < 8 {
+    fail("Native tasks require N-API 8 for asynchronous environment cleanup")
+  }
   if !classes.is_empty() && version < 3 {
     fail("Classes require N-API 3 for environment cleanup")
   }
-  { napi_version: version, builder, targets, features, cjs, esm, classes, }
+  {
+    napi_version: version,
+    builder,
+    targets,
+    features,
+    cjs,
+    esm,
+    classes,
+    native_tasks,
+    worker_tasks,
+    worker_pool,
+  }
 }
 
 ///|

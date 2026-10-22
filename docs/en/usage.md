@@ -1,6 +1,7 @@
 # Usage
 
-Install from the checkout with `moon install ./cmd/napi-mbt-cli`.
+Install from Mooncakes with `moon install unmbt/napi-mbt/cmd/napi-mbt-cli`.
+For development, run `moon install ./cmd/napi-mbt-cli` in the source checkout.
 `napi-mbt-cli --help` and each subcommand's `--help` describe the accepted flags.
 
 | Command | Behavior |

@@ -60,6 +60,7 @@ priv struct NapiAsyncCall {
   mut task : @napi_mbt_async.Task?
   mut signal : NapiReference?
   mut listener : NapiReference?
+  mut cleaned : Bool
   pin : NapiReference
 }
 
@@ -152,6 +153,8 @@ fn napi_signal_get(env : NapiEnv, object : NapiValue, name : Bytes) -> NapiValue
 
 ///|
 fn NapiAsyncCall::cleanup(self : NapiAsyncCall) -> Unit {
+  if self.cleaned { return }
+  self.cleaned = true
   self.promise.dispose()
   // Clear fields before invoking JS: removeEventListener may reenter the addon.
   let signal = self.signal
@@ -214,7 +217,7 @@ fn NapiAsyncCall::listen(self : NapiAsyncCall, options : NapiValue) -> Unit rais
 
 ///|
 fn napi_async_call_new(env : NapiEnv) -> NapiAsyncCall raise {
-  { env, promise: napi_async_promise_new(env), task: None, signal: None, listener: None, pin: napi_reference_empty() }
+  { env, promise: napi_async_promise_new(env), task: None, signal: None, listener: None, cleaned: false, pin: napi_reference_empty() }
 }
 
 ///|

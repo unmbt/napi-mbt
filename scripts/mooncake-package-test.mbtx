@@ -2,9 +2,37 @@ import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process
 
 ///|
 async fn checked(program : String, args : Array[String], cwd : String) -> String {
-  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd~))
+  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args, cwd~))
   if code != 0 { fail(program + " " + args.join(" ") + "\n" + out.text() + err.text()) }
   out.text()
+}
+
+///|
+async fn native_path(temp : String, original : String, windows : Bool) -> String {
+  let paths = original.split(if windows { ";" } else { ":" }).map(p => p.to_owned()).to_array()
+  if windows {
+    let safe = []
+    for path in paths {
+      if path.is_empty() { continue }
+      let mut node = false
+      for name in ["node.exe", "npm", "npm.cmd", "npm.exe"] {
+        if @fs.exists(path + "/" + name) { node = true }
+      }
+      if !node { safe.push(path) }
+    }
+    return safe.join(";")
+  }
+  let bin = temp + "/toolchain"
+  @fs.mkdir(bin)
+  for name in ["moon", "moonc", "moonrun", "cmake", "ninja", "make", "cc", "c++", "gcc", "g++", "clang", "clang++", "ar", "ranlib", "ld", "as", "nm", "strip", "uname", "xcrun", "dsymutil", "sh", "which", "git"] {
+    for path in paths {
+      if @fs.exists(path + "/" + name) && @fs.can_execute(path + "/" + name) {
+        @fs.symlink(bin + "/" + name, target=@fs.realpath(path + "/" + name))
+        break
+      }
+    }
+  }
+  bin
 }
 
 ///|
@@ -34,5 +62,36 @@ async fn main {
     assert_true(@fs.exists(unpacked + "/" + path), msg="Missing packaged source: " + path)
   }
   println(checked("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], unpacked))
-  println("Mooncake packed, unpacked and checked without registry publication")
+  let old_path = @env.get_env_var("PATH").unwrap_or("")
+  let path = native_path(temp, old_path, windows)
+  defer @env.set_env_var("PATH", old_path)
+  @env.set_env_var("PATH", path)
+  for program in ["node", "npm"] {
+    try @process.collect_output(program, ["--version"], cwd=temp) catch { _ => () }
+    noraise { _ => fail(program + " remained available during native installation") }
+  }
+  let install = temp + "/installed CLI 空格"
+  println(checked("moon", ["install", "./cmd/napi-mbt-cli", "--bin", install], unpacked))
+  let binary = install + (if windows { "/napi-mbt-cli.exe" } else { "/napi-mbt-cli" })
+  assert_true(@fs.exists(binary))
+  // The installed executable must contain its parser, headers and templates.
+  @fs.rmdir(unpacked, recursive=true)
+  let consumer = temp + "/consumer outside checkout 空格"
+  println(checked(binary, ["init", consumer, "--name", "packed-addon"], temp))
+  println(checked(binary, ["doctor", consumer, "--json"], temp))
+  println(checked(binary, ["build", consumer, "--release"], temp))
+  println(checked(binary, ["generate", consumer, "--check"], temp))
+  @env.set_env_var("PATH", old_path)
+  for file in ["test/smoke.cjs", "test/smoke.mjs"] {
+    println(checked("node", [file], consumer))
+  }
+  for extension in ["mts", "cts"] {
+    @fs.write_file(consumer + "/consumer." + extension,
+      "import addon, { mbt_add } from './index." + (if extension == "mts" { "mjs" } else { "cjs" }) + "';\nconst result: number = addon.mbt_add(1, 2) + mbt_add(3, 4);\n// @ts-expect-error invalid argument\nmbt_add('1', 2);\n")
+  }
+  for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+    let sources = if mode == "NodeNext" { ["consumer.mts", "consumer.cts"] } else { ["consumer.mts"] }
+    ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", mode, "--moduleResolution", resolution] + sources, consumer))
+  }
+  println("Packed Mooncake installed without Node/npm; isolated CLI, addon, CJS/ESM and TS consumers passed")
 }

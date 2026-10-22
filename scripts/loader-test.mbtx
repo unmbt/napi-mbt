@@ -17,7 +17,7 @@ async fn main {
   checked(binary, ["init", dir, "--name", "loader-fixture"])
   let source = StringBuilder()
   source.write_string(@fs.read_file(dir + "/lib.mbt").text())
-  for i, name in ["failure", "addon", "path", "fs", "require", "createRequire", "fileURLToPath", "dirname", "target", "requiredNapi"] {
+  for i, name in ["failure", "addon", "path", "fs", "require", "createRequire", "fileURLToPath", "directoryName", "target", "requiredNapi"] {
     source.write_string("\n///|\n#export_name(\"\{name}\")\npub fn collision_\{i}() -> Int { 42 }\n")
   }
   @fs.write_file(dir + "/lib.mbt", source.to_string())
@@ -27,6 +27,8 @@ async fn main {
     @fs.write_file(dir + "/napi-mbt.json", ({ "napiVersion": 4, "cjs": cjs, "esm": esm } : Json).stringify())
     checked(binary, ["generate", dir])
     checked(binary, ["generate", dir, "--check"])
+    // A mode change invalidates the build receipt, including generated loaders.
+    checked(binary, ["build", dir, "--release"])
     checked(binary, ["prepublish", dir, "--target", target])
     checked("node", ["scripts/loader.test.cjs", dir, mode, target])
     // Resolve conditional declaration branches as an installed consumer would.

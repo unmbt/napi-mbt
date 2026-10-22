@@ -1,0 +1,172 @@
+///|
+priv struct NapiStreamRead[T] {
+  mut result : Result[T?, Error]?
+  task : @napi_mbt_async.Task
+}
+
+///|
+/// A demand-driven iterator owned by one Node environment. close is idempotent.
+pub struct NapiAsyncIterator[T] {
+  priv env : NapiEnv
+  priv produce : async () -> T?
+  priv finish : async () -> Unit
+  priv mut closed : Bool
+  priv mut finished : Result[Unit, Error]?
+  priv mut queue : Array[NapiStreamRead[T]]
+  priv mut active : NapiStreamRead[T]?
+  priv mut producer : @napi_mbt_async.Task?
+  priv mut lifetime : @napi_mbt_async.Task?
+  priv mut waiters : Array[@napi_mbt_async.Task]
+  priv mut pins : Array[(NapiReference, NapiReference)]
+}
+
+///|
+fn[T] NapiAsyncIterator::check(self : NapiAsyncIterator[T]) -> Unit raise {
+  if !napi_async_owns(self.env) { raise napi_failure(1005, Error, "ERR_NAPI_ENVIRONMENT", "Stream belongs to another environment") }
+}
+
+///|
+fn[T] NapiAsyncIterator::notify(self : NapiAsyncIterator[T]) -> Unit {
+  let tasks = self.waiters
+  self.waiters = []
+  for task in tasks { task.wake() catch { _ => () } }
+  if !napi_async_closing(self.env) { ignore(napi_async_schedule(self.env)) }
+}
+
+///|
+fn[T] NapiAsyncIterator::begin_close(self : NapiAsyncIterator[T]) -> Unit {
+  if self.closed { return }
+  self.closed = true
+  let tasks = self.queue
+  self.queue = []
+  if self.active is Some(request) { tasks.push(request) }
+  for request in tasks {
+    if request.result is None { request.result = Some(Ok(None)) }
+    request.task.wake() catch { _ => () }
+  }
+  if self.producer is Some(task) { task.cancel() catch { _ => () } }
+  if self.lifetime is Some(task) { task.wake() catch { _ => () } }
+  self.notify()
+}
+
+///|
+pub fn[T] NapiAsyncIterator::new(produce : async () -> T?, close : async () -> Unit) -> NapiAsyncIterator[T] raise {
+  let env = napi_current_env()
+  let state : NapiAsyncIterator[T] = { env, produce, finish: close, closed: false, finished: None, queue: [], active: None, producer: None, lifetime: None, waiters: [], pins: [] }
+  state.lifetime = Some(napi_async_submit(env, () => {
+    defer @napi_mbt_async.protect(() => {
+      state.begin_close()
+      state.finished = Some(try { (state.finish)(); Ok(()) } catch { error => Err(error) })
+      let pins = state.pins
+      state.pins = []
+      for (pin, reference) in pins { ignore(napi_listener_unpin(pin)); reference.dispose() catch { _ => () } }
+      state.lifetime = None
+      state.notify()
+    })
+    while !state.closed { @napi_mbt_async.suspend() }
+  }))
+  state
+}
+
+///|
+pub async fn[T] NapiAsyncIterator::next(self : NapiAsyncIterator[T]) -> T? {
+  self.check()
+  if self.closed { return None }
+  let request : NapiStreamRead[T] = { result: None, task: napi_async_get(self.env).scheduler.current_task() }
+  self.queue.push(request)
+  defer { if request.result is None { self.begin_close() } }
+  if self.producer is None {
+    self.producer = Some(napi_async_submit(self.env, () => {
+      defer { self.producer = None; self.active = None }
+      while !self.closed && !self.queue.is_empty() {
+        let request = self.queue[0]
+        self.queue = self.queue[1:].to_owned()
+        self.active = Some(request)
+        let result = try { Ok((self.produce)()) } catch { error => Err(error) }
+        if request.result is None { request.result = Some(result) }
+        request.task.wake() catch { _ => () }
+        self.active = None
+        if result is Ok(None) || result is Err(_) { self.begin_close() }
+      }
+    }))
+  }
+  while request.result is None { @napi_mbt_async.suspend() }
+  match request.result.unwrap() { Ok(None) => { self.close(); None }; Ok(value) => value; Err(error) => raise error }
+}
+
+///|
+pub async fn[T] NapiAsyncIterator::close(self : NapiAsyncIterator[T]) -> Unit {
+  self.check()
+  self.begin_close()
+  while self.finished is None {
+    self.waiters.push(napi_async_get(self.env).scheduler.current_task())
+    @napi_mbt_async.suspend()
+  }
+  match self.finished.unwrap() { Ok(_) => (); Err(error) => raise error }
+}
+
+///|
+#borrow(result)
+extern "c" fn napi_stream_factory(env : NapiEnv, input : Bool, a : NapiValue, b : NapiValue, result : Ref[NapiValue]) -> Int = "napi_mbt_stream_factory"
+
+///|
+fn napi_stream_make(env : NapiEnv, input : Bool, a : NapiValue, b : NapiValue) -> NapiValue raise {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(env, napi_stream_factory(env, input, a, b, result), b"Creating stream adapter")
+  result.val
+}
+
+///|
+fn[T] get_NapiAsyncIterator(env : NapiEnv, value : NapiValue, convert : (NapiEnv, NapiValue) -> T raise) -> NapiAsyncIterator[T] raise {
+  let normalized = napi_stream_make(env, true, value, napi_null(env))
+  let next = NapiCallback::new(env, napi_field_get(env, normalized, "next", true))
+  errdefer { next.dispose() catch { _ => () } }
+  let close = NapiCallback::new(env, napi_field_get(env, normalized, "close", true))
+  errdefer { close.dispose() catch { _ => () } }
+  NapiAsyncIterator::new(() => {
+    if napi_async_closing(env) { raise napi_failure(1004, Error, "ERR_NAPI_ENV_CLOSED", "Reading stream during shutdown") }
+    let promise = get_NapiJsPromise(env, next.call(napi_array_new(env, 0)), fn(env, value) {
+      napi_require_object(env, value)
+      if get_Bool(env, napi_field_get(env, value, "done", true)) { None } else { Some(convert(env, napi_field_get(env, value, "value", true))) }
+    })
+    promise.wait()
+  }, () => {
+    defer { next.dispose() catch { _ => () }; close.dispose() catch { _ => () } }
+    if !napi_async_closing(env) {
+      let promise = get_NapiJsPromise(env, close.call(napi_array_new(env, 0)), fn(_, _) { () })
+      promise.wait()
+    }
+  })
+}
+
+///|
+fn[T] set_NapiAsyncIterator(env : NapiEnv, value : NapiAsyncIterator[T], convert : (NapiEnv, T) -> NapiValue raise) -> NapiValue raise {
+  value.check()
+  fn callback(closing : Bool) -> NapiValue raise {
+    let callback = napi_closure_new(env, fn(env, _) {
+      try {
+        let call = napi_async_call_new(env)
+        call.start(() => {
+          let item = if closing { value.close(); None } else { value.next() }
+          if napi_async_closing(env) { raise napi_failure(1004, Error, "ERR_NAPI_ENV_CLOSED", "Completing stream during shutdown") }
+          let result = napi_object_new(env)
+          napi_field_set(env, result, "done", set_Bool(env, item is None))
+          if item is Some(item) {
+            try { napi_field_set(env, result, "value", convert(env, item)) }
+            catch { error => { value.begin_close(); raise error } }
+          }
+          result
+        })
+        call.promise.promise
+      } catch { error => { throw_napi_error(env, error); moonbit_dummy_napi_value() } }
+    })
+    let pin = napi_reference_empty()
+    let reference = NapiReference::new(env, callback)
+    result_from_status(env, napi_listener_pin(env, callback, pin), b"Retaining stream callback")
+    value.pins.push((pin, reference))
+    callback
+  }
+  let next = callback(false)
+  let close = callback(true)
+  napi_stream_make(env, false, next, close)
+}

@@ -1,0 +1,81 @@
+'use strict';
+const assert = require('node:assert/strict');
+const {Worker} = require('node:worker_threads');
+const {once} = require('node:events');
+const binary = require('node:path').resolve(process.argv[2]);
+const a = require(binary);
+const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+(async () => {
+  const baseline = a.resources();
+  let source = a.range(4, 2);
+  await sleep(15);
+  assert.equal(a.counts()[0], 0);
+  const values = [];
+  for await (const x of source) { values.push(x); await sleep(2); }
+  assert.deepEqual(values, [0,1,2,3]);
+  assert.deepEqual(await source.next(), {done:true, value:undefined});
+  assert.equal(a.counts()[1], 1);
+  console.log('Stream natural completion passed');
+  source = a.range(20, 1);
+  for await (const x of source) { assert.equal(x, 0); break; }
+  assert.equal(a.counts()[1], 2);
+  await source.return(); assert.equal(a.counts()[1], 2);
+  console.log('Stream early close passed');
+  source = a.range(3, 5);
+  assert.deepEqual((await Promise.all([source.next(), source.next(), source.next(), source.next()])).map(x=>x.value), [0,1,2,undefined]);
+  source = a.range(10, 10000);
+  const pending = [source.next(),source.next(),source.next()];
+  await sleep(10); await source.return();
+  assert.ok((await Promise.all(pending)).every(x => x.done));
+  console.log('Stream concurrent output and close passed');
+  let returned = 0, active = 0, maximum = 0, i = 0;
+  const input = { [Symbol.asyncIterator]() { return this; }, async next() { maximum=Math.max(maximum, ++active); await sleep(2); active--; return {value:i++,done:false}; }, async return() { returned++; return {done:true}; } };
+  assert.deepEqual(await a.parallel(input), [0,1,2]);
+  assert.equal(maximum,1); assert.equal(returned,1);
+  console.log('Stream concurrent input passed');
+  assert.equal(await a.sum((async function*(){yield 3;yield 4;})()),7);
+  assert.equal(await a.sum(new ReadableStream({start(c){c.enqueue(5);c.enqueue(6);c.close();}})),11);
+  const error = {marker:42};
+  await assert.rejects(a.sum({[Symbol.asyncIterator](){return this;},next(){throw error;},return(){return {done:true};}}), e=>e===error);
+  await assert.rejects(a.sum((async function*(){yield 'bad';})()), TypeError);
+  source = a.failed(Promise.reject(error));
+  await assert.rejects(source.next(), e=>e===error);
+  assert.equal((await source.next()).done,true);
+  console.log('Stream errors passed');
+  let pulls = a.counts()[0];
+  source = a.range(10,1);
+  const web = source.toReadableStream();
+  await sleep(15); assert.equal(a.counts()[0],pulls);
+  assert.throws(()=>source.toReadableStream(), /consumption/);
+  await assert.rejects(source.next(), /consumption/);
+  const reader = web.getReader();
+  assert.equal((await reader.read()).value,0);
+  await sleep(10); assert.equal(a.counts()[0],pulls+1);
+  await reader.cancel(); reader.releaseLock();
+  const controller = new AbortController();
+  source = a.range(10,10000);
+  const cancelled = source.toReadableStream({signal:controller.signal}).getReader();
+  const read = cancelled.read(); controller.abort(error);
+  await assert.rejects(read,e=>e===error); cancelled.releaseLock();
+  let cancelledInput = 0;
+  const controller2 = new AbortController();
+  const waiting = a.sum(new ReadableStream({cancel(){cancelledInput++;}}), {signal:controller2.signal});
+  await sleep(10); controller2.abort(error);
+  await assert.rejects(waiting,e=>e===error);
+  await sleep(15); assert.equal(cancelledInput,1);
+  console.log('Web stream cancellation passed');
+  source = a.binary((async function*(){yield new Uint8Array([1,2]);})());
+  assert.deepEqual((await source.next()).value,new Uint8Array([1,2]));
+  await source.return();
+  source = null;
+  for(let i=0;i<8;i++) {
+    // Signal from the input stream's pull callback so termination only starts
+    // after the addon has entered its first async N-API callback. The input
+    // remains pending, which still exercises environment teardown.
+    const worker = new Worker(`const {parentPort,workerData}=require('node:worker_threads');const a=require(workerData);a.range(10,100000).next();const input=new ReadableStream({pull(){setImmediate(()=>parentPort.postMessage('ready'));return new Promise(()=>{});}});a.sum(input);`,{eval:true,workerData:binary});
+    await once(worker,'message'); await sleep(20); await worker.terminate();
+  }
+  for(let i=0;i<10;i++){global.gc();await sleep(10);}
+  assert.equal(a.resources(),baseline);
+  console.log('Streams: demand, bidirectional input/output, serialization, break, errors, abort and teardown passed');
+})().catch(e=>{console.error(e);process.exitCode=1;});

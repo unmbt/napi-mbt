@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import addon from './index.mjs';
+import { createRequire } from 'node:module';
+const cjs = createRequire(import.meta.url)('./index.cjs');
+for (const name of Object.keys(addon)) assert.equal(cjs[name], addon[name]);
+const counter = addon.counter(1);
+assert.ok(counter instanceof addon.Counter);
+assert.equal(counter.increment(2), 3);
+counter.value = 7;
+assert.equal(counter.value, 7);
+counter.dispose(); counter.dispose();
+assert.throws(() => counter.increment(1), { code: 'ERR_NAPI_DISPOSED' });
+console.log('native-class passed');

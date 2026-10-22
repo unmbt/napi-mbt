@@ -1,0 +1,50 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn main {
+  if @env.get_env_var("OS") == Some("Windows_NT") {
+    println("Unix libc symbol collision check skipped on Windows")
+    return
+  }
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(
+    @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"),
+  )
+  let temp = @fs.tmpdir(prefix="napi-mbt-unix-symbol-")
+  defer @fs.rmdir(temp, recursive=true)
+  let project = temp + "/fixture"
+  let (init_code, init_out, init_err) = @process.collect_output(
+    binary,
+    ["init", project, "--name", "unix-symbol-fixture"],
+    cwd=root,
+  )
+  if init_code != 0 {
+    fail(init_out.text() + init_err.text())
+  }
+  let source = @fs.read_file(project + "/lib.mbt").text()
+    .replace_all(old="mbt_add", new="read") +
+    "\n///|\n#export_name(\"write\")\npub fn write(value : Int) -> Int { value }\n"
+  @fs.write_file(project + "/lib.mbt", source)
+  // JavaScript names are adapter-prefixed native symbols and may legally use
+  // libc words. The actual native-link export list is the collision boundary.
+  let (js_code, js_out, js_err) = @async.with_timeout(180000, () => {
+    @process.collect_output(binary, ["build", project, "--release"], cwd=root)
+  })
+  assert_eq(js_code, 0, msg=js_out.text() + js_err.text())
+  let package_text = @fs.read_file(project + "/moon.pkg").text().replace_all(
+    old="\"exports\": [],",
+    new="\"exports\": [\"read\", \"write\"],",
+  )
+  @fs.write_file(project + "/moon.pkg", package_text)
+  let (code, out, err) = @async.with_timeout(180000, () => {
+    @process.collect_output(binary, ["build", project, "--release"], cwd=root)
+  })
+  let output = out.text() + err.text()
+  assert_true(code != 0, msg="A libc symbol collision must fail the Unix build")
+  assert_true(
+    output.contains("Unix libc symbol collision") &&
+    output.contains("read") && output.contains("write"),
+    msg=output,
+  )
+  println("Native libc symbol collisions are rejected; JS names remain adapter-scoped")
+}

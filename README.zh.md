@@ -4,20 +4,19 @@
 
 用 MoonBit 编写原生 Node.js addon。独立原生 CLI 通过 Tree-sitter 解析源码，
 校验单一类型 IR，再生成 MoonBit adapter、C glue、TypeScript 声明和独立的
-CJS/ESM loader。项目仍在开发中，请从当前仓库开始使用。
+CJS/ESM loader。项目仍在开发中，通过 Mooncakes 分发。
 
 导出支持严格数值、bigint、保留 UTF-16 的字符串、拥有/借用 Buffer、嵌套
 Option/Array、struct/enum、显式 class、callback，以及返回可取消 Promise 的
 `async fn`。错误会终止当前调用，已有 JavaScript 异常保留原始身份。
 
-## 从源码开始
+## 从 Mooncakes 安装
 
 安装 MoonBit 和原生 C 工具链，已验证版本和 Node 策略见[支持矩阵](docs/zh/support.md)。
 构建需要 CMake、GCC/Clang，或 Visual Studio C++ Build Tools、MSBuild 和 Windows SDK。
 
 ```sh
-moon update
-moon install ./cmd/napi-mbt-cli
+moon install unmbt/napi-mbt/cmd/napi-mbt-cli
 napi-mbt-cli init my-addon
 cd my-addon
 napi-mbt-cli doctor --json
@@ -26,13 +25,19 @@ node -e "console.log(require('./index.cjs').mbt_add(2, 3))"
 ```
 
 原生 CLI 的所有命令（包括 addon 编译）均不依赖 Node/npm。
-Node 用于加载 addon，npm 用于包安装和验证。解析器、头文件、runtime 模板和
+Node 用于加载 addon，pnpm 用于包安装和验证。解析器、头文件、runtime 模板和
 带版本的 async 补丁均已内嵌。
+
+开发者可 clone 仓库后执行 `moon install ./cmd/napi-mbt-cli`。
+根 npm 包标记为 private，仅用于安装开发工具；用户生成的 addon 继续通过
+`prepublish` 准备 npm 主包和平台二进制包。工具发布版本以 `moon.mod` 为准。
 
 在 `pub fn` 或 `pub async fn` 上添加 `#export_name("name")`；注解决定 JS 导出名。
 生成的声明包含源码文档和错误说明。详见[使用指南](docs/zh/usage.md)、
 [类型](docs/zh/types.md)、[class/callback](docs/zh/classes-callbacks.md)和
 [异步](docs/zh/async.md)。
+六个[独立样例](examples/README.md)涵盖基础导出、结构化值、class、callback、
+异步文件和 Buffer；CI 使用打包安装的 CLI 验证真实运行与 TypeScript 消费方式。
 
 ## 常用命令
 
@@ -60,7 +65,7 @@ CJS/ESM 默认同时启用，也可独立启用。未知配置字段、不支持
 ```sh
 moon build --target native --release cmd/napi-mbt-cli
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx

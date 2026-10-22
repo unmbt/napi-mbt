@@ -54,6 +54,11 @@ pub fn EmbeddedLoop::cancel(self : EmbeddedLoop, task : @coroutine.Coroutine) ->
 }
 
 ///|
+pub fn EmbeddedLoop::wake(self : EmbeddedLoop, task : @coroutine.Coroutine) -> Unit raise {
+  self.activate(() => task.wake())
+}
+
+///|
 pub fn EmbeddedLoop::cancel_all(self : EmbeddedLoop) -> Unit raise {
   self.activate(() => {
     for task in @coroutine.all_coroutines().iter().to_array() { task.cancel() }
@@ -87,7 +92,7 @@ pub fn EmbeddedLoop::next_wake(self : EmbeddedLoop) -> Int raise {
     let timeout = self.evloop.get_next_timeout()
     if self.evloop.blocked_tasks > 0 {
       if timeout < 0 { 2 } else { @cmp.minimum(timeout, 2) }
-    } else if timeout < 0 { 2 } else { timeout }
+    } else { timeout }
   })
 }
 

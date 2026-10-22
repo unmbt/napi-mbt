@@ -23,6 +23,7 @@ async fn main {
     "doctor" => doctor(dir, flags.contains("--json"))
     "init" => initialize(dir, options.get("--name"), flags.contains("--force"))
     "generate" => ignore(generate(dir, flags.contains("--check")))
+    "clean" => clean_cache(dir)
     "build" => {
       verbose_commands.val = flags.contains("--verbose")
       if flags.contains("--watch") {
@@ -31,6 +32,7 @@ async fn main {
           flags.contains("--release"),
           options.get("--target"),
           options.get("--output-dir"),
+          no_cache=flags.contains("--no-cache"),
         )
       } else {
         build(
@@ -39,6 +41,7 @@ async fn main {
           flags.contains("--dry-run"),
           options.get("--target"),
           output_directory=options.get("--output-dir"),
+          no_cache=flags.contains("--no-cache"),
         )
       }
     }

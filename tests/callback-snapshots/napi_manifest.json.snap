@@ -1,5 +1,5 @@
 {
-  "runtimeTemplateVersion": "7",
+  "runtimeTemplateVersion": "13",
   "napiVersion": 4,
   "requiredNapiVersion": 4,
   "features": [
@@ -8,7 +8,8 @@
   "targets": [
     "win32-x64-msvc",
     "darwin-arm64",
-    "linux-x64-gnu"
+    "linux-x64-gnu",
+    "linux-arm64-gnu"
   ],
   "cjs": true,
   "esm": true,
@@ -202,5 +203,12 @@
     }
   ],
   "types": [],
-  "classes": []
+  "classes": [],
+  "nativeTasks": {},
+  "workerTasks": [],
+  "workerPool": {
+    "size": 2,
+    "maxQueue": 64,
+    "idleTimeoutMs": 30000
+  }
 }

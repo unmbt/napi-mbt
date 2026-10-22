@@ -27,7 +27,7 @@ moon check --target native --warn-list +73 --deny-warn
 moon build --target native --release cmd/napi-mbt-cli
 moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets
 moon run --target native --release cmd/napi-mbt-cli -- build --release
-npm ci --ignore-scripts
+pnpm install --frozen-lockfile --ignore-scripts
 moon run scripts/ci-regression-test.mbtx
 moon run scripts/ci-consumers.mbtx
 moon run scripts/sanitizer-test.mbtx
@@ -54,49 +54,57 @@ verify that leak detection remains active; no whole-library suppression is used.
 
 ## Package gates
 
-Versions in `moon.mod`, `package.json`, lockfile and platform dependencies must
-match; release tags are checked. `prepublish` rejects missing, wrong-architecture,
+The Mooncakes version in `moon.mod` is independent from the private root npm
+manifest. The manifest and lockfile must agree; release tags are checked against
+`moon.mod`. `prepublish` rejects missing, wrong-architecture,
 non-library or stale artifacts/declarations. It preserves user package metadata
 and includes bundled licenses. Generated `npm/`, `artifacts/` and `licenses/`
 are not source-controlled.
 
 Release with `moon-bump` from the repository root. Its configured
-`prepare-release.mbtx` hook synchronizes the npm manifest and lockfile versions
-from `moon.mod`, strictly checks the project (regenerating the CLI version), and
-runs the release checks before committing and tagging. `all: true` includes
-these generated changes in the release commit. To repair or validate a manually
-changed version, run `moon run scripts/prepare-release.mbtx`. CI runs
-`release-check.mbtx` without `--write`, so an inconsistent release still fails.
+`prepare-release.mbtx` hook canonicalizes the development lockfile, strictly
+checks the project (regenerating the CLI version), and runs the release checks
+before committing and tagging. It does not synchronize the private npm version
+with `moon.mod`. `all: true` includes generated changes in the release commit.
+Run `moon run scripts/prepare-release.mbtx` to repair or validate a checkout.
+CI runs `release-check.mbtx` without `--write`, so an inconsistent release still
+fails.
 
 The checkout manifest contains development dependencies, without unpublished
 platform packages. `prepublish` adds the platform dependencies for distribution;
 the root distribution test restores the checkout manifest afterward.
-`source-install-test.mbtx` runs `npm ci` in a fresh temporary directory with
+`source-install-test.mbtx` runs `pnpm install --frozen-lockfile` in a fresh temporary directory with
 only the manifests and verifies rejection of an incomplete lockfile.
 
 ```sh
 moon run scripts/release-check.mbtx
 moon run scripts/distribution-test.mbtx
-moon run scripts/distribution-test.mbtx _build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --root
 moon run scripts/mooncake-package-test.mbtx
 ```
 
-The distribution test runs npm pack/dry-run, installs actual tarballs offline in
+The distribution test runs pnpm pack/dry-run, installs actual tarballs offline in
 a clean directory, loads CJS/ESM and checks installed TypeScript declarations.
 It also verifies that corrupt binaries, stale declarations and version mismatches
-are rejected. `--root` emits root/package tarballs to `dist/npm/<target>/`.
+are rejected. Only generated addons are packaged for npm; napi-mbt itself is
+distributed through Mooncakes. Its private npm manifest installs development tools.
 No registry publication occurs. Source digests are not currently tied to binary
 receipts; always build the checkout being packaged.
 
 The Mooncake gate packs the module, rejects accidental dependencies/binaries in
-the archive, extracts it, and strictly checks the extracted sources. It uses no
-registry publication. `moon publish --dry-run` additionally contacts the registry
+the archive, extracts and checks its sources, then installs the CLI without
+Node/npm on PATH. It deletes the extracted source and uses that installed CLI
+outside the checkout to build and execute CJS/ESM and TypeScript consumers.
+It uses no registry publication. `moon publish --dry-run` additionally contacts
+the registry
 and rejects a version that already exists; use it
 only when checking availability of an actual new release version.
 
-CI pins Moon/core and CMake, builds the three release platforms, runs the Node
+CI pins Moon/core and CMake, builds the currently supported native target profiles, runs the Node
 22/24/26 matrix and minimum consumers, and gates release archives on tests.
 A separate job checks latest MoonBit compatibility. Test orchestration uses
 `.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`
-as local reference only. [Benchmarks](../performance.md) and the
+as local reference only. The MoonBit setup action currently cannot provide a
+macOS x64 compiler, and the pinned MoonBit toolchain currently cannot start in
+the Alpine musl image; macOS x64 and both musl profiles remain CI-pending.
+[Benchmarks](../performance.md) and the
 [roadmap](../roadmap.md) describe remaining performance and platform work.

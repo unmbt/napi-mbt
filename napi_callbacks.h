@@ -1,31 +1,53 @@
 /* Included after napi_lifecycle.h; all operations run on the owning JS thread. */
-typedef struct { napi_mbt_resource *resource; } napi_mbt_callback_ref;
+typedef struct { napi_mbt_resource *resource; bool borrowed; bool boxed; } napi_mbt_callback_ref;
 struct napi_mbt_arguments { size_t count; napi_value *values; };
 typedef napi_value (*napi_mbt_trampoline)(void *, napi_env, napi_mbt_arguments *);
 
 static void napi_mbt_callback_finalizer(void *data) {
     napi_mbt_callback_ref *callback = data;
-    napi_mbt_free_resource(callback->resource);
+    /* Listener pins borrow a JS-owned container. In particular their MoonBit
+     * finalizer can run while environment cleanup decrefs that very closure. */
+    if (!callback->borrowed) napi_mbt_free_resource(callback->resource);
 }
 
 MOONBIT_FFI_EXPORT void *napi_mbt_callback_empty(void) {
     napi_mbt_callback_ref *callback = moonbit_make_external_object(napi_mbt_callback_finalizer, sizeof(*callback));
     callback->resource = NULL;
+    callback->borrowed = false;
+    callback->boxed = false;
     return callback;
 }
 MOONBIT_FFI_EXPORT napi_env napi_mbt_dummy_env(void) { return NULL; }
 
-/* Box values so references retain primitives (including thrown undefined) too. */
+/* Keep object-like values directly. Older N-API versions reject primitive
+ * references, so only those values need a temporary box. This matters during
+ * Node 26 Worker::terminate: creating an Array is a V8 allocation and can
+ * trip IsOnCentralStack while the isolate is being disposed. */
 MOONBIT_FFI_EXPORT int napi_mbt_reference_bind(napi_env env, napi_value value, napi_mbt_callback_ref *reference) {
-    napi_value box;
-    napi_status status = napi_create_array_with_length(env, 1, &box);
-    if (status == napi_ok) status = napi_set_element(env, box, 0, value);
+    /* Node 26 can run native async cleanup while the isolate is already off
+     * its central JS stack. Do not create a new V8 handle/reference once the
+     * owning environment has started closing; the scheduler will propagate
+     * ERR_NAPI_ENV_CLOSED and the normal cleanup path will release existing
+     * references without entering JavaScript. */
+    if (napi_mbt_active && napi_mbt_active->closing) return 1004;
+    napi_valuetype type;
+    napi_status status = napi_typeof(env, value, &type);
     if (status != napi_ok) return (int)status;
     napi_mbt_resource *resource = napi_mbt_new_resource(env, 5, 0);
     if (!resource) return napi_generic_failure;
-    status = napi_create_reference(env, box, 1, &resource->reference);
+    napi_value target = value;
+    napi_value box;
+    bool boxed = false;
+    if (type != napi_object && type != napi_function && type != napi_symbol) {
+        status = napi_create_array_with_length(env, 1, &box);
+        if (status == napi_ok) status = napi_set_element(env, box, 0, value);
+        target = box;
+        boxed = true;
+    }
+    if (status == napi_ok) status = napi_create_reference(env, target, 1, &resource->reference);
     if (status != napi_ok) { napi_mbt_free_resource(resource); return (int)status; }
     reference->resource = resource;
+    reference->boxed = boxed;
     return napi_ok;
 }
 
@@ -34,7 +56,10 @@ MOONBIT_FFI_EXPORT int napi_mbt_reference_get(napi_env env, napi_mbt_callback_re
     if (status != napi_ok) return status;
     napi_value box;
     status = napi_get_reference_value(env, reference->resource->reference, &box);
-    if (status == napi_ok) status = napi_get_element(env, box, 0, result);
+    if (status == napi_ok) {
+        if (reference->boxed) status = napi_get_element(env, box, 0, result);
+        else *result = box;
+    }
     return status;
 }
 
@@ -50,13 +75,32 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_pin(napi_env env, napi_value value, napi
     /* This reference borrows the container; its JS wrapper is retained by a
      * separate NapiReference until the pin has been disposed. */
     reference->resource = resource;
+    reference->borrowed = true;
     return napi_ok;
 }
 
 MOONBIT_FFI_EXPORT int napi_mbt_closure_unpin(napi_mbt_callback_ref *reference) {
     napi_mbt_resource *resource = reference->resource;
     reference->resource = NULL;
-    return resource ? napi_mbt_dispose_resource(resource) : napi_ok;
+    if (!resource) return napi_ok;
+    /* After teardown the borrowed pointer may be stale. Compare it against the
+     * current owner's registry before touching it. */
+    napi_mbt_resource *entry = napi_mbt_active ? napi_mbt_active->resources : NULL;
+    while (entry && entry != resource) entry = entry->next;
+    return entry ? napi_mbt_dispose_resource(entry) : napi_ok;
+}
+
+/* Promise reactions cannot be removed from JS. Drop their MoonBit payload on
+ * completion/cancellation, and let a later reaction return undefined safely. */
+MOONBIT_FFI_EXPORT int napi_mbt_closure_inert(napi_env env, napi_value value) {
+    void *pointer = NULL;
+    int status = napi_unwrap(env, value, &pointer);
+    if (status != napi_ok) return status;
+    napi_mbt_resource *resource = napi_mbt_active->resources;
+    while (resource && resource != pointer) resource = resource->next;
+    if (!resource || resource->kind != 2) return 1007;
+    resource->inert_on_dispose = true;
+    return napi_ok;
 }
 
 MOONBIT_FFI_EXPORT int napi_mbt_owned_reference_dispose(napi_mbt_callback_ref *reference) {
@@ -154,6 +198,10 @@ static napi_value napi_mbt_closure_call(napi_env env, napi_callback_info info) {
     checked = napi_get_cb_info(env, info, &args.count, NULL, NULL, (void **)&resource);
     if (checked != napi_ok) goto done;
     checked = napi_mbt_check_resource(resource, env);
+    if (checked == 1006 && resource->inert_on_dispose) {
+        checked = napi_get_undefined(env, &result);
+        goto done;
+    }
     if (checked != napi_ok) goto done;
     if (args.count > INT32_MAX || args.count > SIZE_MAX / sizeof(napi_value)) { checked = napi_invalid_arg; goto done; }
     args.values = args.count ? malloc(sizeof(napi_value) * args.count) : NULL;

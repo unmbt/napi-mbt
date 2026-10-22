@@ -1,6 +1,9 @@
 ///|
 // Node-API introduction versions, matching napi-rs/cli/src/utils/version.ts.
-fn node_engine(version : Int32, esm : Bool) -> String {
+fn node_engine(version : Int32, esm : Bool, streams~ : Bool = false) -> String {
+  if streams && version <= 8 {
+    return ">=18.0.0"
+  }
   if esm && version <= 7 {
     return ">=12.20.0 <13 || >=14.13.1"
   }
@@ -45,6 +48,7 @@ fn node_engine(version : Int32, esm : Bool) -> String {
 ///|
 let managed_package_files : Array[String] = [
   "index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts", "napi_manifest.json",
+  "napi_workers.cjs", "napi_worker_entry.cjs",
 ]
 
 ///|
@@ -78,6 +82,9 @@ fn package_metadata(pkg : Map[String, Json], conf : Config) -> Json raise {
     files.push("licenses")
   }
   files.append(["index.d.ts", "napi_manifest.json"])
+  if !conf.worker_tasks.is_empty() {
+    files.append(["napi_workers.cjs", "napi_worker_entry.cjs"])
+  }
   if conf.cjs {
     files.append(["index.cjs", "index.d.cts"])
   }
@@ -89,7 +96,13 @@ fn package_metadata(pkg : Map[String, Json], conf : Config) -> Json raise {
     Some(value) => object(value)
     None => Map([])
   }
-  engines["node"] = Json(node_engine(conf.napi_version, conf.esm))
+  engines["node"] = Json(
+    node_engine(
+      conf.napi_version,
+      conf.esm,
+      streams=conf.features.contains("streams"),
+    ),
+  )
   pkg["engines"] = Json(engines)
   Json(pkg)
 }

@@ -20,6 +20,10 @@
   "scripts": {
     "test": "node test/smoke.cjs && node test/smoke.mjs"
   },
+  "engines": {
+    "pnpm": ">=10",
+    "node": ">=12.20.0 <13 || >=14.13.1"
+  },
   "files": [
     "licenses",
     "index.d.ts",
@@ -28,8 +32,5 @@
     "index.d.cts",
     "index.mjs",
     "index.d.mts"
-  ],
-  "engines": {
-    "node": ">=12.20.0 <13 || >=14.13.1"
-  }
+  ]
 }

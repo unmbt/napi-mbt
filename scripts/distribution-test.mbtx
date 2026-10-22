@@ -8,14 +8,19 @@ async fn checked(program : String, args : Array[String], cwd? : StringView) -> S
 }
 
 ///|
-async fn npm(args : Array[String], cwd : String) -> String {
-  if @env.get_env_var("OS") != Some("Windows_NT") { return checked("npm", args, cwd~) }
-  // Pass argv directly to Node; do not compose a cmd.exe command string.
-  for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
-    let cli = dir.to_owned() + "/node_modules/npm/bin/npm-cli.js"
-    if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+async fn pnpm(args : Array[String], cwd : String) -> String {
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    return checked("pnpm", args, cwd~)
   }
-  fail("Cannot find npm-cli.js beside Node on PATH")
+  for dir in @env.get_env_var("PATH").unwrap_or("").split(";") {
+    for base in [dir.to_owned() + "/node_modules/pnpm/bin", dir.to_owned() + "/../pnpm/bin"] {
+      for name in ["pnpm.mjs", "pnpm.cjs"] {
+        let cli = base + "/" + name
+        if @fs.exists(cli) { return checked("node", [cli] + args, cwd~) }
+      }
+    }
+  }
+  fail("Cannot find pnpm launcher beside Node on PATH")
 }
 
 ///|
@@ -30,19 +35,12 @@ async fn main {
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-distribution-")
   defer @fs.rmdir(temp, recursive=true)
-  let root_package = @env.args().contains("--root")
-  let dir = if root_package { root } else { temp + "/package with spaces" }
-  // Release metadata belongs to the packed artifact; keep checkout installs
-  // independent of platform packages that have not been published yet.
-  let original_package = if root_package { Some(@fs.read_file(dir + "/package.json").binary()) } else { None }
-  defer { if original_package is Some(data) { @fs.write_file(dir + "/package.json", data) } }
-  if !root_package {
-    ignore(checked(binary, ["init", dir, "--name", "distribution-fixture"]))
-    ignore(checked(binary, ["build", dir, "--release"]))
-  }
+  assert_true(!@env.args().contains("--root"), msg="napi-mbt is distributed through Mooncakes; this test packages a generated addon")
+  let dir = temp + "/package with spaces"
+  ignore(checked(binary, ["init", dir, "--name", "distribution-fixture"]))
+  ignore(checked(binary, ["build", dir, "--release"]))
   let target = @fs.readdir(dir + "/artifacts")[0]
   let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
-  if !root_package {
   let binary_data = @fs.read_file(artifact).binary()
   @fs.write_file(artifact, "broken")
   rejected(binary, dir, target)
@@ -55,32 +53,27 @@ async fn main {
   @fs.write_file(dir + "/moon.mod", mod + "\nversion = \"999.0.0\"\n")
   rejected(binary, dir, target)
   @fs.write_file(dir + "/moon.mod", mod)
-  }
   ignore(checked(binary, ["prepublish", dir, "--target", target]))
   let tarballs = []
   for package_dir in [dir + "/npm/" + target, dir] {
-    let dry = npm(["pack", package_dir, "--dry-run", "--json", "--ignore-scripts"], temp)
-    guard @json.parse(dry) is [{ "files": Array(files), .. }] else { fail("Invalid npm dry-run result") }
+    let dry = pnpm(["pack", "--dry-run", "--json"], package_dir)
+    guard @json.parse(dry) is { "files": Array(files), .. } else { fail("Invalid pnpm pack result") }
     for license in ["napi-mbt.txt", "node-api.txt", "moonbit-async.txt", "libuv.txt"] {
       assert_true(files.any(file => match file { { "path": String(path), .. } => path == "licenses/" + license; _ => false }), msg="Missing bundled license: " + license)
     }
     assert_true(files.all(file => match file { { "path": String(path), .. } => !path.has_prefix(".napi-mbt/") && !path.has_suffix(".mbt") && !path.has_suffix(".c"); _ => false }))
-    let packed = npm(["pack", package_dir, "--json", "--ignore-scripts"], temp)
-    guard @json.parse(packed) is [{ "filename": String(filename), .. }] else { fail("Invalid npm pack result") }
-    tarballs.push(temp + "/" + filename)
-    if root_package {
-      @fs.mkdir(root + "/dist/npm/" + target, recursive=true, allow_exist=true)
-      @fs.write_file(root + "/dist/npm/" + target + "/" + filename, @fs.read_file(temp + "/" + filename))
-    }
+    let packed = pnpm(["pack", "--json", "--pack-destination", temp], package_dir)
+    guard @json.parse(packed) is { "filename": String(filename), .. } else { fail("Invalid pnpm pack result") }
+    tarballs.push(filename)
   }
   let consumer = temp + "/clean consumer"
   @fs.mkdir(consumer)
   @fs.write_file(consumer + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
-  ignore(npm(["install", "--offline", "--ignore-scripts", "--no-audit", "--no-fund", "--omit=dev", "--package-lock=false"] + tarballs, consumer))
-  let package_name = if root_package { "napi-mbt" } else { "distribution-fixture" }
-  let function_name = if root_package { "add" } else { "mbt_add" }
+  ignore(pnpm(["add", "--offline", "--ignore-scripts", "--save-prod"] + tarballs, consumer))
+  let package_name = "distribution-fixture"
+  let function_name = "mbt_add"
   ignore(checked("node", [root + "/scripts/distribution.test.cjs", consumer, package_name, function_name]))
   @fs.write_file(consumer + "/check.mts", "import addon, { \{function_name} } from '\{package_name}';\nconst result: number = addon.\{function_name}(1, 2) + \{function_name}(3, 4);\n// @ts-expect-error invalid input\n\{function_name}('1', 2);\n")
   ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", "NodeNext", "--moduleResolution", "NodeNext", consumer + "/check.mts"]))
-  println("Release gates, npm pack/dry-run, offline clean installation, CJS/ESM and installed declarations passed")
+  println("Release gates, pnpm pack/dry-run, offline clean installation, CJS/ESM and installed declarations passed")
 }

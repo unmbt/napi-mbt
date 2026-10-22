@@ -1,0 +1,41 @@
+///|
+priv type NapiNativeTaskHandle
+
+///|
+#borrow(name, input, status)
+extern "c" fn napi_native_start(env : NapiEnv, name : Bytes, input : Bytes, status : Ref[Int]) -> NapiNativeTaskHandle = "napi_mbt_native_start"
+
+///|
+#borrow(handle)
+extern "c" fn napi_native_close(handle : NapiNativeTaskHandle) -> Unit = "napi_mbt_native_close"
+
+///|
+#borrow(handle)
+extern "c" fn napi_native_status(handle : NapiNativeTaskHandle) -> Int = "napi_mbt_native_status"
+
+///|
+#borrow(handle)
+extern "c" fn napi_native_output(handle : NapiNativeTaskHandle) -> Bytes = "napi_mbt_native_output"
+
+///|
+#borrow(handle)
+extern "c" fn napi_native_error(handle : NapiNativeTaskHandle, code : Bool) -> Bytes = "napi_mbt_native_error"
+
+///|
+/// Invoke a task registered in napi-mbt.json. Input and output are C-owned copies
+/// while running; cancellation requests cooperative termination and releases the
+/// caller immediately. The native work retains its storage until it exits.
+pub async fn napi_native_task(name : String, input : Bytes) -> Bytes {
+  if name.contains("\u0000") { raise napi_failure(1, TypeError, "ERR_NAPI_NATIVE_NAME", "Invalid native task name") }
+  let env = napi_current_env()
+  let status = Ref(0)
+  let handle = napi_native_start(env, @utf8.encode(name), input, status)
+  defer napi_native_close(handle)
+  result_from_status(env, status.val, b"Starting registered native task")
+  while napi_native_status(handle) == 0 { @napi_mbt_tasks.sleep(1) }
+  match napi_native_status(handle) {
+    1 => napi_native_output(handle)
+    3 => raise napi_failure(11, Error, "ERR_NAPI_NATIVE_CANCELLED", "Native task cancelled")
+    _ => raise napi_failure(9, Error, @utf8.decode_lossy(napi_native_error(handle, true)), @utf8.decode_lossy(napi_native_error(handle, false)))
+  }
+}

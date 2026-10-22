@@ -29,7 +29,15 @@ fn conversion_types(
     }
     types.push(value)
     match value {
-      OptionType(inner) | ArrayType(inner) => collect(inner, read)
+      OptionType(inner)
+      | ArrayType(inner)
+      | MapType(inner)
+      | JsPromiseType(inner)
+      | AsyncIteratorType(inner) => collect(inner, read)
+      TupleType(items) =>
+        for item in items {
+          collect(item, read)
+        }
       CallbackType(params, ret, _) => {
         for p in params {
           collect(p, !read)
@@ -107,6 +115,21 @@ fn conversions(
       )
     }
     match value {
+      AsyncIteratorType(inner) =>
+        out.write_string(
+          "  " +
+          (if read { "get_" } else { "set_" }) +
+          "NapiAsyncIterator(env, value, fn(env, value) { " +
+          conversion_name(inner, types, read) +
+          (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
+          " })\n",
+        )
+      JsPromiseType(inner) =>
+        out.write_string(
+          "  get_NapiJsPromise(env, value, fn(env, value) { " +
+          conversion_name(inner, types, true) +
+          "(env, value, []) })\n",
+        )
       CallbackType(params, ret, _) =>
         out.write_string(
           callback_conversion(
@@ -125,6 +148,56 @@ fn conversions(
             read,
           ),
         )
+      JsonType =>
+        out.write_string(
+          if read {
+            "  napi_read_json(env, value, _path)\n"
+          } else {
+            "  napi_write_json(env, value, _depth)\n"
+          },
+        )
+      MapType(inner) => {
+        enter()
+        if read {
+          out.write_string(
+            "  let result : " +
+            mbt +
+            " = Map([])\n  for key in napi_object_keys(env, value) {\n    result[key] = " +
+            convert(inner, "napi_key_get(env, value, key)") +
+            "\n  }\n  result\n",
+          )
+        } else {
+          out.write_string(
+            "  let result = napi_object_new(env)\n  for key, item in value {\n    napi_key_set(env, result, key, " +
+            convert(inner, "item") +
+            ")\n  }\n  result\n",
+          )
+        }
+      }
+      TupleType(items) => {
+        enter()
+        if read {
+          out.write_string(
+            "  if napi_array_length(env, value) != \{items.length()} { raise napi_failure(1, TypeError, \"ERR_NAPI_TUPLE_LENGTH\", \"Unexpected tuple length\") }\n  (" +
+            items
+            .mapi((i, t) => convert(t, "napi_array_get(env, value, \{i})"))
+            .join(", ") +
+            ")\n",
+          )
+        } else {
+          out.write_string(
+            "  let result = napi_array_new(env, \{items.length()})\n",
+          )
+          for i, t in items {
+            out.write_string(
+              "  napi_array_set(env, result, \{i}, " +
+              convert(t, "value.\{i}") +
+              ")\n",
+            )
+          }
+          out.write_string("  result\n")
+        }
+      }
       UnitType if read =>
         out.write_string("  ignore(env)\n  ignore(value)\n  ()\n")
       OptionType(inner) =>

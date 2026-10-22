@@ -63,7 +63,7 @@ async fn main {
     #|#export_name("color")
     #|pub fn color(value : Color) -> Color { effects.val += 1; value }
     #|///|
-    #|#export_name("link")
+    #|#export_name("linkValue")
     #|pub fn link(value : Link) -> Link { effects.val += 1; value }
     #|///|
     #|#export_name("optional")

@@ -70,7 +70,7 @@ export function effects(): number;
  * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
  * @throws Argument conversion failure prevents business execution.
  */
-export function link(value: Link$Input): Link;
+export function linkValue(value: Link$Input): Link;
 /**
  * @throws Node-API errors carry code, status and context; existing JS exceptions preserve identity.
  * @throws Argument conversion failure prevents business execution.

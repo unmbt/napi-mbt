@@ -569,8 +569,8 @@ pub fn napi_mbt_adapter_effects(env : NapiEnv) -> NapiValue {
 }
 
 ///|
-#export_name("napi_mbt_adapter_link")
-pub fn napi_mbt_adapter_link(env : NapiEnv, a0 : NapiValue) -> NapiValue {
+#export_name("napi_mbt_adapter_linkValue")
+pub fn napi_mbt_adapter_linkValue(env : NapiEnv, a0 : NapiValue) -> NapiValue {
   try {
     let p0 = napi_mbt_read_7(env, a0, [])
     let result : Link = link(p0)

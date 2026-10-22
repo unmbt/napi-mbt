@@ -4,6 +4,9 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
     prepare_dependency_pic(dir)
   }
   let exports = generated.source.native_exports()
+  for name in generated.config.worker_tasks {
+    exports.push("napi_mbt_adapter___napi_mbt_snapshot_" + name)
+  }
   let path = dir + "/moon.pkg"
   let overlay = build_package_overlay(
     read_text(path),

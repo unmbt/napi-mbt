@@ -37,6 +37,7 @@ async fn watch_build(
   release : Bool,
   target : String?,
   output : String?,
+  no_cache~ : Bool = false,
 ) -> Unit {
   let dir = @fs.realpath(dir).replace_all(old="\\", new="/")
   // Resolve the output before constructing the watcher, including '..' and links.
@@ -64,7 +65,7 @@ async fn watch_build(
   while true {
     if dirty {
       eprintln("[napi-mbt] watch: building")
-      build(dir, release, false, target, output_directory=output) catch {
+      build(dir, release, false, target, output_directory=output, no_cache~) catch {
         error =>
           eprintln(
             "[napi-mbt] watch: build failed; keeping last successful artifact\n" +
