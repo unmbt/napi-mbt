@@ -69,8 +69,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   await source.return();
   source = null;
   for(let i=0;i<8;i++) {
-    const worker = new Worker(`const {parentPort,workerData}=require('node:worker_threads');const a=require(workerData);a.range(10,100000).next();a.sum(new ReadableStream());parentPort.postMessage('ready');`,{eval:true,workerData:binary});
-    await once(worker,'message'); await worker.terminate();
+    // Signal from the input stream's pull callback so termination only starts
+    // after the addon has entered its first async N-API callback. The input
+    // remains pending, which still exercises environment teardown.
+    const worker = new Worker(`const {parentPort,workerData}=require('node:worker_threads');const a=require(workerData);a.range(10,100000).next();const input=new ReadableStream({pull(){setImmediate(()=>parentPort.postMessage('ready'));return new Promise(()=>{});}});a.sum(input);`,{eval:true,workerData:binary});
+    await once(worker,'message'); await sleep(20); await worker.terminate();
   }
   for(let i=0;i<10;i++){global.gc();await sleep(10);}
   assert.equal(a.resources(),baseline);
