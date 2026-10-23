@@ -23,5 +23,5 @@ pub fn pipeline(input : NapiAsyncIterator[Bytes]) -> NapiAsyncIterator[Bytes] ra
 pub fn digest(input : NapiUint8Array) -> Map[String, (UInt, Float)] {
   let mut sum = 0U
   for byte in input.to_array() { sum += byte.to_uint() }
-  { "__proto__": (sum, input.length().to_float()) }
+  { "__proto__": (sum, Float::from_int(input.length())) }
 }

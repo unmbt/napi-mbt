@@ -14,7 +14,7 @@ fn main {
         "-fPIC"
       },
       "NAPI_LINK_FLAGS": if windows {
-        "/LD \"./.napi-mbt/napi.lib\""
+        "/DLL \"./.napi-mbt/napi.lib\""
       } else {
         "-shared -fPIC"
       },

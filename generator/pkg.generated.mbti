@@ -6,7 +6,7 @@ pub fn parse_source(String, String) -> ParsedSource raise
 
 pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig]) -> ParsedSource raise
 
-pub fn render(ParsedSource, String, Int, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String]) -> Array[(String, String)] raise
+pub fn render(ParsedSource, String, Int32, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String]) -> Array[(String, String)] raise
 
 // Errors
 
@@ -22,11 +22,11 @@ pub(all) enum BinaryKind {
 
 pub(all) enum BindingKind {
   FunctionBinding
-  ConstructorBinding(Int)
-  MethodBinding(Int)
-  StaticBinding(Int)
-  GetterBinding(Int)
-  SetterBinding(Int)
+  ConstructorBinding(Int32)
+  MethodBinding(Int32)
+  StaticBinding(Int32)
+  GetterBinding(Int32)
+  SetterBinding(Int32)
 }
 
 pub(all) struct ClassConfig {
@@ -55,7 +55,7 @@ pub(all) struct Parameter {
 }
 
 pub(all) struct ParsedClass {
-  id : Int
+  id : Int32
   name : String
   type_name : String
   construct : ParsedExport
@@ -71,7 +71,7 @@ pub(all) struct ParsedExport {
   throws : Bool
   is_async : Bool
   filename : String
-  line : Int
+  line : Int32
   binding : BindingKind
   documentation : Array[String]
 }
@@ -90,7 +90,7 @@ pub(all) struct TypeDefinition {
   name : String
   shape : TypeShape
   filename : String
-  line : Int
+  line : Int32
   documentation : Array[String]
 }
 pub fn TypeDefinition::manifest(Self) -> Json
@@ -121,7 +121,7 @@ pub(all) enum ValueType {
   MapType(ValueType)
   TupleType(Array[ValueType])
   NamedType(String)
-  ClassType(String, String, Int)
+  ClassType(String, String, Int32)
   CallbackType(Array[ValueType], ValueType, Bool)
 }
 pub fn ValueType::runtime_name(Self) -> String

@@ -27,7 +27,21 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
   } else {
     overlay
   }
-  write_text_file(path, overlay)
+  write_text_file(path, foreign_library_executable_overlay(overlay))
+  for file in @fs.readdir(dir, sort=true) {
+    if file.has_suffix(".mbt") {
+      let source_path = dir + "/" + file
+      let source = read_text(source_path)
+      let stripped = strip_export_name_attributes(source)
+      if stripped != source {
+        write_text_file(source_path, stripped)
+      }
+    }
+  }
+  // An executable package needs a main entry point. This source is written
+  // only to the isolated workspace and is never installed into the user's
+  // project or included in generated outputs; a loaded addon never calls it.
+  write_text_file(dir + "/napi_mbt_main.mbt", "///|\nfn main { }\n")
   // Reference the registration translation unit from MoonBit initialization,
   // so the native linker pulls it from the package's stub archive.
   write_text_file(

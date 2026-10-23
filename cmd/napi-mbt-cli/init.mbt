@@ -89,8 +89,8 @@ async fn initialize(
     #|      - uses: actions/checkout@v4
     #|      - uses: hustcer/setup-moonbit@v1
     #|        with:
-    #|          version: '0.10.15+943464bfa'
-    #|          core-version: '0.10.15+943464bfa'
+    #|          version: '0.10.17+093cb8f9c'
+    #|          core-version: '0.10.17+093cb8f9c'
     #|      - run: moon install unmbt/napi-mbt/cmd/napi-mbt-cli
     #|      - run: napi-mbt-cli build --release
     #|      - uses: actions/setup-node@v4
