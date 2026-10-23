@@ -31,10 +31,19 @@ async fn main {
     @process.collect_output(binary, ["build", project, "--release"], cwd=root)
   })
   assert_eq(js_code, 0, msg=js_out.text() + js_err.text())
-  let package_text = @fs.read_file(project + "/moon.pkg").text().replace_all(
-    old="\"exports\": [],",
-    new="\"exports\": [\"read\", \"write\"],",
-  )
+  let raw_pkg = @fs.read_file(project + "/moon.pkg").text()
+  let package_text = raw_pkg
+    .replace_all(
+      old="\"exports\": [ ],",
+      new="\"exports\": [\"read\", \"write\"],",
+    )
+    .replace_all(
+      old="\"exports\": [],",
+      new="\"exports\": [\"read\", \"write\"],",
+    )
+  if package_text == raw_pkg {
+    fail("Failed to inject exports into moon.pkg")
+  }
   @fs.write_file(project + "/moon.pkg", package_text)
   let (code, out, err) = @async.with_timeout(180000, () => {
     @process.collect_output(binary, ["build", project, "--release"], cwd=root)
