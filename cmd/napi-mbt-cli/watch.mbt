@@ -32,6 +32,13 @@ async fn watch_package_identity(dir : String) -> String {
 }
 
 ///|
+async fn watch_input_snapshot(dir : String, excluded : Array[String]) -> String {
+  stable_json(input_snapshot(dir, excluded)) catch {
+    error => "error:" + error.to_string()
+  }
+}
+
+///|
 async fn watch_build(
   dir : String,
   release : Bool,
@@ -41,9 +48,10 @@ async fn watch_build(
 ) -> Unit {
   let dir = @fs.realpath(dir).replace_all(old="\\", new="/")
   // Resolve the output before constructing the watcher, including '..' and links.
-  let out = output_path(dir, output)
-  mkdirp(out)
-  let out = @fs.realpath(out).replace_all(old="\\", new="/")
+  let out_path = output_path(dir, output)
+  mkdirp(out_path)
+  let excluded = [@fs.realpath(out_path)]
+  let out = excluded[0].replace_all(old="\\", new="/")
   if out == dir {
     fail("Watch output directory must not be the project root")
   }
@@ -61,16 +69,32 @@ async fn watch_build(
   )
   defer watcher.close()
   let mut identity = watch_package_identity(dir) catch { _ => "invalid" }
+  let mut last_snapshot = ""
   let mut dirty = true
   while true {
     if dirty {
       eprintln("[napi-mbt] watch: building")
-      build(dir, release, false, target, output_directory=output, no_cache~) catch {
-        error =>
-          eprintln(
-            "[napi-mbt] watch: build failed; keeping last successful artifact\n" +
-            error.to_string(),
-          )
+      while true {
+        let snapshot_before = watch_input_snapshot(dir, excluded)
+        let mut retry = false
+        build(dir, release, false, target, output_directory=output, no_cache~) catch {
+          error => {
+            let message = error.to_string()
+            if message.contains("Project inputs changed during build") ||
+              watch_input_snapshot(dir, excluded) != snapshot_before {
+              retry = true
+            } else {
+              eprintln(
+                "[napi-mbt] watch: build failed; keeping last successful artifact\n" +
+                message,
+              )
+            }
+          }
+        }
+        if !retry {
+          last_snapshot = watch_input_snapshot(dir, excluded)
+          break
+        }
       }
       eprintln("[napi-mbt] watch: waiting for changes")
       dirty = false
@@ -94,6 +118,9 @@ async fn watch_build(
           dirty = true
         }
       }
+    }
+    if dirty && watch_input_snapshot(dir, excluded) == last_snapshot {
+      dirty = false
     }
   }
 }

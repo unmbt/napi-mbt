@@ -80,6 +80,7 @@ static napi_mbt_environment *napi_mbt_active = NULL;
 static bool napi_mbt_initialized = false;
 static int napi_mbt_environment_count = 0;
 static int napi_mbt_resource_count = 0;
+extern void moonbit_runtime_init(int argc, char **argv);
 extern void moonbit_init(void);
 
 static void napi_mbt_unlink_resource(napi_mbt_resource *resource) {
@@ -196,7 +197,13 @@ int napi_mbt_enter(napi_env env, void **previous) {
     }
     *previous = napi_mbt_active;
     napi_mbt_active = owner;
-    if (!napi_mbt_initialized) { moonbit_init(); napi_mbt_initialized = true; }
+    if (!napi_mbt_initialized) {
+        /* Since MoonBit 0.10.17 the addon is linked from an executable package,
+         * whose moonbit_init leaves runtime initialization to main. */
+        moonbit_runtime_init(0, 0);
+        moonbit_init();
+        napi_mbt_initialized = true;
+    }
     if (owner) napi_mbt_flush_resources(owner);
     return napi_ok;
 }

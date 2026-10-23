@@ -72,6 +72,41 @@ test "package overlay preserves user fields flags exports and stubs" {
 }
 
 ///|
+test "package overlay uses a linker DLL flag on Windows" {
+  let output = build_package_overlay(
+    "link(native(\"cc-link-flags\": \"\"))",
+    [],
+    4,
+    true,
+  )
+  assert_eq(
+    package_value(output, native_block(output), "cc-link-flags"),
+    Some("\"/DLL \\\"./.napi-mbt/napi.lib\\\"\""),
+  )
+}
+
+///|
+test "foreign-library fallback preserves the package overlay" {
+  let input = "// keep this comment\npkgtype(kind: \"foreign_library\")\noptions(link: {\"native\": {\"cc-link-flags\": \"-shared\"}})"
+  let output = foreign_library_executable_overlay(input)
+  assert_true(output.has_prefix("// keep this comment\n"))
+  let open = package_call(package_tokens(output), "pkgtype").unwrap()
+  assert_eq(package_value(output, open, "kind"), Some("\"executable\""))
+  assert_true(output.contains("cc-link-flags"))
+  let source = "// #export_name(\"comment\")\nlet s = \"#export_name(\\\"literal\\\") 🌙\"\n#export_name(\"add\")\npub fn add(a : Int, b : Int) -> Int {\n  a + b\n}\n"
+  let stripped = strip_export_name_attributes(source)
+  assert_true(stripped.contains("// #export_name(\"comment\")"))
+  assert_true(
+    stripped.contains("let s = \"#export_name(\\\"literal\\\") 🌙\""),
+  )
+  assert_true(!stripped.contains("#export_name(\"add\")"))
+  assert_eq(
+    stripped.split("\n").to_array().length(),
+    source.split("\n").to_array().length(),
+  )
+}
+
+///|
 test "package overlay accepts native DSL and rejects conflicting NAPI flags" {
   let input = "link(native(\"stub-cc-flags\": \"-DKEEP=42\", exports: [\"keep\"]))"
   let output = build_package_overlay(input, ["moonbit_init"], 4, true)
