@@ -4,17 +4,11 @@ fn watch_ignored(path : String, output : String) -> Bool {
     return true
   }
   for part in path.split("/") {
-    if [
-        ".git", ".codegraph", ".napi-mbt", ".moonagent", "_build", "target", "node_modules",
-        "artifacts", "dist", "npm",
-      ].contains(part.to_owned()) {
+    if ignored_build_directories.contains(part.to_owned()) {
       return true
     }
   }
-  if [
-      "napi_exports.mbt", "napi_glue.c", "napi_manifest.json", "napi-mbt.schema.json",
-      "index.cjs", "index.mjs", "index.d.ts", "index.d.cts", "index.d.mts",
-    ].contains(path) {
+  if generated_input_files.contains(path) {
     return true
   }
   path.has_suffix(".mbti") ||

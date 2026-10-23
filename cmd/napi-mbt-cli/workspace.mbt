@@ -1,4 +1,11 @@
 ///|
+let ignored_build_directories : Array[String] = [
+  ".git", ".github", ".githooks", ".codegraph", ".napi-mbt", ".moonagent", ".vscode",
+  ".idea", "_build", "target", "node_modules", "artifacts", "dist", "npm", "licenses",
+  "docs", "napi-rs", "packages",
+]
+
+///|
 async fn copy_build_workspace(
   source : String,
   destination : String,
@@ -16,10 +23,7 @@ async fn copy_build_workspace(
   parents.push(canonical)
   mkdirp(destination)
   for name in @fs.readdir(source, sort=true) {
-    if [
-        ".git", ".codegraph", ".napi-mbt", ".moonagent", "_build", "target", "node_modules",
-        "artifacts", "dist", "npm",
-      ].contains(name) {
+    if ignored_build_directories.contains(name) {
       continue
     }
     let src = source + "/" + name

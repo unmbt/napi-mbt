@@ -16,3 +16,7 @@ npm/
 *.tar.gz
 /napi-rs/
 /licenses/
+.vscode/
+.idea/
+packages/
+

@@ -83,10 +83,7 @@ async fn input_snapshot(dir : String, excluded : Array[String]) -> Json {
     let parents = ancestors.copy()
     parents.push(canonical)
     for name in @fs.readdir(path, sort=true) {
-      if [
-          ".git", ".codegraph", ".napi-mbt", ".moonagent", "_build", "target", "node_modules",
-          "artifacts", "dist", "npm", "licenses",
-        ].contains(name) {
+      if ignored_build_directories.contains(name) {
         continue
       }
       let key = relative + name

@@ -8,7 +8,9 @@
   "targets": [
     "win32-x64-msvc",
     "darwin-arm64",
-    "linux-x64-gnu"
+    "linux-x64-gnu",
+    "linux-arm64-gnu",
+    "linux-x64-musl"
   ],
   "cjs": true,
   "esm": true,

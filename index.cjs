@@ -67,8 +67,8 @@ if (fs.existsSync(local)) {
   let metadata;
   try { metadata = require(metadataPath); }
   catch (cause) { throw failure('ERR_NAPI_PACKAGE', 'Cannot load platform package metadata', cause); }
-  if (metadata.name !== packageName || metadata.version !== "0.1.1" || metadata.napiVersion !== requiredNapi || metadata.napiTarget !== target) {
-    throw failure('ERR_NAPI_PACKAGE_VERSION', 'Platform package metadata mismatch; expected ' + packageName + '@' + "0.1.1");
+  if (metadata.name !== packageName || metadata.version !== "0.2.1" || metadata.napiVersion !== requiredNapi || metadata.napiTarget !== target) {
+    throw failure('ERR_NAPI_PACKAGE_VERSION', 'Platform package metadata mismatch; expected ' + packageName + '@' + "0.2.1");
   }
   attemptedPaths.push(packageName);
   try { addon = require(packageName); }
