@@ -56,22 +56,35 @@ async fn initialize(
     "\n"
   files["moon.mod"] = "name = " +
     Json(name.replace_all(old="@", new="")).stringify() +
-    "\nversion = \"0.1.0\"\npreferred_target = \"native\"\nsupported_targets = \"native\"\n"
+    "\n\nversion = \"0.1.0\"\n\npreferred_target = \"native\"\n\nsupported_targets = \"native\"\n"
   let moon_package =
-    #|import { "moonbitlang/core/encoding/utf8" }
+    #|import {
+    #|  "moonbitlang/core/encoding/utf8",
+    #|}
+    #|
     #|pkgtype(kind: "foreign_library")
+    #|
     #|options(
-    #|  "native-stub": ["stub.c", "napi_glue.c"],
-    #|  link: { "native": {
-    #|    "cc-flags": "",
-    #|    "stub-cc-flags": "",
-    #|    "cc-link-flags": "",
-    #|    "exports": [],
-    #|  } },
+    #|  "native-stub": [ "stub.c", "napi_glue.c" ],
+    #|  link: {
+    #|    "native": {
+    #|      "cc-flags": "",
+    #|      "stub-cc-flags": "",
+    #|      "cc-link-flags": "",
+    #|      "exports": [ ],
+    #|    },
+    #|  },
     #|)
     #|
   files["moon.pkg"] = moon_package
-  files["lib.mbt"] = "///|\n#export_name(\"mbt_add\")\npub fn add(a : Int, b : Int) -> Int { a + b }\n"
+  let lib_mbt =
+    #|///|
+    #|#export_name("mbt_add")
+    #|pub fn add(a : Int32, b : Int32) -> Int32 {
+    #|  a + b
+    #|}
+    #|
+  files["lib.mbt"] = lib_mbt
   files[".gitignore"] = "_build/\n.mooncakes/\n.napi-mbt/\nartifacts/\nnode_modules/\n"
   files["test/smoke.cjs"] = "const assert = require('assert');\nconst addon = require('../index.cjs');\nassert.strictEqual(addon.mbt_add(2, 3), 5);\nconsole.log('napi-mbt template smoke test passed');\n"
   files["test/smoke.mjs"] = "import assert from 'assert';\nimport addon, { mbt_add } from '../index.mjs';\nassert.strictEqual(mbt_add(2, 3), 5);\nassert.strictEqual(addon.mbt_add, mbt_add);\n"
