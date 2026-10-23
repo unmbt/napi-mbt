@@ -14,6 +14,10 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   checked(binary, ["init", temp + "/project", "--name", "snapshot-fixture"])
   let dir = temp + "/project"
+  let workflow = @fs.read_file(dir + "/.github/workflows/build.yml").text()
+  assert_true(workflow.contains("GITHUB_PATH"))
+  assert_true(workflow.contains("if: runner.os != 'Windows'"))
+  assert_true(workflow.contains("if: runner.os == 'Windows'"))
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
   @fs.write_file(dir + "/lib.mbt", "///|\n#export_name(\"public_name\")\npub fn internal_name(a : Int32, text : String, flag : Bool, d : Double, data : Bytes, view : NapiBufferView) -> String raise { text }\n///|\n#export_name(\"noop\")\npub fn noop() -> Unit { () }\n")
   checked(binary, ["generate", dir])

@@ -105,6 +105,14 @@ async fn initialize(
     #|          version: '0.10.17+093cb8f9c'
     #|          core-version: '0.10.17+093cb8f9c'
     #|      - run: moon install unmbt/napi-mbt/cmd/napi-mbt-cli
+    #|      - name: Add Moon binaries to PATH (Unix)
+    #|        if: runner.os != 'Windows'
+    #|        shell: bash
+    #|        run: echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+    #|      - name: Add Moon binaries to PATH (Windows)
+    #|        if: runner.os == 'Windows'
+    #|        shell: pwsh
+    #|        run: echo "$env:USERPROFILE\.moon\bin" >> $env:GITHUB_PATH
     #|      - run: napi-mbt-cli build --release
     #|      - uses: actions/setup-node@v4
     #|        with: { node-version: '${{ matrix.node }}' }
