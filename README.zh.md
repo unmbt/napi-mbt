@@ -24,7 +24,7 @@
 你无需手写繁琐的 C/C++ 胶水代码，`napi-mbt` 内置了基于 Tree-sitter 的 MoonBit 语法分析器，能够自动为你完成：
 
 - **生成原生 Node-API C 胶水层**：内置严格的边界参数校验与确定性的资源生命周期管理
-- **编译 `.node` 原生动态库**：驱动 `moon build --target native` 与 CMake，调用宿主 C 编译器（MSVC / GCC / Clang）完成构建
+- **编译 `.node` 原生动态库**：驱动 `moon build --target native` 配合宿主 C 工具链（MSVC / GCC / Clang）完成构建与链接
 - **生成双模式 JS 加载器**：同时产出 CommonJS（`index.cjs`）与 ES Module（`index.mjs`）入口
 - **生成严格 TypeScript 类型声明**：自动输出与 MoonBit 函数签名和类型定义一一对应的 `index.d.ts`
 - **生成跨平台 npm 发布清单**：支持按平台拆分的 `optionalDependencies` 预编译二进制包结构
@@ -37,11 +37,11 @@
 
 | 核心能力 | 特性说明 |
 | :--- | :--- |
-| 🎯 **零样板代码导出** | 直接分析 MoonBit 源码中的 `pub fn`、`pub async fn`、`pub struct` 与 `pub enum` 并生成绑定；仅具状态的原生类需要显式添加 `// napi:class` 标记。 |
+| 🎯 **直接导出** | 使用 `#export_name("...")` 导出 `pub fn` 与 `pub async fn`，并直接导出拥有所有权的 `pub struct` 与 `pub enum` 值类型；原生类在 `napi-mbt.json` 中集中配置。 |
 | 🛡️ **严格边界校验** | 在进入 MoonBit 逻辑前的 C 边界层直接拦截 `NaN`、`±Infinity`、传给整数参数的小数、超出 32/64 位范围的数值以及非法 UTF-16 / Buffer 输入。 |
-| ⚡ **全栈异步与并发能力** | 原生支持可取消的 `pub async fn` Promise（基于 `moonbitlang/async@0.22.4` + libuv）、C 线程池任务（`NapiTask`）、隔离的 MoonBit 进程池（`NapiWorker`）、等待 JS Promise（`NapiJsPromise`）以及按需拉取的异步流（`NapiAsyncIterator`）。 |
-| 🧱 **安全的原生类与回调** | 原生类（`NapiClass[T]`）支持构造函数、静态工厂、读写属性、实例方法以及显式 `.dispose()` / `Symbol.dispose`；回调函数（`NapiCallback`）同时支持同步借用调用与跨线程安全持久化（Threadsafe Function）。 |
-| 🔒 **非侵入式隔离构建** | 所有中间产物均在 `.napi-mbt/build/` 隔离目录中合成与编译，绝不污染用户源码树；内置内容哈希增量缓存、`watch` 监听模式与原生符号冲突检查（`nm` / `dumpbin`）。 |
+| ⚡ **全栈异步与并发能力** | 原生支持可取消的 `pub async fn` Promise（基于 `moonbitlang/async@0.22.4` + libuv 与 `AbortSignal`）、C 线程池任务（`nativeTasks`）、隔离的 MoonBit 进程池（`workerTasks`）、等待 JS Promise（`NapiJsPromise`）以及按需拉取的异步流（`NapiAsyncIterator`）。 |
+| 🧱 **安全的原生类与回调** | 原生类支持构造函数、静态工厂、读写属性、实例方法以及显式幂等的 `.dispose()`；回调函数支持强类型 MoonBit 签名 `(Args) -> Ret raise`、带 `.dispose()` 的返回闭包与线程安全函数（`NapiCallback`）。 |
+| 🔒 **非侵入式隔离构建** | 所有中间产物均在隔离工作区中合成与编译，绝不污染用户源码树；内置内容哈希增量缓存、监听模式（`--watch`）与原生符号冲突检查（`nm` / `dumpbin`）。 |
 | 📦 **精准 ABI 与引擎范围** | 默认面向 **N-API v4**，仅在使用 `BigInt`、`Bytes`/`BufferView` 或异步运行时等高阶特性时按需提升至对应 N-API 版本（最高 v8），并自动计算精确的 `package.json` `engines.node` 范围。 |
 
 ---
@@ -103,11 +103,10 @@ napi-mbt-cli init my-addon
 cd my-addon
 moon update
 moon check
-napi-mbt-cli check
 napi-mbt-cli build
 ```
 
-新生成的项目会在 `moon.mod` 中声明 `"preferred_target": "native"` 并依赖 `unmbt/napi-mbt`，默认目标为 **N-API 4** 且同时开启 CommonJS 与 ESM 加载器。
+新生成的项目会在 `moon.mod` 中声明 `"preferred_target": "native"`，默认目标为 **N-API 4** 且同时开启 CommonJS 与 ESM 加载器。
 
 ### 3. 编写 MoonBit 并在 JS / TS 中调用
 
@@ -115,18 +114,16 @@ napi-mbt-cli build
 
 ```moonbit
 ///|
-pub struct Summary {
+pub(all) struct Summary {
   label : String
   total : Int
 }
 
 ///|
+#export_name("summarize")
 pub fn summarize(label : String, values : Array[Int]) -> Summary raise {
   if label.is_empty() {
-    raise @napi.NapiError::invalid_arg(
-      message="label must not be empty",
-      code="EMPTY_LABEL",
-    )
+    fail("label must not be empty")
   }
   let mut total = 0
   for v in values {
@@ -156,46 +153,48 @@ console.log(summarize('orders', [10, 20, 30]));
 | :--- | :--- | :--- |
 | `Int`, `UInt` | `number` | 严格校验 32 位有符号（`[-2^31, 2^31 - 1]`）与无符号（`[0, 2^32 - 1]`）整数；拒绝 `NaN`、`±Infinity` 与小数。 |
 | `Int64`, `UInt64` | `bigint` | 严格校验 64 位有符号/无符号 `BigInt`（`N-API 6`）；拒绝超出 64 位表示范围的值。 |
-| `Double`, `Bool`, `Unit` | `number`, `boolean`, `void` | `Double` 要求有限 IEEE-754 浮点数（拒绝 `NaN` 与 `±Infinity`）。 |
+| `Double`, `Float`, `Bool`, `Unit` | `number`, `boolean`, `void` | 完整保留 IEEE-754 浮点数值（包含 `NaN` 与 `±Infinity`）。 |
 | `String` | `string` | 直接在 UTF-16 字符串之间桥接，避免多余的 UTF-8 中间转码。 |
 | `Bytes` | `Buffer` | 跨边界拥有所有权的字节拷贝（`N-API 7`），可安全持久化或在异步函数中返回。 |
-| `@napi.NapiBufferView` | `Buffer \| Uint8Array` | 零拷贝同步只读借用（`N-API 7`），仅在当前同步调用栈帧内有效。 |
-| `@napi.NapiUint8Array` / `NapiInt32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | `Uint8Array` / `Int32Array` / `Float64Array` / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝，完整保留元素长度。 |
+| `NapiBufferView` | `Buffer` | 零拷贝同步只读借用（`N-API 7`），仅在当前同步调用栈帧内有效。 |
+| `NapiUint8Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | `Uint8Array` / `Int32Array` / `Uint32Array` / `Float32Array` / `Float64Array` / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝，完整保留元素长度。 |
 | `T?`, `Array[T]`, `Map[String, T]`, `(A, B, ...)`, `Json` | `T \| null`, `Array<T>`, `Record<string, T>`, `[A, B, ...]`, `JsonValue` | 递归结构化校验；`Option::None` 输出为 `null`（输入同时接受 `null` 或 `undefined`）。 |
-| `pub struct` / `pub enum` | Object / 判别联合类型 | 结构体映射为强类型 JS 对象；枚举映射为 `{ tag: "Variant", ... }` 判别联合。 |
-| `// napi:class` + `@napi.NapiClass[T]` | 带 `dispose()` 与 `[Symbol.dispose]()` 的 `class` | 原生对象句柄封装，支持构造函数、静态工厂、属性读写、实例方法与确定性释放。 |
-| `@napi.NapiCallback[Args, Ret]` | `(...args) => Ret` | 支持同步调用期借用以及通过 `.clone()` 持久化的线程安全函数（`N-API 4`）。 |
-| `pub async fn(...) -> T raise` | `Promise<T>`（支持 `.cancel()` 与 `{ signal }`） | 运行于内嵌的 `moonbitlang/async@0.22.4` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
-| `@napi.NapiJsPromise[T]` | `Promise<T> \| PromiseLike<T>` | 在 MoonBit `async fn` 中直接等待 JavaScript Promise 或 thenable 并校验返回值类型。 |
-| `@napi.NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` 与 `ReadableStream<T>` | 按需驱动的异步流输入与输出，支持背压控制与消费端提前终止（`return()`）。 |
-| `@napi.NapiTask` / `@napi.NapiWorker` | `Promise<T>` / Worker 进程池类 | 将 C 计算任务卸载至 libuv 线程池（`NapiTask`），或将纯 MoonBit 计算放入隔离的 Node 子进程池（`NapiWorker`）。 |
+| `pub struct` / `pub enum` | Object / 判别联合类型 | 结构体映射为强类型 JS 对象；枚举映射为构造器名称字符串或 `{ tag: "Variant", args: [...] }` 判别联合。 |
+| 配置类 (`napi-mbt.json`) | 带 `dispose()` 的 `class` | 原生对象句柄封装，支持构造函数、静态工厂、属性读写、实例方法与确定性释放。 |
+| `(Args) -> Ret raise` / `NapiCallback` | `(...args) => Ret` | 支持同步调用期借用、带 `dispose()` 的返回闭包以及线程安全函数（`N-API 4`）。 |
+| `pub async fn(...) -> T` | `Promise<T>`（支持 `{ signal?: AbortSignal }`） | 运行于内嵌的 `moonbitlang/async@0.22.4` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
+| `NapiJsPromise[T]` | `Promise<T>` | 在 MoonBit `async fn` 中直接等待 JavaScript Promise 并校验返回值类型。 |
+| `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` 与 `ReadableStream<T>` | 按需驱动的异步流输入与输出，支持背压控制与消费端提前终止（`return()`）。 |
+| `nativeTasks` / `workerTasks` (`napi-mbt.json`) | `Promise<T>` / Worker 进程池 | 将 C 计算任务卸载至 libuv 线程池（`nativeTasks`），或将纯 MoonBit 计算放入隔离的 Node 子进程池（`workerTasks`）。 |
 
 ---
 
 ## 🛠️ CLI 命令参考
 
 ```text
-napi-mbt-cli <command> [project-dir] [options]
+napi-mbt-cli <command> [directory] [options]
 ```
 
 | 子命令 | 功能说明 |
 | :--- | :--- |
-| `init <dir>` | 初始化新的 MoonBit 原生扩展项目（支持 `--name <pkg>`、`--napi-version <1..8>`、`--no-cjs`、`--no-esm`）。 |
-| `check [dir]` | 在不执行完整编译的情况下校验 `napi-mbt.json`、MoonBit 导出签名、N-API 版本要求与宿主工具链。 |
-| `generate [dir]` | 在项目根目录生成 `index.cjs`、`index.mjs`、`index.d.ts`，并在 `.napi-mbt/generated/` 下生成 C/MoonBit 胶水代码。 |
-| `build [dir]` | 在 `.napi-mbt/build/` 隔离目录运行 `moon build --target native` 与 CMake，产出 `.node` 与加载器（`--debug`、`--release`、`--clean`）。 |
-| `watch [dir]` | 监听源码与配置变更并自动增量重建（支持 `--once` 单次验证模式）。 |
-| `doctor [dir]` | 诊断宿主 MoonBit、CMake、C/C++ 编译器、链接器及可选的 Node/npm 环境（支持 `--json`）。 |
-| `npm-packages [dir]` | 生成多平台 npm 子包目录（`npm/<platform>/`）并更新根 `optionalDependencies`（支持 `--stage-prebuilds`）。 |
-| `prepublish [dir]` | 校验已暂存的各平台二进制、ELF/PE/Mach-O 头部信息，并支持运行 `npm pack --dry-run`（`--verify-pack`）。 |
-| `version` | 输出当前 `napi-mbt-cli` 版本信息（支持 `--json`）。 |
+| `init <dir>` | 创建官方扩展工程模板（支持 `--name <pkg>`、`--force`）。 |
+| `generate [dir]` | 生成 Node-API 绑定与加载器（支持 `--check` 仅检查不写入）。 |
+| `build [dir]` | 在隔离工作区中构建原生扩展（`--release`、`--watch`、`--no-cache`、`--dry-run`、`--verbose`、`--target <t>`、`--output-dir <p>`）。 |
+| `clean [dir]` | 清理当前工程的持久增量构建缓存（`--cache`）。 |
+| `doctor [dir]` | 检查宿主 C 编译器、链接器与平台 SDK 环境（支持 `--json`）。 |
+| `prepublish [dir]` | 校验发布产物并准备各平台 npm 包元数据（`--target <t>`）。 |
+| `targets` | 列出支持的宿主目标三元组。 |
+
+通用选项：
+- `--help`, `-h`: 输出帮助信息。
+- `--version`, `-V`: 输出 CLI 版本信息。
 
 ### 隔离构建流水线工作原理
 
-1. **源码与导出分析**：`napi-mbt-cli` 解析项目 `.mbt` 源码与 `napi-mbt.json`，校验导出签名并推导所需的最低 N-API 版本。
-2. **非侵入式工作区合成**：在 `.napi-mbt/build/` 下合成独立的构建工作区，绝不修改用户源码树。
-3. **原生编译与链接**：调用 `moon build --target native` 生成原生静态库/目标产物，再由 CMake 将其与生成的 `napi_exports.c`、内嵌的 `node-api-headers` 以及（按需启用的）`moonbitlang/async` libuv 桥接层链接为 `.node` 动态库。
-4. **符号检查与加载器输出**：使用 `nm` / `dumpbin` 检查导出符号以防止与 C 运行时符号冲突，随后将 `.node` 产物、`index.cjs`、`index.mjs` 与 `index.d.ts` 输出到项目目录。
+1. **源码与导出分析**：`napi-mbt-cli` 解析项目 `.mbt` 源码（`#export_name`）与 `napi-mbt.json`，校验导出签名并推导所需的最低 N-API 版本。
+2. **非侵入式工作区合成**：在 `.napi-mbt/cache/`（或临时目录）中合成独立的构建工作区，绝不修改用户源码树。
+3. **原生编译与链接**：调用 `moon build --target native` 生成原生目标产物，链接生成的 Node-API C 胶水层（`napi_glue.c`）、内嵌的 `node-api-headers` 以及（按需启用的）`moonbitlang/async` libuv 桥接层。
+4. **符号检查与加载器输出**：使用 `nm` / `dumpbin` 检查导出符号以防止与 C 运行时符号冲突，随后将 `.node` 产物安装到构件目录，并输出 `index.cjs`、`index.mjs` 与 `index.d.ts`。
 
 ---
 
@@ -219,12 +218,12 @@ napi-mbt-cli <command> [project-dir] [options]
 | :--- | :--- |
 | [`examples/hello-addon`](examples/hello-addon) | CJS/ESM 双模式导入与严格的标量边界校验 |
 | [`examples/structured-data`](examples/structured-data) | 嵌套 `struct` / `enum` 结构、`Option`、`Array`、`Map` 与 `Json` |
-| [`examples/native-class`](examples/native-class) | 具状态 `// napi:class` 原生类、属性读写、静态工厂与 `Symbol.dispose` |
+| [`examples/native-class`](examples/native-class) | `napi-mbt.json` 中配置的原生类句柄、属性读写、静态工厂与 `.dispose()` |
 | [`examples/callbacks`](examples/callbacks) | 同步借用回调、持久化线程安全回调与 JS 异常传播 |
 | [`examples/async-file`](examples/async-file) | `pub async fn` 原生文件 I/O、`AbortSignal` 取消与异常恢复 |
 | [`examples/binary-processing`](examples/binary-processing) | 拥有所有权的 `Bytes`（`Buffer`）对比零拷贝同步借用 `NapiBufferView` 与 TypedArray |
-| [`examples/native-tasks`](examples/native-tasks) | C 线程池任务（`NapiTask`）、任务取消以及与 MoonBit `async fn` 组合调用 |
-| [`examples/worker-tasks`](examples/worker-tasks) | 在隔离的 Node 子进程池中运行纯 MoonBit 密集计算任务（`NapiWorker`） |
+| [`examples/native-tasks`](examples/native-tasks) | C 线程池任务（`nativeTasks`）、任务取消以及与 MoonBit `async fn` 组合调用 |
+| [`examples/worker-tasks`](examples/worker-tasks) | 在隔离的 Node 子进程池中运行纯 MoonBit 密集计算任务（`workerTasks`） |
 | [`examples/streams`](examples/streams) | `NapiAsyncIterator` 异步流输入/输出、背压控制、提前取消与 Web `ReadableStream` |
 
 你可以将任意示例一键物化到独立目录中构建并运行测试：
