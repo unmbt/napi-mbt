@@ -27,6 +27,7 @@ pub fn NapiSymbol::new(
 }
 
 ///|
+#warnings("-unused_value")
 fn get_NapiSymbol(
   env : NapiEnv,
   value : NapiValue,
@@ -45,6 +46,7 @@ fn get_NapiSymbol(
 }
 
 ///|
+#warnings("-unused_value")
 fn set_NapiSymbol(
   env : NapiEnv,
   value : NapiSymbol,

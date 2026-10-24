@@ -63,6 +63,7 @@ extern "c" fn napi_iterator_factory(
 ) -> Int32 = "napi_mbt_iterator_factory"
 
 ///|
+#warnings("-unused_value")
 fn[T] get_NapiIterator(
   env : NapiEnv,
   value : NapiValue,
@@ -116,6 +117,7 @@ fn[T] get_NapiIterator(
 }
 
 ///|
+#warnings("-unused_value")
 fn[T] set_NapiIterator(
   env : NapiEnv,
   value : NapiIterator[T],
