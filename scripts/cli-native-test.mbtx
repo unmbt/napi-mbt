@@ -72,6 +72,14 @@ async fn main {
   let install_dir = temp + "/installed"
   ignore(checked("moon", ["install", "./cmd/napi-mbt-cli", "--bin", install_dir], root, env))
   let installed = install_dir + (if @env.get_env_var("OS") == Some("Windows_NT") { "/napi-mbt-cli.exe" } else { "/napi-mbt-cli" })
+  if @env.get_env_var("OS") != Some("Windows_NT") {
+    let named_dir = temp + "/named project 空格"
+    ignore(checked(installed, ["init", named_dir, "--name", "named-fixture"], temp, env))
+    let old_path = env["PATH"]
+    env["PATH"] = install_dir + ":" + old_path
+    ignore(checked("napi-mbt-cli", ["build", named_dir, "--release"], temp, env))
+    env["PATH"] = old_path
+  }
   for (label, executable) in [("release", binary), ("installed", installed)] {
     let dir = temp + "/" + label + " project 空格"
     println("Testing \{label} CLI outside the repository")

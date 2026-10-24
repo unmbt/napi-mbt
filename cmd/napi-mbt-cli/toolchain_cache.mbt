@@ -1,4 +1,14 @@
 ///|
+async fn executable_path() -> String {
+  let executable = @env.args()[0]
+  if executable.contains("/") || executable.contains("\\") {
+    @fs.realpath(executable)
+  } else {
+    require_command(executable)
+  }
+}
+
+///|
 async fn toolchain_signature(
   dir : String,
   builder : String,
@@ -17,7 +27,7 @@ async fn toolchain_signature(
     require_command("moon"),
     require_command("moonc"),
     require_command("cmake"),
-    @fs.realpath(@env.args()[0]),
+    executable_path(),
   ]
   if report is { "compiler": { "path": String(path), .. }, .. } {
     paths.push(path)
