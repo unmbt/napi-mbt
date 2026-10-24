@@ -22,6 +22,7 @@ async fn check(path : String) -> Unit {
 ///|
 async fn visit(directory : String) -> Unit {
   for name in @fs.readdir(directory) {
+    if name.has_prefix(".") || name == "_build" || name == "node_modules" { continue }
     let path = directory + "/" + name
     if @fs.kind(path) == Directory { visit(path) }
     else if name.has_suffix(".md") { check(path) }
@@ -35,5 +36,6 @@ async fn main {
   }
   visit(".githooks")
   visit("docs")
+  visit("examples")
   println("Documentation links and removed-tool checks passed")
 }

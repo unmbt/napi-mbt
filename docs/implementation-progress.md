@@ -105,6 +105,6 @@ and sanitizer results are reported only when actually executed.
   publication or release tag is part of this change.
 - Step 15: low-level JS handles, External/zero-copy memory, DataView and BigInt
   typed arrays, N-API 8/9/10 helpers and encoded typed TSFN passed generator
-  snapshots, native consumers, Linux/Windows ASan, all seven native profiles,
+  snapshots, native consumers, Linux/Windows ASan, four hosted native profiles,
   Node 22/24/26 and minimum-version consumers. No release publication is part
   of this change.

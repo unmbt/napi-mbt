@@ -1,5 +1,9 @@
 # 原生线程与 TSFN
 
+在 MoonBit 所属线程使用 typed 队列包装时，参考[高级示例](../../examples/advanced-api/README.md)
+和[typed API 指南](advanced-api.md#高层-typed-tsfn)。编码器是 `call` 同步执行的
+MoonBit 闭包，不能在任意原生线程运行；下方 C fixture 才是原生线程生产者示例。
+
 底层 Threadsafe Function API 继续使用 N-API 4。后台线程只传递 C 拥有的数据，
 不访问 MoonBit 对象、引用计数或 JS 句柄；JS 转换和回调只能在所属 Node 线程执行。
 关闭时 Node 可能以 `env == NULL` 调用清理回调，此时仍须释放队列中的 C payload。

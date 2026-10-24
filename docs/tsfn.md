@@ -1,5 +1,10 @@
 # Native threads and Threadsafe Functions
 
+For the owner-thread typed queue wrapper, use the [advanced addon example](../examples/advanced-api/README.md)
+and [typed API guide](en/advanced-api.md#typed-tsfn). Its encoder is a MoonBit
+closure executed synchronously by `call`; that wrapper cannot run on arbitrary
+native producer threads. The C fixture below demonstrates actual native threads.
+
 The existing low-level TSFN API requires N-API 4. A producer thread may pass
 C-owned payloads through `napi_call_threadsafe_function`; it must not access
 MoonBit objects, reference counts or JS handles. Convert values and invoke JS

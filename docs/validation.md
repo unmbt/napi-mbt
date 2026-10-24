@@ -219,15 +219,31 @@ Mooncake archive extraction/checking and artifact uploads. `Release archives`
 was correctly skipped because this was a branch push, not a version tag. That
 historical run does not establish GitHub Release or registry publication and did
 not include Linux ARM64 or macOS x64 in its release matrix; the current PR's
-seven-profile result is recorded below.
+advanced-API validation is recorded below.
 
 ## Low-level and advanced API PR confirmation
 
 On 2026-10-24, [PR #4](https://github.com/unmbt/napi-mbt/pull/4) passed the full
 hosted matrix for the low-level JS, External/zero-copy, extended binary,
 N-API 8/9/10 and encoded typed-TSFN changes. The run included native gates for
-all seven target profiles, Node 22/24/26 consumers, Node 10/12 minimum consumers,
+four host profiles (Windows x64, Linux glibc x64/arm64 and macOS arm64),
+Node 22/24/26 consumers, Node 10/12 minimum consumers,
 latest-MoonBit compatibility, and Linux/Windows memory jobs. Local checks also
 passed the generator and structured snapshots, owned-binary Node consumer, and
 the structured ASan fixture. The PR did not publish a release or registry
 artifact.
+
+## Runnable usage examples and lifetime regressions
+
+On 2026-10-24, the advanced example exposed bugs not covered by PR #4's fixtures:
+hidden-environment conversion, external finalizer hint handling, writable literal
+backing, UTF-16 SyntaxErrors/module filenames, DataView backing validation, and
+typed-TSFN rejected/shutdown payload cleanup. Regression assertions now live in
+the standalone example; the sanitizer runner includes `advanced-api`.
+
+Local Windows x64 / Node 26.4.0 validation passed strict native checking, all 64
+MoonBit tests, generator snapshots, owned-binary consumers, advanced runtime and
+NodeNext/Bundler consumers, and the advanced Windows ASan fixture. Windows ASan
+checks memory access, with leak detection disabled by the existing runner;
+Linux leak validation is provided by the CI memory job. These local results
+do not establish execution on other hosts.

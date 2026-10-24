@@ -14,7 +14,7 @@ The extension surface has four goals:
 2. provide explicit ownership choices for external memory and binary values;
 3. make Node-API 8, 9 and 10 additions available without weakening the default
    N-API 4 project baseline; and
-4. let producers send typed data through a threadsafe function without moving
+4. let owner-thread callers queue typed data through a threadsafe function without moving
    MoonBit objects or closures to a foreign thread.
 
 The generator still rejects generic exports, nested borrowed handles,
@@ -61,25 +61,35 @@ moon fmt
 | `NapiExternal` | Caller-owned `UnmanagedBuffer` pointer | N-API stores the pointer; `NapiExternal::new` does not free it |
 | external Buffer/ArrayBuffer/string | MoonBit `Bytes` plus a GC finalizer | C increments the Bytes reference and decrements it exactly once when V8 releases the value |
 | `NapiDataView` and owned typed arrays | MoonBit-owned copied data | No JS handle or backing pointer survives conversion; safe across async/worker boundaries |
-| typed TSFN payload | C heap allocation containing copied `Bytes` | Background code owns the allocation until JS callback or queue rejection frees it |
+| typed TSFN payload | C heap allocation containing copied `Bytes` | Queue owns accepted allocations; rejection, delivery or shutdown frees them |
 
 The external Buffer and ArrayBuffer helpers are intentionally explicit: JS can
 mutate their backing store, so callers must treat the supplied Bytes as shared
 external storage for the lifetime of the JS value. Use owned binary wrappers
 when MoonBit immutability or async persistence is required.
+Static Bytes literals are copied to writable memory before being exposed as
+Buffer/ArrayBuffer; dynamic backing retains zero-copy sharing. External strings
+are read-only through every alias, and Node may copy them. Finalizers use the
+owner record in `hint`, not the backing byte pointer in `data`, and release the
+retained Bytes exactly once on both copied-string and GC paths.
 
 ## Low-level JavaScript API
 
 `NapiObject`, `NapiFunction` and `NapiArray` are thin typed wrappers over
 `NapiValue`. They provide property get/set/has, data-property descriptors,
-own-key enumeration, calls, construction, prototypes, `instanceof`, strict
+enumerable-key enumeration, calls, construction, prototypes, `instanceof`, strict
 equality and value-kind checks. Handle scopes are explicit guards so cleanup is
 visible in MoonBit code.
+`NapiObject::keys` includes inherited keys; `napi_object_keys` selects own keys.
+The object-valued `prototype` wrapper currently rejects null prototypes.
 
 The wrappers never hide an environment. Methods take `NapiEnv` at the call
 site, which makes the thread and lifetime boundary reviewable. The generator
 allows these types only as direct parameters or returns; they cannot be nested
 in arrays, maps, structs, promises, streams, async functions or worker tasks.
+The adapter injects `NapiEnv` directly from its callback argument; it never
+passes an environment through a `NapiValue` converter. Low-level TypeScript
+outputs remain `unknown`/`object`/`unknown[]` and require narrowing.
 
 ## External and binary APIs
 
@@ -116,17 +126,21 @@ was not enabled.
 ## Typed TSFN data flow
 
 ```text
-producer thread -- encode(T) --> copied C payload -- queue --> JS callback
+MoonBit owner thread -- encode(T) --> copied C payload -- queue --> JS callback
                                                         |
                                                         +--> Buffer argument
 ```
 
 `NapiTypedThreadsafeFunction[T]` stores only the raw TSFN handle and an encoder.
-`call`/`try_call` encode on the producer side, copy the bytes to C-owned memory,
+`call`/`try_call` invoke the MoonBit encoder on the calling owner thread, copy the bytes to C-owned memory,
 and return `Accepted`, `QueueFull` or `Closing`. The owner-thread callback
 creates a Node Buffer and invokes JavaScript. `acquire`, `release` and `abort`
-map directly to the N-API producer-count lifecycle. No MoonBit closure, GC
-object or `NapiValue` crosses the worker boundary.
+map directly to the N-API producer-count lifecycle. Native threads must use the
+low-level TSFN API with C-owned data instead of this MoonBit wrapper/closure.
+Creation owns one count; abort releases one count. Closing ends the producer's
+ownership and prohibits further use. Blocking on a full queue from the owner
+thread can deadlock. Every non-ok enqueue status frees the rejected allocation;
+the drain callback frees queued payloads even with a null env/callback.
 
 ## Error and test contract
 
@@ -144,8 +158,17 @@ moon test --target native
 moon run scripts/sync-runtime.mbtx --check
 moon run scripts/generator-snapshot-test.mbtx <cli-path>
 moon run scripts/owned-binary-test.mbtx <cli-path>
+moon run scripts/advanced-api-test.mbtx <cli-path>
+moon run scripts/examples-test.mbtx
 moon run scripts/sanitizer-test.mbtx <release-cli-path>
 ```
 
-Hosted CI additionally builds the seven native profiles, Node 22/24/26
-consumers, minimum Node consumers, and Linux/Windows memory jobs.
+The advanced fixture reuses the standalone example and checks GC/process exit,
+literal writable fallback, Unicode/NUL errors, filename encoding, detached/shared
+DataViews, queue-full, abort and worker teardown. It is included in sanitizer
+runs. All standalone examples are built with a freshly packed/installed CLI and
+their TypeScript consumers checked under NodeNext and Bundler.
+
+Hosted CI currently builds four host profiles (Windows x64, Linux glibc x64/arm64
+and macOS arm64), Node 22/24/26 consumers, minimum Node consumers and Linux/Windows
+memory jobs. Seven recognized target profiles do not imply seven tested hosts.

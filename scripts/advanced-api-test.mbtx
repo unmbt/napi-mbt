@@ -1,0 +1,43 @@
+import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+
+///|
+async fn checked(program : String, args : Array[String], cwd? : String, environment? : Map[String, String] = Map([])) -> Unit {
+  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?=cwd.map(s => s[:]), extra_env=environment))
+  if code != 0 { fail(out.text() + err.text()) }
+  println(out.text())
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-advanced-")
+  defer @fs.rmdir(temp, recursive=true)
+  let dir = temp + "/示例-addon"
+  checked(binary, ["init", dir])
+  let source = root + "/examples/advanced-api"
+  for name in ["moon.mod", "moon.pkg"] {
+    @fs.write_file(dir + "/" + name, @fs.read_file(source + "/" + name))
+  }
+  checked("moon", ["check", "--target", "native"], cwd=dir)
+  for name in @fs.readdir(source) {
+    if @fs.kind(source + "/" + name) != Directory {
+      @fs.write_file(dir + "/" + name, @fs.read_file(source + "/" + name))
+    }
+  }
+  let asan = @env.args().contains("--asan")
+  if asan {
+    let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
+    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+  }
+  checked(binary, ["build", dir, "--release"])
+  let environment : Map[String, String] = Map([])
+  if asan && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
+  checked("node", ["--expose-gc", "test.mjs"], cwd=dir, environment~)
+  if !asan {
+    for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
+      checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, "--types", "node", "--typeRoots", root + "/node_modules/@types", dir + "/consumer.mts"])
+    }
+  }
+  println("Advanced API runtime and lifetime checks passed")
+}

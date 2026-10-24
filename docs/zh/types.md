@@ -88,3 +88,9 @@ TypedArray 包装提供 `new(Array[T])`、`length()` 和 `to_array()`；ArrayBuf
 store，JavaScript GC 回收时释放持有的 Bytes；`NapiExternal` 用于显式管理外部指针。
 运行 `moon run scripts/owned-binary-test.mbtx` 验证复制隔离、偏移、分离、共享存储、
 嵌套及异步生命周期。
+
+External Buffer/ArrayBuffer 共享动态 Bytes；静态字面量会复制到可写内存。
+External string 的 backing 不能通过任何别名修改。可运行示例：
+[结构化数据与 JS 值](../../examples/structured-data/README.md)、
+[数值二进制类型](../../examples/binary-processing/README.md)、
+[DataView/BigInt/External](../../examples/advanced-api/README.md)。

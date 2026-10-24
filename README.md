@@ -224,19 +224,20 @@ Common flags:
 
 ### Standalone Examples
 
-The [`examples/`](examples/README.md) directory contains 9 complete, self-contained addon projects covering every runtime surface:
+The [`examples/`](examples/README.md) directory contains 10 standalone addon projects covering the main usage patterns, with executable JS tests and TypeScript consumers:
 
 | Example | Demonstrated Capabilities |
 | :--- | :--- |
 | [`examples/hello-addon`](examples/hello-addon) | Dual CJS/ESM imports and strict scalar boundary checks |
-| [`examples/structured-data`](examples/structured-data) | Nested `struct` / `enum` records, `Option`, `Array`, `Map`, and `Json` |
-| [`examples/native-class`](examples/native-class) | Stateful class handles configured in `napi-mbt.json`, getters/setters, static factories, and `.dispose()` |
-| [`examples/callbacks`](examples/callbacks) | Synchronous callbacks, stored threadsafe functions, and JS exception propagation |
-| [`examples/async-file`](examples/async-file) | `pub async fn` native file I/O, `AbortSignal` cancellation, and error recovery |
+| [`examples/structured-data`](examples/structured-data) | Structs/enums, optional fields, records, JSON, tuples, Date, Symbol, Set and synchronous iterators |
+| [`examples/native-class`](examples/native-class) | Stateful class handles configured in `napi-mbt.json`, getters/setters, a factory export, and `.dispose()` |
+| [`examples/callbacks`](examples/callbacks) | Stored synchronous callbacks, returned closures and JS exception propagation |
+| [`examples/async-file`](examples/async-file) | Native file I/O, `AbortSignal` cancellation, recovery and JS Promise input |
 | [`examples/binary-processing`](examples/binary-processing) | Owned `Bytes` (`Buffer`) vs. zero-copy synchronous `NapiBufferView` and TypedArrays |
 | [`examples/native-tasks`](examples/native-tasks) | C worker-pool jobs (`nativeTasks`), cancellation, and composition with MoonBit `async fn` |
 | [`examples/worker-tasks`](examples/worker-tasks) | Pure MoonBit CPU-bound computation in isolated Node worker process pools (`workerTasks`) |
 | [`examples/streams`](examples/streams) | `NapiAsyncIterator` input/output, backpressure, cancellation, and Web `ReadableStream` |
+| [`examples/advanced-api`](examples/advanced-api) | Environment-bound low-level handles, External/zero-copy values, owned DataView/BigInt arrays, N-API 8/9/10 helpers, and typed TSFN |
 
 To materialize any example into a standalone directory and run its test suite:
 
@@ -258,7 +259,7 @@ moon check                              # Typecheck all MoonBit packages
 moon test                               # Run unit, whitebox, and blackbox tests
 moon run scripts/docs-check.mbtx        # Verify Markdown links and documentation gates
 moon run scripts/release-check.mbtx     # Verify module version and lockfile hygiene
-moon run scripts/examples-test.mbtx     # Package the CLI and build/test all 9 standalone examples
+moon run scripts/examples-test.mbtx     # Package the CLI and build/test all 10 standalone examples
 ```
 
 See [Development Workflow](docs/en/development.md) and [Validation Record](docs/validation.md) for the complete verification suite.

@@ -23,6 +23,10 @@ fn conversion_types(
   let readers : Array[ValueType] = []
   let writers : Array[ValueType] = []
   fn collect(value : ValueType, read : Bool) -> Unit {
+    // Environments are injected directly, never read from a JS value.
+    if value is EnvType {
+      return
+    }
     let types = if read { readers } else { writers }
     if types.any(t => t.runtime_name() == value.runtime_name()) {
       return
@@ -92,13 +96,28 @@ fn conversions(
   for value in types {
     let name = conversion_name(value, types, read)
     let mbt = value.moonbit()
+    let passthrough = value is RawValueType ||
+      (
+        !read &&
+        value
+        is (ObjectValueType
+        | FunctionValueType
+        | ArrayValueType
+        | ExternalValueType)
+      )
+    let environment = if passthrough { "_env" } else { "env" }
+    let effect = if passthrough || (read && value is UnitType) {
+      ""
+    } else {
+      " raise"
+    }
     if read {
       out.write_string(
-        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt}\{if value is UnitType { "" } else { " raise" }} {\n",
+        "\n///|\nfn \{name}(\n  \{environment} : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt}\{effect} {\n",
       )
     } else {
       out.write_string(
-        "\n///|\nfn \{name}(\n  env : NapiEnv,\n  value : \{mbt},\n  _depth : Int32,\n) -> NapiValue raise {\n",
+        "\n///|\nfn \{name}(\n  \{environment} : NapiEnv,\n  value : \{mbt},\n  _depth : Int32,\n) -> NapiValue\{effect} {\n",
       )
     }
     fn convert(t : ValueType, expression : String) -> String {
