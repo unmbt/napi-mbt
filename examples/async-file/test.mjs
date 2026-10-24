@@ -24,4 +24,8 @@ try {
  await new Promise(resolve => setImmediate(resolve));
  assert.equal((await addon.readFile(path, data)).toString(), 'Moon');
 } finally { await rm(dir, { recursive: true, force: true }); }
+assert.equal(await addon.twice(Promise.resolve(21)), 42);
+const rejection = new Error('upstream failure');
+await assert.rejects(addon.twice(Promise.reject(rejection)), e => e === rejection);
+await assert.rejects(addon.twice(Promise.resolve('wrong type')));
 console.log('async-file passed');

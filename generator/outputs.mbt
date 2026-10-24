@@ -76,9 +76,15 @@ fn adapters(
         js_index += 1
         result
       }
-      out.write_string(
-        "    let p\{i} = \{conversion_name(p.value_type, readers, true)}(env, \{input}, [])\n",
-      )
+      if p.value_type is EnvType {
+        // NapiEnv is injected by the callback and is already the MoonBit
+        // environment value. It must not go through a NapiValue reader.
+        out.write_string("    let p\{i} = env\n")
+      } else {
+        out.write_string(
+          "    let p\{i} = \{conversion_name(p.value_type, readers, true)}(env, \{input}, [])\n",
+        )
+      }
       arguments.push("p\{i}")
       if p.value_type is BufferViewType {
         out.write_string("    defer p\{i}.invalidate()\n")

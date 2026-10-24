@@ -153,12 +153,29 @@ typedef struct {
 } napi_mbt_external_owner;
 
 static void napi_mbt_external_owner_finalize(napi_env env, void *data, void *hint) {
-    (void)env; (void)hint;
-    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)data;
+    (void)env; (void)data;
+    /* data is the backing byte address; only hint contains our owner record. */
+    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)hint;
     if (owner) {
         if (owner->owner) moonbit_decref(owner->owner);
         free(owner);
     }
+}
+
+static napi_mbt_external_owner *napi_mbt_external_owner_new(moonbit_bytes_t data, bool writable) {
+    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)calloc(1, sizeof(*owner));
+    if (!owner) return NULL;
+    /* Static Bytes (including literals) can reside in read-only memory. The
+     * runtime's immortal RC is negative, in both packed and legacy RC layouts. */
+    if (writable && (int32_t)Moonbit_object_header(data)->rc < 0) {
+        int32_t length = Moonbit_array_length(data);
+        owner->owner = moonbit_make_bytes_raw(length);
+        if (length) memcpy(owner->owner, data, (size_t)length);
+    } else {
+        owner->owner = data;
+        moonbit_incref(data);
+    }
+    return owner;
 }
 
 MOONBIT_FFI_EXPORT
@@ -167,13 +184,11 @@ int napi_mbt_create_external_buffer(napi_env env, moonbit_bytes_t data, napi_val
     (void)env; (void)data; (void)result;
     return (int)napi_generic_failure;
 #else
-    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)calloc(1, sizeof(*owner));
+    napi_mbt_external_owner *owner = napi_mbt_external_owner_new(data, true);
     if (!owner) return (int)napi_generic_failure;
-    owner->owner = data;
-    moonbit_incref(data);
-    napi_status status = napi_create_external_buffer(env, (size_t)Moonbit_array_length(data), data,
+    napi_status status = napi_create_external_buffer(env, (size_t)Moonbit_array_length(data), owner->owner,
         napi_mbt_external_owner_finalize, owner, result);
-    if (status != napi_ok) napi_mbt_external_owner_finalize(env, owner, NULL);
+    if (status != napi_ok) napi_mbt_external_owner_finalize(env, NULL, owner);
     return (int)status;
 #endif
 }
@@ -184,13 +199,11 @@ int napi_mbt_create_external_arraybuffer(napi_env env, moonbit_bytes_t data, nap
     (void)env; (void)data; (void)result;
     return (int)napi_generic_failure;
 #else
-    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)calloc(1, sizeof(*owner));
+    napi_mbt_external_owner *owner = napi_mbt_external_owner_new(data, true);
     if (!owner) return (int)napi_generic_failure;
-    owner->owner = data;
-    moonbit_incref(data);
-    napi_status status = napi_create_external_arraybuffer(env, data, (size_t)Moonbit_array_length(data),
+    napi_status status = napi_create_external_arraybuffer(env, owner->owner, (size_t)Moonbit_array_length(data),
         napi_mbt_external_owner_finalize, owner, result);
-    if (status != napi_ok) napi_mbt_external_owner_finalize(env, owner, NULL);
+    if (status != napi_ok) napi_mbt_external_owner_finalize(env, NULL, owner);
     return (int)status;
 #endif
 }
@@ -214,6 +227,15 @@ int napi_mbt_read_dataview(napi_env env, napi_value value, moonbit_bytes_t *resu
     void *data = NULL;
     napi_value backing = NULL;
     if (status == napi_ok) status = napi_get_dataview_info(env, value, &length, &data, &backing, &offset);
+#if NAPI_VERSION >= 7
+    if (status == napi_ok) status = napi_is_arraybuffer(env, backing, &valid);
+    if (status == napi_ok && !valid) status = napi_invalid_arg;
+    bool detached = false;
+    if (status == napi_ok) status = napi_is_detached_arraybuffer(env, backing, &detached);
+    if (status == napi_ok && detached) status = napi_invalid_arg;
+#else
+    status = napi_generic_failure;
+#endif
     if (status == napi_ok && (length > INT_MAX || (length && !data))) status = napi_invalid_arg;
     moonbit_bytes_t bytes = moonbit_make_bytes_raw(status == napi_ok ? (int32_t)length : 0);
     if (status == napi_ok && length) memcpy(bytes, data, length);
@@ -266,16 +288,14 @@ int napi_mbt_create_property_key_utf8(napi_env env, moonbit_bytes_t value, napi_
 MOONBIT_FFI_EXPORT
 int napi_mbt_create_external_string_latin1(napi_env env, moonbit_bytes_t value, napi_value *result, int *copied) {
 #if NAPI_VERSION >= 10
-    napi_mbt_external_owner *owner = (napi_mbt_external_owner *)calloc(1, sizeof(*owner));
+    napi_mbt_external_owner *owner = napi_mbt_external_owner_new(value, false);
     if (!owner) return (int)napi_generic_failure;
-    owner->owner = value;
-    moonbit_incref(value);
     bool did_copy = false;
     napi_status status = node_api_create_external_string_latin1(env, (char *)value,
         (size_t)Moonbit_array_length(value), napi_mbt_external_owner_finalize, owner,
         result, &did_copy);
     if (copied) *copied = did_copy ? 1 : 0;
-    if (status != napi_ok) napi_mbt_external_owner_finalize(env, owner, NULL);
+    if (status != napi_ok) napi_mbt_external_owner_finalize(env, NULL, owner);
     return (int)status;
 #else
     (void)env; (void)value; (void)result; (void)copied; return (int)napi_generic_failure;
@@ -286,8 +306,10 @@ MOONBIT_FFI_EXPORT
 int napi_mbt_create_syntax_error(napi_env env, moonbit_string_t code, moonbit_string_t message, napi_value *result) {
 #if NAPI_VERSION >= 9
     napi_value js_code, js_message;
-    napi_status status = napi_create_string_utf8(env, (const char *)code, NAPI_AUTO_LENGTH, &js_code);
-    if (status == napi_ok) status = napi_create_string_utf8(env, (const char *)message, NAPI_AUTO_LENGTH, &js_message);
+    napi_status status = napi_create_string_utf16(
+        env, (const char16_t *)code, (size_t)Moonbit_array_length(code), &js_code);
+    if (status == napi_ok) status = napi_create_string_utf16(
+        env, (const char16_t *)message, (size_t)Moonbit_array_length(message), &js_message);
     if (status == napi_ok) status = node_api_create_syntax_error(env, js_code, js_message, result);
     return (int)status;
 #else
@@ -299,7 +321,14 @@ int napi_mbt_create_syntax_error(napi_env env, moonbit_string_t code, moonbit_st
 MOONBIT_FFI_EXPORT
 int napi_mbt_throw_syntax_error(napi_env env, moonbit_string_t code, moonbit_string_t message) {
 #if NAPI_VERSION >= 9
-    return (int)node_api_throw_syntax_error(env, (const char *)code, (const char *)message);
+    napi_value js_code, js_message, error;
+    napi_status status = napi_create_string_utf16(
+        env, (const char16_t *)code, (size_t)Moonbit_array_length(code), &js_code);
+    if (status == napi_ok) status = napi_create_string_utf16(
+        env, (const char16_t *)message, (size_t)Moonbit_array_length(message), &js_message);
+    if (status == napi_ok) status = node_api_create_syntax_error(env, js_code, js_message, &error);
+    if (status == napi_ok) status = napi_throw(env, error);
+    return (int)status;
 #else
     (void)env; (void)code; (void)message;
     return (int)napi_generic_failure;
@@ -312,10 +341,24 @@ int napi_mbt_get_module_file_name(napi_env env, moonbit_string_t *result) {
     const char *name = NULL;
     napi_status status = node_api_get_module_file_name(env, &name);
     if (status != napi_ok || !name) { if (result) *result = moonbit_make_string(0, 0); return (int)status; }
-    size_t length = strlen(name);
-    if (length > INT_MAX) return (int)napi_generic_failure;
+    napi_value js_name;
+    status = napi_create_string_utf8(env, name, NAPI_AUTO_LENGTH, &js_name);
+    if (status != napi_ok) { if (result) *result = moonbit_make_string(0, 0); return (int)status; }
+    size_t length = 0;
+    status = napi_get_value_string_utf16(env, js_name, NULL, 0, &length);
+    if (status != napi_ok || length > INT_MAX) {
+        if (result) *result = moonbit_make_string(0, 0);
+        return status == napi_ok ? (int)napi_generic_failure : (int)status;
+    }
     moonbit_string_t value = moonbit_make_string_raw((int32_t)length);
-    memcpy(value, name, length);
+    size_t written = 0;
+    status = napi_get_value_string_utf16(
+        env, js_name, (char16_t *)value, length + 1, &written);
+    if (status != napi_ok || written != length) {
+        moonbit_decref(value);
+        if (result) *result = moonbit_make_string(0, 0);
+        return status == napi_ok ? (int)napi_generic_failure : (int)status;
+    }
     if (result) *result = value;
     return (int)napi_ok;
 #else
@@ -420,6 +463,8 @@ static void napi_mbt_typed_tsfn_call_js(napi_env env, napi_value js_cb, void *co
     (void)context;
     napi_mbt_typed_tsfn_payload *payload = (napi_mbt_typed_tsfn_payload *)data;
     if (!payload) return;
+    /* Shutdown/abort can drain the queue without a usable JS environment. */
+    if (!env || !js_cb) { free(payload); return; }
     napi_value buffer = NULL;
     napi_status status = napi_create_buffer_copy(env, payload->length, payload->data, NULL, &buffer);
     if (status == napi_ok) {
@@ -453,7 +498,8 @@ int napi_mbt_typed_tsfn_call(napi_threadsafe_function func, moonbit_bytes_t data
     payload->length = length;
     if (length) memcpy(payload->data, data, length);
     napi_status status = napi_call_threadsafe_function(func, payload, (napi_threadsafe_function_call_mode)mode);
-    if (status != napi_ok && status != napi_queue_full) free(payload);
+    /* No failing status transfers ownership, including queue-full. */
+    if (status != napi_ok) free(payload);
     return (int)status;
 #else
     (void)func; (void)data; (void)mode; return (int)napi_generic_failure;

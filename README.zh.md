@@ -160,7 +160,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `Double`, `Float`, `Bool`, `Unit` | `number`, `boolean`, `void` | 完整保留 IEEE-754 浮点数值（包含 `NaN` 与 `±Infinity`）。 |
 | `String` | `string` | 直接在 UTF-16 字符串之间桥接，避免多余的 UTF-8 中间转码。 |
 | `Bytes` | `Buffer` | 跨边界拥有所有权的字节拷贝（`N-API 7`），可安全持久化或在异步函数中返回。 |
-| `NapiBufferView` | `Buffer` | 零拷贝同步只读借用（`N-API 7`），仅在当前同步调用栈帧内有效。 |
+| `NapiBufferView` | `Buffer` | 零拷贝同步借用（`N-API 7`），支持读写，仅在当前同步调用栈帧内有效。 |
 | `NapiObject` / `NapiFunction` / `NapiArray` | JavaScript 对象/函数/数组 | 绑定当前环境的低层 handle，提供属性、调用、构造、原型和 `instanceof`；不可跨 async/worker。 |
 | `NapiInt8Array` / `NapiUint8Array` / `NapiUint8ClampedArray` / `NapiInt16Array` / `NapiUint16Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | 对应 JavaScript TypedArray / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝；8/16 位元素在 MoonBit 中使用可安全表达其范围的整数数组。 |
 | `NapiBigInt64Array` / `NapiBigUint64Array` / `NapiDataView` | BigInt64Array / BigUint64Array / DataView | 拥有型拷贝；拒绝 detached 与共享 backing。 |
@@ -224,19 +224,20 @@ napi-mbt-cli <command> [directory] [options]
 
 ### 独立示例项目 (`examples/`)
 
-[`examples/`](examples/README.md) 目录包含 9 个覆盖全部运行时特性的独立扩展项目：
+[`examples/`](examples/README.md) 目录包含 10 个覆盖主要用法的独立扩展项目，每个都有可执行 JS 测试和 TypeScript 消费示例：
 
 | 示例项目 | 演示能力 |
 | :--- | :--- |
 | [`examples/hello-addon`](examples/hello-addon) | CJS/ESM 双模式导入与严格的标量边界校验 |
-| [`examples/structured-data`](examples/structured-data) | 嵌套 `struct` / `enum` 结构、`Option`、`Array`、`Map` 与 `Json` |
-| [`examples/native-class`](examples/native-class) | `napi-mbt.json` 中配置的原生类句柄、属性读写、静态工厂与 `.dispose()` |
-| [`examples/callbacks`](examples/callbacks) | 同步借用回调、持久化线程安全回调与 JS 异常传播 |
-| [`examples/async-file`](examples/async-file) | `pub async fn` 原生文件 I/O、`AbortSignal` 取消与异常恢复 |
+| [`examples/structured-data`](examples/structured-data) | struct/enum、可选字段、记录、JSON、元组、Date、Symbol、Set 和同步迭代器 |
+| [`examples/native-class`](examples/native-class) | `napi-mbt.json` 中配置的原生类句柄、属性读写、工厂导出与 `.dispose()` |
+| [`examples/callbacks`](examples/callbacks) | 持久化同步回调、返回闭包与 JS 异常传播 |
+| [`examples/async-file`](examples/async-file) | 原生文件 I/O、`AbortSignal` 取消、异常恢复和 JS Promise 输入 |
 | [`examples/binary-processing`](examples/binary-processing) | 拥有所有权的 `Bytes`（`Buffer`）对比零拷贝同步借用 `NapiBufferView` 与 TypedArray |
 | [`examples/native-tasks`](examples/native-tasks) | C 线程池任务（`nativeTasks`）、任务取消以及与 MoonBit `async fn` 组合调用 |
 | [`examples/worker-tasks`](examples/worker-tasks) | 在隔离的 Node 子进程池中运行纯 MoonBit 密集计算任务（`workerTasks`） |
 | [`examples/streams`](examples/streams) | `NapiAsyncIterator` 异步流输入/输出、背压控制、提前取消与 Web `ReadableStream` |
+| [`examples/advanced-api`](examples/advanced-api) | 环境绑定低层 handle、External/零拷贝值、拥有型 DataView/BigInt 数组、N-API 8/9/10 helper 与 typed TSFN |
 
 你可以将任意示例一键物化到独立目录中构建并运行测试：
 
@@ -258,7 +259,7 @@ moon check                              # 对所有 MoonBit 包执行类型检�
 moon test                               # 运行单元、白盒与黑盒测试
 moon run scripts/docs-check.mbtx        # 校验所有 Markdown 文档相对链接与门禁
 moon run scripts/release-check.mbtx     # 校验模块版本号与开发锁文件规范
-moon run scripts/examples-test.mbtx     # 打包当前 CLI 并完整构建/测试全部 9 个独立示例
+moon run scripts/examples-test.mbtx     # 打包当前 CLI 并完整构建/测试全部 10 个独立示例
 ```
 
 更多工程验证细节请参阅 [开发流程](docs/zh/development.md) 与 [验证记录](docs/validation.md)。

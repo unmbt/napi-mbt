@@ -37,5 +37,5 @@ async fn main {
     }
   }
   checked(binary, ["build", "--release"], destination)
-  checked("node", ["test.mjs"], destination)
+  checked("node", ["--expose-gc", "test.mjs"], destination)
 }

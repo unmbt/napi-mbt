@@ -1,0 +1,10 @@
+{
+  "$schema": "./napi-mbt.schema.json",
+  "napiVersion": 10,
+  "features": [
+    "external", "zero_copy", "binary_extended", "instance_data",
+    "freeze", "seal", "type_tag", "symbol_for", "syntax_error",
+    "module_filename", "property_key", "external_string",
+    "buffer_from_arraybuffer", "typed_tsfn"
+  ]
+}

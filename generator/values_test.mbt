@@ -52,5 +52,9 @@ test "low-level environment and JS values are injected without JS parameters" {
     if name == "napi_glue.c" {
       assert_true(text.contains("size_t argc = 2;"))
     }
+    if name == "napi_exports.mbt" {
+      assert_true(text.contains("let p0 = env"))
+      assert_true(!text.contains("(env, env, []"))
+    }
   }
 }

@@ -1,0 +1,5 @@
+{
+  "name": "napi-mbt-example-advanced-api",
+  "version": "0.1.0",
+  "scripts": { "test": "node --expose-gc test.mjs" }
+}

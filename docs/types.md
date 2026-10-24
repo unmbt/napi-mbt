@@ -21,6 +21,10 @@ with a source filename and line; no type falls back to Buffer.
 | NapiDataView | DataView | Owned byte snapshot; N-API 7 |
 | NapiArrayBuffer | ArrayBuffer | Owned bytes; independent output backing store; N-API 7 |
 | NapiExternal | External | Caller-managed `UnmanagedBuffer` pointer; it is not freed by the wrapper |
+| NapiDate | Date | Copied timestamp in milliseconds; invalid dates rejected; N-API 5 |
+| NapiSymbol | symbol | Preserves JS identity in its owning Node environment |
+| NapiSet[T] | Set<T> | Copies and converts elements; preserves JS iteration order |
+| NapiIterator[T] | Iterable<T> input / IterableIterator<T> output | Environment-bound synchronous iteration; close on early exit |
 | Option[T] / T? | T or null | Missing, undefined and null become None; None returns null |
 | Array[T] | Array | Recursive conversion; sparse slots behave as undefined |
 | Map[String, T] | Record<string, T> | Own enumerable string keys; safe data properties on output |
@@ -95,7 +99,14 @@ shared-store, nested and asynchronous lifetime checks.
 
 External helpers (`napi_external_buffer`, `napi_external_arraybuffer` and
 `napi_external_string_latin1`) deliberately retain a MoonBit `Bytes` backing
-store until JavaScript GC releases the value. The store is shared and may be
-mutated by JavaScript; use an owned wrapper when a copy is required. The
+store until JavaScript GC releases the value (or Node copies the string).
+Buffer/ArrayBuffer backing is shared and writable; string backing is read-only.
+Use an owned wrapper when a copy is required. The
 low-level handle and N-API 8/9/10 contracts are documented in
 [Advanced APIs](en/advanced-api.md) and the [software design description](sdd.md).
+
+External Buffer/ArrayBuffer share dynamic Bytes; static literals receive a
+writable copy. External string backing must never be mutated. Runnable examples:
+[structured values](../examples/structured-data/README.md),
+[numeric binary types](../examples/binary-processing/README.md), and
+[DataView/BigInt/external values](../examples/advanced-api/README.md).

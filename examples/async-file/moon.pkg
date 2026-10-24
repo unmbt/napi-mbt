@@ -1,3 +1,19 @@
-import { "moonbitlang/core/encoding/utf8", "moonbitlang/async", "moonbitlang/async/fs" }
+import {
+  "moonbitlang/core/encoding/utf8",
+  "moonbitlang/async",
+  "moonbitlang/async/fs",
+}
+
 pkgtype(kind: "foreign_library")
-options("native-stub": ["stub.c", "napi_glue.c"], link: { "native": { "cc-flags": "", "stub-cc-flags": "", "cc-link-flags": "", "exports": [] } })
+
+options(
+  "native-stub": [ "stub.c", "napi_glue.c" ],
+  link: {
+    "native": {
+      "cc-flags": "",
+      "stub-cc-flags": "",
+      "cc-link-flags": "",
+      "exports": [ ],
+    },
+  },
+)

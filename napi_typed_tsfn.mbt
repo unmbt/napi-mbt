@@ -1,8 +1,9 @@
 /// A typed, high-level Threadsafe Function.
 ///
-/// Values are encoded before crossing the worker boundary.  The default
-/// callback receives a Node Buffer containing the encoded payload, so no
-/// MoonBit object or closure is touched from a background thread.
+/// Call this wrapper on the MoonBit owner thread: `call` runs the encoder
+/// synchronously, then copies its bytes into a C-owned queue payload. The JS
+/// callback receives a Node Buffer. Native producer threads must instead use
+/// the low-level TSFN API with C-owned payloads, without MoonBit closures or RC.
 
 ///|
 pub struct NapiTypedThreadsafeFunction[T] {
@@ -28,6 +29,8 @@ extern "c" fn napi_typed_tsfn_call_raw(
 ) -> Int32 = "napi_mbt_typed_tsfn_call"
 
 ///|
+/// Creation owns one producer count. Release it when finished. This wrapper
+/// does not automatically release or prevent use after the last release.
 pub fn[T] NapiTypedThreadsafeFunction::new(
   env : NapiEnv,
   callback : NapiValue,
@@ -44,6 +47,7 @@ pub fn[T] NapiTypedThreadsafeFunction::new(
 }
 
 ///|
+/// Prefer Nonblocking on the owner thread; Blocking on a full queue can deadlock.
 pub fn[T] NapiTypedThreadsafeFunction::call(
   self : NapiTypedThreadsafeFunction[T],
   value : T,
@@ -82,6 +86,7 @@ pub fn[T] NapiTypedThreadsafeFunction::release(
 }
 
 ///|
+/// Stop delivery and release one producer count. Do not use this producer again.
 pub fn[T] NapiTypedThreadsafeFunction::abort(
   self : NapiTypedThreadsafeFunction[T],
 ) -> NapiTsfnStatus raise NapiError {
