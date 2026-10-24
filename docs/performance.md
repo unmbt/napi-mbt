@@ -72,4 +72,4 @@ median improvement target. Other platforms have not been measured for this chang
 
 The combined Promise/native-task/stream/worker fixture passed cached and
 `--no-cache` builds on Windows. It verifies consumer behavior; platform timings
-await CI.
+were not collected as part of the hosted CI gates.

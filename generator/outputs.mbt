@@ -48,12 +48,17 @@ fn adapters(
     if item.binding is ConstructorBinding(_) {
       params.push("receiver : NapiValue")
     }
-    for i, _ in item.parameters {
-      params.push("a\{i} : NapiValue")
+    let mut js_index = 0
+    for p in item.parameters {
+      if p.value_type is EnvType {
+        continue
+      }
+      params.push("a\{js_index} : NapiValue")
+      js_index += 1
     }
     let line = "pub fn \{name}(\{params.join(", ")}) -> NapiValue {"
     out.write_string("\n///|\n#export_name(\"\{name}\")\n")
-    if item.parameters.length() <= 1 && line.length() <= 80 {
+    if js_index <= 1 && line.length() <= 80 {
       out.write_string(line + "\n")
     } else {
       out.write_string(
@@ -62,9 +67,17 @@ fn adapters(
     }
     let arguments = []
     out.write_string("  try {\n")
+    let mut js_index = 0
     for i, p in item.parameters {
+      let input = if p.value_type is EnvType {
+        "env"
+      } else {
+        let result = "a\{js_index}"
+        js_index += 1
+        result
+      }
       out.write_string(
-        "    let p\{i} = \{conversion_name(p.value_type, readers, true)}(env, a\{i}, [])\n",
+        "    let p\{i} = \{conversion_name(p.value_type, readers, true)}(env, \{input}, [])\n",
       )
       arguments.push("p\{i}")
       if p.value_type is BufferViewType {
@@ -108,7 +121,10 @@ fn c_glue(
     out.write_string(
       "extern napi_value napi_mbt_adapter_\{item.export_name}(napi_env env",
     )
-    for _ in item.parameters {
+    for p in item.parameters {
+      if p.value_type is EnvType {
+        continue
+      }
       out.write_string(", napi_value")
     }
     if item.is_async {
@@ -117,12 +133,20 @@ fn c_glue(
     out.write_string(");\n")
   }
   for item in exports {
-    let n = item.parameters.length() + (if item.is_async { 1 } else { 0 })
+    let visible_count = item.parameters
+      .filter(p => !(p.value_type is EnvType))
+      .length()
+    let n = visible_count + (if item.is_async { 1 } else { 0 })
     let mut required = 0
-    for i, p in item.parameters {
-      if !(p.value_type is OptionType(_)) {
-        required = i + 1
+    let mut js_index = 0
+    for p in item.parameters {
+      if p.value_type is EnvType {
+        continue
       }
+      if !(p.value_type is OptionType(_)) {
+        required = js_index + 1
+      }
+      js_index += 1
     }
     if item.is_async {
       required = 0
@@ -199,9 +223,10 @@ fn typescript_parameters(
   parameters : Array[Parameter],
   is_async~ : Bool = false,
 ) -> String {
+  let visible = parameters.filter(p => !(p.value_type is EnvType))
   let params = []
-  for i, p in parameters {
-    let optional = parameters[i:].all(p => p.value_type is OptionType(_))
+  for i, p in visible {
+    let optional = visible[i:].all(p => p.value_type is OptionType(_))
     params.push(
       p.name +
       (if optional { "?: " } else { ": " }) +
@@ -210,7 +235,7 @@ fn typescript_parameters(
   }
   if is_async {
     let mut name = "options"
-    while parameters.any(p => p.name == name) {
+    while visible.any(p => p.name == name) {
       name += "_"
     }
     params.push(name + "?: { signal?: AbortSignal }")

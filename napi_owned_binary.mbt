@@ -559,3 +559,127 @@ pub fn set_NapiUint16Array(
   )
   result.val
 }
+
+///|
+/// Owned signed 64-bit BigInt elements copied from/to JavaScript.
+pub struct NapiBigInt64Array {
+  priv data : FixedArray[Int64]
+}
+
+///|
+pub fn NapiBigInt64Array::new(values : Array[Int64]) -> NapiBigInt64Array {
+  { data: FixedArray::makei(values.length(), i => values[i]), }
+}
+
+///|
+pub fn NapiBigInt64Array::length(self : NapiBigInt64Array) -> Int32 {
+  self.data.length()
+}
+
+///|
+pub fn NapiBigInt64Array::to_array(self : NapiBigInt64Array) -> Array[Int64] {
+  Array::makei(self.data.length(), i => self.data[i])
+}
+
+///|
+#borrow(status)
+extern "c" fn napi_read_BigInt64Array(
+  env : NapiEnv,
+  value : NapiValue,
+  status : Ref[Int32],
+) -> FixedArray[Int64] = "moonbit_napi_read_BigInt64Array"
+
+///|
+#borrow(data, result)
+extern "c" fn napi_write_BigInt64Array(
+  env : NapiEnv,
+  data : FixedArray[Int64],
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_write_BigInt64Array"
+
+///|
+pub fn get_NapiBigInt64Array(
+  env : NapiEnv,
+  value : NapiValue,
+) -> NapiBigInt64Array raise NapiError {
+  let status = Ref(0)
+  let data = napi_read_BigInt64Array(env, value, status)
+  result_from_status(env, status.val, b"Reading owned BigInt64Array")
+  { data, }
+}
+
+///|
+pub fn set_NapiBigInt64Array(
+  env : NapiEnv,
+  value : NapiBigInt64Array,
+) -> NapiValue raise NapiError {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(
+    env,
+    napi_write_BigInt64Array(env, value.data, result),
+    b"Writing owned BigInt64Array",
+  )
+  result.val
+}
+
+///|
+/// Owned unsigned 64-bit BigInt elements copied from/to JavaScript.
+pub struct NapiBigUint64Array {
+  priv data : FixedArray[UInt64]
+}
+
+///|
+pub fn NapiBigUint64Array::new(values : Array[UInt64]) -> NapiBigUint64Array {
+  { data: FixedArray::makei(values.length(), i => values[i]), }
+}
+
+///|
+pub fn NapiBigUint64Array::length(self : NapiBigUint64Array) -> Int32 {
+  self.data.length()
+}
+
+///|
+pub fn NapiBigUint64Array::to_array(self : NapiBigUint64Array) -> Array[UInt64] {
+  Array::makei(self.data.length(), i => self.data[i])
+}
+
+///|
+#borrow(status)
+extern "c" fn napi_read_BigUint64Array(
+  env : NapiEnv,
+  value : NapiValue,
+  status : Ref[Int32],
+) -> FixedArray[UInt64] = "moonbit_napi_read_BigUint64Array"
+
+///|
+#borrow(data, result)
+extern "c" fn napi_write_BigUint64Array(
+  env : NapiEnv,
+  data : FixedArray[UInt64],
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_write_BigUint64Array"
+
+///|
+pub fn get_NapiBigUint64Array(
+  env : NapiEnv,
+  value : NapiValue,
+) -> NapiBigUint64Array raise NapiError {
+  let status = Ref(0)
+  let data = napi_read_BigUint64Array(env, value, status)
+  result_from_status(env, status.val, b"Reading owned BigUint64Array")
+  { data, }
+}
+
+///|
+pub fn set_NapiBigUint64Array(
+  env : NapiEnv,
+  value : NapiBigUint64Array,
+) -> NapiValue raise NapiError {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(
+    env,
+    napi_write_BigUint64Array(env, value.data, result),
+    b"Writing owned BigUint64Array",
+  )
+  result.val
+}

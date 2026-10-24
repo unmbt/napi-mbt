@@ -37,3 +37,20 @@ test "date requires N-API 5" {
     _ => fail("Expected Date to require N-API 5")
   }
 }
+
+///|
+test "low-level environment and JS values are injected without JS parameters" {
+  let source = @generator.parse_source(
+    "#export_name(\"inspect\")\npub fn inspect(env : NapiEnv, value : NapiValue, object : NapiObject) -> NapiValue { let _ = NapiObject::from_value(env, value); object.value() }",
+    "low-level.mbt",
+  )
+  let files = @generator.render(source, "fixture", 1, package_version="0.1.0")
+  for (name, text) in files {
+    if name == "index.d.ts" {
+      assert_true(text.contains("inspect(value: unknown, object: object)"))
+    }
+    if name == "napi_glue.c" {
+      assert_true(text.contains("size_t argc = 2;"))
+    }
+  }
+}

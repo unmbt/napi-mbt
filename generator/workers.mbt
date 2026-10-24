@@ -6,6 +6,12 @@ fn worker_owned(
 ) -> Bool {
   match value {
     BufferViewType
+    | EnvType
+    | RawValueType
+    | ObjectValueType
+    | FunctionValueType
+    | ArrayValueType
+    | ExternalValueType
     | CallbackType(_, _, _)
     | ClassType(_, _, _)
     | JsPromiseType(_)

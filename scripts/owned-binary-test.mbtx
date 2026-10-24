@@ -19,7 +19,7 @@ async fn main {
   checked("moon", ["check", "--target", "native"], cwd=dir)
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
   let source = StringBuilder()
-  for tag in ["Uint8Array", "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "ArrayBuffer"] {
+  for tag in ["Uint8Array", "Int32Array", "Uint32Array", "Float32Array", "Float64Array", "BigInt64Array", "BigUint64Array", "DataView", "ArrayBuffer"] {
     let name = "Napi" + tag
     source.write_string("///|\n#export_name(\"echo_\{tag}\")\npub fn echo_\{tag}(v : \{name}) -> \{name} { v }\n")
     source.write_string("///|\n#export_name(\"async_\{tag}\")\npub async fn async_\{tag}(v : \{name}) -> \{name} { @async.sleep(5); v }\n")

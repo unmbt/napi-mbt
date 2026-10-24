@@ -51,7 +51,21 @@
           "callback",
           "async",
           "native_tasks",
-          "streams"
+          "streams",
+          "type_tag",
+          "freeze",
+          "seal",
+          "external",
+          "zero_copy",
+          "binary_extended",
+          "instance_data",
+          "symbol_for",
+          "syntax_error",
+          "module_filename",
+          "property_key",
+          "external_string",
+          "buffer_from_arraybuffer",
+          "typed_tsfn"
         ]
       }
     },
@@ -389,6 +403,333 @@
         "properties": {
           "napiVersion": {
             "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "type_tag"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "freeze"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "seal"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 8
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "external"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "zero_copy"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "binary_extended"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 7
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "instance_data"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 6
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "symbol_for"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 9
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "syntax_error"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 9
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "module_filename"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 9
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "property_key"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 10
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "external_string"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 10
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "buffer_from_arraybuffer"
+            }
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "napiVersion"
+        ],
+        "properties": {
+          "napiVersion": {
+            "minimum": 10
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "required": [
+          "features"
+        ],
+        "properties": {
+          "features": {
+            "contains": {
+              "const": "typed_tsfn"
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "napiVersion": {
+            "minimum": 4
           }
         }
       }

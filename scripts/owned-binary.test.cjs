@@ -7,15 +7,15 @@ function detach(buffer) {
   port1.postMessage(buffer, [buffer]); port1.close(); port2.close();
 }
 async function main() {
-  for (const Type of [Uint8Array, Int32Array, Uint32Array, Float32Array, Float64Array]) {
+  for (const Type of [Uint8Array, Int32Array, Uint32Array, Float32Array, Float64Array, BigInt64Array, BigUint64Array]) {
     const echo = addon[`echo_${Type.name}`];
     const delayed = addon[`async_${Type.name}`];
     const floating = Type === Float32Array || Type === Float64Array;
-    const original = new Type(floating ? [-0, NaN, Infinity, -Infinity, 1 / 3] : [0, 1, -1, 2147483647, 4294967295]);
+    const original = new Type(floating ? [-0, NaN, Infinity, -Infinity, 1 / 3] : (Type === BigInt64Array ? [0n, 1n, -1n, 9223372036854775807n] : Type === BigUint64Array ? [0n, 1n, 18446744073709551615n] : [0, 1, -1, 2147483647, 4294967295]));
     const copy = echo(original);
     assert.ok(copy instanceof Type); assert.notEqual(copy.buffer, original.buffer);
     assert.deepEqual(copy, original);
-    copy[0] = 12; assert.equal(original[0], floating ? -0 : 0);
+    copy[0] = floating ? 12 : (Type === BigInt64Array || Type === BigUint64Array ? 12n : 12); assert.equal(original[0], floating ? -0 : (Type === BigInt64Array || Type === BigUint64Array ? 0n : 0));
     const view = original.subarray(1, 4);
     assert.deepEqual(echo(view), view);
     assert.equal(echo(new Type()).length, 0);
@@ -24,12 +24,15 @@ async function main() {
     assert.throws(() => echo(shared), TypeError);
     const transferred = new Type(2); detach(transferred.buffer);
     assert.throws(() => echo(transferred));
-    const input = new Type([1, 2]); const pending = delayed(input);
-    input[0] = 99; detach(input.buffer);
-    assert.deepEqual(await pending, new Type([1, 2]));
+    const inputValues = Type === BigInt64Array || Type === BigUint64Array ? [1n, 2n] : [1, 2];
+    const input = new Type(inputValues); const pending = delayed(input);
+    input[0] = Type === BigInt64Array || Type === BigUint64Array ? 99n : 99; detach(input.buffer);
+    assert.deepEqual(await pending, new Type(inputValues));
     await assert.rejects(delayed(shared), TypeError);
     for (let i = 0; i < 500; i++) echo(original);
   }
+  const view = addon.echo_DataView(new DataView(new Uint8Array([1, 2, 3]).buffer, 1, 2));
+  assert.ok(view instanceof DataView); assert.deepEqual(Array.from(new Uint8Array(view.buffer)), [2, 3]);
   assert.deepEqual(addon.construct(), new Int32Array([-1, 2]));
   const original = new Uint8Array([1, 2, 3]).buffer;
   const copied = addon.echo_ArrayBuffer(original);

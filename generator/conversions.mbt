@@ -117,6 +117,37 @@ fn conversions(
       )
     }
     match value {
+      EnvType =>
+        if read {
+          out.write_string("  env\n")
+        } else {
+          out.write_string("  abort(\"NapiEnv cannot be returned\")\n")
+        }
+      RawValueType => out.write_string("  value\n")
+      ObjectValueType =>
+        if read {
+          out.write_string("  NapiObject::from_value(env, value)\n")
+        } else {
+          out.write_string("  value.value()\n")
+        }
+      FunctionValueType =>
+        if read {
+          out.write_string("  NapiFunction::from_value(env, value)\n")
+        } else {
+          out.write_string("  value.value()\n")
+        }
+      ArrayValueType =>
+        if read {
+          out.write_string("  NapiArray::from_value(env, value)\n")
+        } else {
+          out.write_string("  value.value()\n")
+        }
+      ExternalValueType =>
+        if read {
+          out.write_string("  NapiExternal::from_value(env, value)\n")
+        } else {
+          out.write_string("  value.value()\n")
+        }
       AsyncIteratorType(inner) =>
         out.write_string(
           "  " +

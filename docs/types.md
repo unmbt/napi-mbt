@@ -14,9 +14,13 @@ with a source filename and line; no type falls back to Buffer.
 | String | string | Exact UTF-16 code units, including NUL and lone surrogates |
 | Bytes | Buffer | Owned copy; N-API 7 for backing-store checks |
 | NapiBufferView | Buffer | Direct synchronous borrowed parameter; invalid after the call |
+| NapiObject / NapiFunction / NapiArray | JavaScript object/function/array | Environment-bound low-level handles; direct parameters/returns only, never nested or async/worker-owned |
 | NapiUint8Array / NapiInt32Array / NapiUint32Array | Uint8Array / Int32Array / Uint32Array | Owned copies of the exact view type; N-API 7 |
 | NapiFloat32Array / NapiFloat64Array | Float32Array / Float64Array | Owned copies preserving IEEE values; N-API 7 |
+| NapiBigInt64Array / NapiBigUint64Array | BigInt64Array / BigUint64Array | Owned 64-bit integer copies; N-API 7 |
+| NapiDataView | DataView | Owned byte snapshot; N-API 7 |
 | NapiArrayBuffer | ArrayBuffer | Owned bytes; independent output backing store; N-API 7 |
+| NapiExternal | External | Caller-managed `UnmanagedBuffer` pointer; it is not freed by the wrapper |
 | Option[T] / T? | T or null | Missing, undefined and null become None; None returns null |
 | Array[T] | Array | Recursive conversion; sparse slots behave as undefined |
 | Map[String, T] | Record<string, T> | Own enumerable string keys; safe data properties on output |
@@ -88,3 +92,10 @@ so these wrappers can cross async boundaries. Use `NapiInt32Array::new([1, 2])`
 the existing Bytes or NapiBufferView APIs. Run
 `moon run scripts/owned-binary-test.mbtx` for copy isolation, offset, detached,
 shared-store, nested and asynchronous lifetime checks.
+
+External helpers (`napi_external_buffer`, `napi_external_arraybuffer` and
+`napi_external_string_latin1`) deliberately retain a MoonBit `Bytes` backing
+store until JavaScript GC releases the value. The store is shared and may be
+mutated by JavaScript; use an owned wrapper when a copy is required. The
+low-level handle and N-API 8/9/10 contracts are documented in
+[Advanced APIs](en/advanced-api.md) and the [software design description](sdd.md).

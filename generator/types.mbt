@@ -1,5 +1,11 @@
 ///|
 pub(all) enum ValueType {
+  EnvType
+  RawValueType
+  ObjectValueType
+  FunctionValueType
+  ArrayValueType
+  ExternalValueType
   IntType
   UIntType
   FloatType
@@ -31,6 +37,12 @@ pub(all) enum ValueType {
 ///|
 pub fn ValueType::runtime_name(self : ValueType) -> String {
   match self {
+    EnvType => "NapiEnv"
+    RawValueType => "NapiValue"
+    ObjectValueType => "NapiObject"
+    FunctionValueType => "NapiFunction"
+    ArrayValueType => "NapiArray"
+    ExternalValueType => "NapiExternal"
     IntType => "Int"
     UIntType => "UInt"
     FloatType => "Float"
@@ -70,6 +82,12 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
 ///|
 fn ValueType::moonbit(self : ValueType) -> String {
   match self {
+    EnvType => "NapiEnv"
+    RawValueType => "NapiValue"
+    ObjectValueType => "NapiObject"
+    FunctionValueType => "NapiFunction"
+    ArrayValueType => "NapiArray"
+    ExternalValueType => "NapiExternal"
     IntType => "Int32"
     DateType => "NapiDate"
     SymbolType => "NapiSymbol"
@@ -93,6 +111,12 @@ fn ValueType::moonbit(self : ValueType) -> String {
 ///|
 fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
   match self {
+    EnvType => "never"
+    RawValueType => "unknown"
+    ObjectValueType => "object"
+    FunctionValueType => "(...args: unknown[]) => unknown"
+    ArrayValueType => "unknown[]"
+    ExternalValueType => "unknown"
     IntType | UIntType | FloatType | DoubleType => "number"
     DateType => "Date"
     SymbolType => "symbol"
@@ -232,6 +256,12 @@ fn parse_value_type(
     }
   }
   match text {
+    "NapiEnv" if parameter => EnvType
+    "NapiValue" => RawValueType
+    "NapiObject" => ObjectValueType
+    "NapiFunction" => FunctionValueType
+    "NapiArray" => ArrayValueType
+    "NapiExternal" => ExternalValueType
     "Int" | "Int32" => IntType
     "UInt" | "UInt32" => UIntType
     "Float" => FloatType
@@ -247,6 +277,9 @@ fn parse_value_type(
     "NapiUint32Array" => OwnedBinaryType(Uint32)
     "NapiFloat32Array" => OwnedBinaryType(Float32)
     "NapiFloat64Array" => OwnedBinaryType(Float64)
+    "NapiBigInt64Array" => OwnedBinaryType(BigInt64)
+    "NapiBigUint64Array" => OwnedBinaryType(BigUint64)
+    "NapiDataView" => OwnedBinaryType(DataView)
     "NapiArrayBuffer" => OwnedBinaryType(ArrayBuffer)
     "Int64" => Int64Type
     "UInt64" => UInt64Type

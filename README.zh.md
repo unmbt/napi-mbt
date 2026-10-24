@@ -11,7 +11,7 @@
 [![CI](https://github.com/unmbt/napi-mbt/actions/workflows/build-and-release.yml/badge.svg?branch=master)](https://github.com/unmbt/napi-mbt/actions/workflows/build-and-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square)](docs/zh/support.md)
-[![Node-API](https://img.shields.io/badge/ABI-Node--API%20v4--v8-339933?style=flat-square)](docs/zh/support.md)
+[![Node-API](https://img.shields.io/badge/ABI-Node--API%20v4--v10-339933?style=flat-square)](docs/zh/support.md)
 
 </div>
 
@@ -42,7 +42,7 @@
 | ⚡ **全栈异步与并发能力** | 原生支持可取消的 `pub async fn` Promise（基于 `moonbitlang/async@0.22.4` + libuv 与 `AbortSignal`）、C 线程池任务（`nativeTasks`）、隔离的 MoonBit 进程池（`workerTasks`）、等待 JS Promise（`NapiJsPromise`）以及按需拉取的异步流（`NapiAsyncIterator`）。 |
 | 🧱 **安全的原生类与回调** | 原生类支持构造函数、静态工厂、读写属性、实例方法以及显式幂等的 `.dispose()`；回调函数支持强类型 MoonBit 签名 `(Args) -> Ret raise`、带 `.dispose()` 的返回闭包与线程安全函数（`NapiCallback`）。 |
 | 🔒 **非侵入式隔离构建** | 所有中间产物均在隔离工作区中合成与编译，绝不污染用户源码树；内置内容哈希增量缓存、监听模式（`--watch`）与原生符号冲突检查（`nm` / `dumpbin`）。 |
-| 📦 **精准 ABI 与引擎范围** | 默认面向 **N-API v4**，仅在使用 `BigInt`、`Bytes`/`BufferView` 或异步运行时等高阶特性时按需提升至对应 N-API 版本（最高 v8），并自动计算精确的 `package.json` `engines.node` 范围。 |
+| 📦 **精准 ABI 与引擎范围** | 默认面向 **N-API v4**，仅在使用 `BigInt`、`Bytes`/`BufferView`、External、低层 JS 或异步运行时等高阶特性时按需提升至对应 N-API 版本（最高 v10），并自动计算精确的 `package.json` `engines.node` 范围。 |
 
 ---
 
@@ -71,7 +71,11 @@
 | 持久化 / 线程安全回调（`NapiCallback`，新项目默认基线） | **4** | `>=12.20.0 <13 \|\| >=14.13.1`（双模式默认范围） |
 | 精确 64 位整数 `Int64` / `UInt64`（`bigint`） | **6** | Node 10.7.0+（与加载器要求取交集） |
 | `Bytes`（`Buffer`）与同步零拷贝借用 `NapiBufferView` | **7** | Node 10.16.0+（与加载器要求取交集） |
+| External/零拷贝 Buffer、ArrayBuffer、DataView 与 BigInt TypedArray | **7** | Node 10.16.0+（与加载器要求取交集） |
 | `pub async fn`、`NapiTask`、`NapiJsPromise`、`NapiAsyncIterator` 与异步宿主清理 | **8** | `>=12.22.0 <13 \|\| >=14.17.0 <15 \|\| >=15.12.0 <16 \|\| >=16.0.0` |
+| freeze/seal 与 type tag | **8** | Node 12.22.0+（与加载器要求取交集） |
+| `Symbol.for`、SyntaxError 与 module filename | **9** | Node 18.0.0+（与加载器要求取交集） |
+| property key、external string 与 ArrayBuffer-backed Buffer | **10** | Node 22.0.0+（与加载器要求取交集） |
 | Web `ReadableStream` 辅助包装器（`*Stream`） | **8** | **Node 18.0.0+** |
 
 仓库 CI 持续在 **Node 22、24、26** 以及最低兼容版本消费端上运行完整门禁，并包含 Windows 与 Linux 原生内存泄漏检查。
@@ -157,7 +161,10 @@ console.log(summarize('orders', [10, 20, 30]));
 | `String` | `string` | 直接在 UTF-16 字符串之间桥接，避免多余的 UTF-8 中间转码。 |
 | `Bytes` | `Buffer` | 跨边界拥有所有权的字节拷贝（`N-API 7`），可安全持久化或在异步函数中返回。 |
 | `NapiBufferView` | `Buffer` | 零拷贝同步只读借用（`N-API 7`），仅在当前同步调用栈帧内有效。 |
+| `NapiObject` / `NapiFunction` / `NapiArray` | JavaScript 对象/函数/数组 | 绑定当前环境的低层 handle，提供属性、调用、构造、原型和 `instanceof`；不可跨 async/worker。 |
 | `NapiInt8Array` / `NapiUint8Array` / `NapiUint8ClampedArray` / `NapiInt16Array` / `NapiUint16Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | 对应 JavaScript TypedArray / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝；8/16 位元素在 MoonBit 中使用可安全表达其范围的整数数组。 |
+| `NapiBigInt64Array` / `NapiBigUint64Array` / `NapiDataView` | BigInt64Array / BigUint64Array / DataView | 拥有型拷贝；拒绝 detached 与共享 backing。 |
+| `NapiExternal` 与 external helper | External / Buffer / ArrayBuffer / string | 显式管理的外部指针或 GC 保活的 Bytes backing；需要拷贝时使用拥有型包装。 |
 | `NapiDate` | `Date` | 通过 ECMAScript 毫秒时间值拷贝；非法 Date 在边界处拒绝（N-API 5）。 |
 | `NapiSymbol` | `symbol` | 通过环境归属的持久引用保留 Symbol 身份；描述文本只用于创建。 |
 | `NapiSet[T]` | `Set<T>` | 通过 `Set` 的插入顺序复制元素，递归使用同一转换器并保留集合去重语义。 |
@@ -168,6 +175,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub async fn(...) -> T` | `Promise<T>`（支持 `{ signal?: AbortSignal }`） | 运行于内嵌的 `moonbitlang/async@0.22.4` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
 | `NapiJsPromise[T]` | `Promise<T>` | 在 MoonBit `async fn` 中直接等待 JavaScript Promise 并校验返回值类型。 |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` 与 `ReadableStream<T>` | 按需驱动的异步流输入与输出，支持背压控制与消费端提前终止（`return()`）。 |
+| `NapiTypedThreadsafeFunction[T]` | 后台 producer 到 JS callback | 后台把 `T` 编码为拷贝的 Bytes，JS 线程 callback 收到 Buffer。 |
 | `NapiIterator[T]` | `IterableIterator<T>` | 同步消费 JavaScript Iterable，并提供带 `return()` 的惰性迭代器；关闭和异常会释放回调资源。 |
 | `nativeTasks` / `workerTasks` (`napi-mbt.json`) | `Promise<T>` / Worker 进程池 | 将 C 计算任务卸载至 libuv 线程池（`nativeTasks`），或将纯 MoonBit 计算放入隔离的 Node 子进程池（`workerTasks`）。 |
 
@@ -212,7 +220,7 @@ napi-mbt-cli <command> [directory] [options]
 | **平台与 ABI 策略** | [支持策略](docs/zh/support.md) · [平台验证 (EN)](docs/platforms.md) · [验证记录 (EN)](docs/validation.md) |
 | **类型系统与对象生命周期** | [类型映射](docs/zh/types.md) · [类与回调](docs/zh/classes-callbacks.md) · [线程安全函数](docs/zh/tsfn.md) |
 | **异步、流与多进程/多线程** | [异步函数](docs/zh/async.md) · [异步运行时适配器](docs/zh/async-adapter.md) · [JS Promise 输入](docs/zh/js-promises.md) · [异步流与 Web Streams](docs/zh/streams.md) · [原生后台任务](docs/zh/native-tasks.md) · [Worker 进程池](docs/zh/workers.md) |
-| **工程实践、对比与路线图** | [性能基准](docs/zh/performance.md) · [开发流程](docs/zh/development.md) · [与 napi-rs 对比](docs/zh/napi-rs-comparison.md) · [路线图](docs/zh/roadmap.md) |
+| **工程实践、对比与路线图** | [软件设计说明（SDD）](docs/zh/sdd.md) · [高级 API](docs/zh/advanced-api.md) · [性能基准](docs/zh/performance.md) · [开发流程](docs/zh/development.md) · [与 napi-rs 对比](docs/zh/napi-rs-comparison.md) · [路线图](docs/zh/roadmap.md) |
 
 ### 独立示例项目 (`examples/`)
 

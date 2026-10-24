@@ -14,6 +14,11 @@
 | 流与输入 Promise | 类型化 JS Promise 输入、双向 AsyncIterable/Web 流、按需生产与统一关闭 |
 | 迭代器 | 同步 Iterable 与异步 AsyncIterable 双向转换；同步迭代器在耗尽/关闭时释放回调 |
 | 二进制值 | 拥有型 Int8/Uint8/Uint8Clamped/Int16/Uint16/Int32/Uint32/Float32/Float64 TypedArray 与 ArrayBuffer 双向复制；拒绝 detached/SharedArrayBuffer |
+| 低层 JS API | `NapiObject`、`NapiFunction`、`NapiArray`、属性/调用/构造、原型、类型检查和 HandleScope |
+| External/零拷贝 | `NapiExternal`、external Buffer/ArrayBuffer、DataView，以及 N-API 10 ArrayBuffer-backed Buffer view |
+| 扩展二进制 | `NapiBigInt64Array`、`NapiBigUint64Array`、`NapiDataView` |
+| N-API 8/9/10 | freeze/seal、type tag、instance data、`Symbol.for`、SyntaxError、module filename、property key、external string |
+| 高层 TSFN | `NapiTypedThreadsafeFunction[T]`，编码后安全跨线程排队，回调在 JS 线程接收 Buffer |
 | 开发体验 | doctor、严格 schema、独立 CJS/ESM、watch、计时和明确加载错误 |
 | 工程 | 持久隔离增量缓存、跨进程锁、源码/工具链/产物构建记录、事务更新 |
 | 分发 | 工具通过 Mooncakes 安装；用户 addon 保留 npm 平台包、干净安装、TS、ASan 门禁 |
@@ -27,8 +32,8 @@ napi-mbt 原生 CLI 无 Node 依赖，新工程默认 N-API 4，addon 最低 Nod
 测试参考 napi-rs 的消费者验收方式：实际加载和执行、类型正反例、worker、错误恢复、
 生命周期、异步和安装包。没有复制其完整 API 或全部平台矩阵。
 异步实现基于 MoonBit 的调度器，与 Rust 的实现不同；N-API cleanup 要求和运行线程
-约束仍需明确满足。现有七目标实现及新增平台 CI 待验证状态见支持矩阵，
-不能将配置好的平台任务当作已通过的原生测试。
+约束仍需明确满足。现有七目标实现及本次新增 API 已通过 hosted CI 的 native、
+consumer 与 memory 门禁；后续工具链变化仍应以真实构建和消费者结果更新支持矩阵。
 
 详见[支持矩阵](support.md)、[实际验证](../validation.md)、[性能结果](performance.md)
 和[路线图](roadmap.md)。
