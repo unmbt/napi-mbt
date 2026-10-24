@@ -44,9 +44,12 @@ assert.equal(addon.literalBuffer().toString(), 'literal');
 new Uint8Array(addon.literalArrayBuffer())[0] = 76;
 assert.equal(new TextDecoder().decode(addon.literalArrayBuffer()), 'literal');
 
-const external = addon.makeExternal();
+let external = addon.makeExternal();
 assert.equal(addon.externalIdentity(external), external);
 assert.throws(() => addon.externalIdentity({}));
+// Release the ESM top-level root so GC can reclaim Node's ExternalWrapper too.
+// Its weak callback does not run for a still-rooted value at isolate disposal.
+external = null;
 
 const view = addon.dataViewRoundtrip(new DataView(Uint8Array.from([1, 2, 3]).buffer));
 assert.deepEqual([...new Uint8Array(view.buffer)], [1, 2, 3]);
