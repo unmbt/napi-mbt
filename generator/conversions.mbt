@@ -32,6 +32,8 @@ fn conversion_types(
       OptionType(inner)
       | ArrayType(inner)
       | MapType(inner)
+      | SetType(inner)
+      | IteratorType(inner)
       | JsPromiseType(inner)
       | AsyncIteratorType(inner) => collect(inner, read)
       TupleType(items) =>
@@ -174,6 +176,31 @@ fn conversions(
           )
         }
       }
+      SetType(inner) => {
+        enter()
+        if read {
+          out.write_string(
+            "  let raw = napi_set_values(env, value)\n  let length = napi_array_length(env, raw)\n  NapiSet::new(Array::makei(length, i => " +
+            convert(inner, "napi_array_get(env, raw, i)") +
+            "))\n",
+          )
+        } else {
+          out.write_string(
+            "  let raw = napi_array_new(env, value.length())\n  for i, item in value.to_array() { napi_array_set(env, raw, i, " +
+            convert(inner, "item") +
+            ") }\n  napi_set_new(env, raw)\n",
+          )
+        }
+      }
+      IteratorType(inner) =>
+        out.write_string(
+          "  " +
+          (if read { "get_" } else { "set_" }) +
+          "NapiIterator(env, value, fn(env, value) { " +
+          conversion_name(inner, types, read) +
+          (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
+          " })\n",
+        )
       TupleType(items) => {
         enter()
         if read {

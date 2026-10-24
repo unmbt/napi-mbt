@@ -21,7 +21,7 @@ async fn main {
     if check && files.get("workers/" + name) != Some(Json(text)) { fail("Worker runtime is stale") }
     files["workers/" + name] = Json(text)
   }
-  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_collections.mbt", "napi_owned_binary.mbt", "napi_arraybuffer.mbt", "napi_owned_binary.h", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
+  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_collections.mbt", "napi_owned_binary.mbt", "napi_arraybuffer.mbt", "napi_owned_binary.h", "napi_dates.mbt", "napi_symbols.mbt", "napi_iterators.mbt", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt"] {
     let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
     let (target, source) = if name == "lib.mbt" {
       ("napi_runtime.mbt", source)

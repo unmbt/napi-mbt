@@ -151,6 +151,20 @@ fn resolve_type(
       }
       resolve_type(inner, declarations, types, features, location, classes)
     }
+    DateType => if !features.contains("date") { features.push("date") }
+    SymbolType => if !features.contains("symbol") { features.push("symbol") }
+    SetType(inner) => {
+      if !features.contains("set") {
+        features.push("set")
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
+    IteratorType(inner) => {
+      if !features.contains("iterator") {
+        features.push("iterator")
+      }
+      resolve_type(inner, declarations, types, features, location, classes)
+    }
     CallbackType(params, ret, _) => {
       if !features.contains("callback") {
         features.push("callback")

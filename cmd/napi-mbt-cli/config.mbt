@@ -106,6 +106,7 @@ struct Config {
 ///|
 fn feature_version(name : String) -> Int32 raise {
   match name {
+    "date" | "set" | "iterator" | "symbol" => 1
     "promise" => 1
     "threadsafe_function" => 4
     "bigint" => 6

@@ -3,6 +3,10 @@ pub(all) enum ValueType {
   IntType
   UIntType
   FloatType
+  DateType
+  SymbolType
+  SetType(ValueType)
+  IteratorType(ValueType)
   JsonType
   JsPromiseType(ValueType)
   AsyncIteratorType(ValueType)
@@ -30,6 +34,10 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     IntType => "Int"
     UIntType => "UInt"
     FloatType => "Float"
+    DateType => "NapiDate"
+    SymbolType => "NapiSymbol"
+    SetType(inner) => "NapiSet[" + inner.runtime_name() + "]"
+    IteratorType(inner) => "NapiIterator[" + inner.runtime_name() + "]"
     JsonType => "Json"
     JsPromiseType(inner) => "NapiJsPromise[" + inner.runtime_name() + "]"
     AsyncIteratorType(inner) =>
@@ -63,6 +71,10 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
 fn ValueType::moonbit(self : ValueType) -> String {
   match self {
     IntType => "Int32"
+    DateType => "NapiDate"
+    SymbolType => "NapiSymbol"
+    SetType(inner) => "NapiSet[" + inner.moonbit() + "]"
+    IteratorType(inner) => "NapiIterator[" + inner.moonbit() + "]"
     OptionType(inner) => "Option[" + inner.moonbit() + "]"
     ArrayType(inner) => "Array[" + inner.moonbit() + "]"
     MapType(inner) => "Map[String, " + inner.moonbit() + "]"
@@ -82,6 +94,15 @@ fn ValueType::moonbit(self : ValueType) -> String {
 fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
   match self {
     IntType | UIntType | FloatType | DoubleType => "number"
+    DateType => "Date"
+    SymbolType => "symbol"
+    SetType(inner) => "Set<" + inner.typescript(input~) + ">"
+    IteratorType(inner) =>
+      if input {
+        "Iterable<" + inner.typescript(input~) + ">"
+      } else {
+        "IterableIterator<" + inner.typescript() + ">"
+      }
     JsonType => "$NapiJson"
     JsPromiseType(inner) => "Promise<" + inner.typescript(input~) + ">"
     AsyncIteratorType(inner) =>
@@ -182,7 +203,10 @@ fn parse_value_type(
     }
     return MapType(parse_value_type(value, location, true))
   }
-  for prefix in ["Option[", "Array[", "NapiJsPromise[", "NapiAsyncIterator["] {
+  for
+    prefix in [
+      "Option[", "Array[", "NapiSet[", "NapiIterator[", "NapiJsPromise[", "NapiAsyncIterator[",
+    ] {
     if text.has_prefix(prefix) && text.has_suffix("]") {
       let inner = parse_value_type(
         text[prefix.length():text.length() - 1].to_owned(),
@@ -194,6 +218,10 @@ fn parse_value_type(
       }
       return if prefix == "Option[" {
         OptionType(inner)
+      } else if prefix == "NapiSet[" {
+        SetType(inner)
+      } else if prefix == "NapiIterator[" {
+        IteratorType(inner)
       } else if prefix == "NapiJsPromise[" {
         JsPromiseType(inner)
       } else if prefix == "NapiAsyncIterator[" {
@@ -207,8 +235,14 @@ fn parse_value_type(
     "Int" | "Int32" => IntType
     "UInt" | "UInt32" => UIntType
     "Float" => FloatType
+    "Date" | "NapiDate" => DateType
+    "Symbol" | "NapiSymbol" => SymbolType
     "Json" => JsonType
+    "NapiInt8Array" => OwnedBinaryType(Int8)
     "NapiUint8Array" => OwnedBinaryType(Uint8)
+    "NapiUint8ClampedArray" => OwnedBinaryType(Uint8Clamped)
+    "NapiInt16Array" => OwnedBinaryType(Int16)
+    "NapiUint16Array" => OwnedBinaryType(Uint16)
     "NapiInt32Array" => OwnedBinaryType(Int32)
     "NapiUint32Array" => OwnedBinaryType(Uint32)
     "NapiFloat32Array" => OwnedBinaryType(Float32)

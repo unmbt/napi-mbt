@@ -258,6 +258,37 @@ MOONBIT_FFI_EXPORT int moonbit_napi_value_same(napi_env env, napi_value a, napi_
     return (int)status;
 }
 
+MOONBIT_FFI_EXPORT int moonbit_napi_read_date(napi_env env, napi_value value, double *result) {
+#if NAPI_VERSION >= 5
+    bool is_date = false;
+    napi_status status = napi_is_date(env, value, &is_date);
+    if (status != napi_ok) return (int)status;
+    if (!is_date) return (int)napi_invalid_arg;
+    return (int)napi_get_date_value(env, value, result);
+#else
+    (void)env; (void)value; (void)result;
+    return (int)napi_generic_failure;
+#endif
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_write_date(napi_env env, double value, napi_value *result) {
+#if NAPI_VERSION >= 5
+    return (int)napi_create_date(env, value, result);
+#else
+    (void)env; (void)value; (void)result;
+    return (int)napi_generic_failure;
+#endif
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_symbol_new(napi_env env, moonbit_string_t description, napi_value *result) {
+    napi_value text;
+    napi_status status = napi_create_string_utf16(
+        env, (const char16_t *)description,
+        (size_t)Moonbit_array_length(description), &text);
+    if (status == napi_ok) status = napi_create_symbol(env, text, result);
+    return (int)status;
+}
+
 MOONBIT_FFI_EXPORT int moonbit_napi_array_length(napi_env env, napi_value value, int *result) {
     bool array = false;
     napi_status status = napi_is_array(env, value, &array);
@@ -348,4 +379,79 @@ MOONBIT_FFI_EXPORT int moonbit_napi_key_set(napi_env env, napi_value value, napi
     descriptor.value = field;
     descriptor.attributes = (napi_property_attributes)(napi_writable | napi_enumerable | napi_configurable);
     return (int)napi_define_properties(env, value, 1, &descriptor);
+}
+
+static napi_status napi_mbt_get_set_constructor(napi_env env, napi_value *constructor) {
+    napi_value global;
+    napi_status status = napi_get_global(env, &global);
+    if (status == napi_ok) status = napi_get_named_property(env, global, "Set", constructor);
+    return status;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_set_values(napi_env env, napi_value value, napi_value *result) {
+    napi_value constructor, iterator, values, next;
+    napi_status status = napi_mbt_get_set_constructor(env, &constructor);
+    bool instance = false;
+    if (status == napi_ok) status = napi_instanceof(env, value, constructor, &instance);
+    if (status != napi_ok) return (int)status;
+    if (!instance) return (int)napi_invalid_arg;
+    status = napi_get_named_property(env, value, "values", &values);
+    if (status == napi_ok) status = napi_call_function(env, value, values, 0, NULL, &iterator);
+    if (status == napi_ok) status = napi_get_named_property(env, iterator, "next", &next);
+    if (status != napi_ok) return (int)status;
+    status = napi_create_array(env, result);
+    if (status != napi_ok) return (int)status;
+    uint32_t index = 0;
+    for (;;) {
+        napi_value step, done, item;
+        status = napi_call_function(env, iterator, next, 0, NULL, &step);
+        if (status == napi_ok) status = napi_get_named_property(env, step, "done", &done);
+        if (status == napi_ok) status = napi_get_value_bool(env, done, &instance);
+        if (status != napi_ok) return (int)status;
+        if (instance) break;
+        if (index == UINT32_MAX) return (int)napi_generic_failure;
+        status = napi_get_named_property(env, step, "value", &item);
+        if (status == napi_ok) status = napi_set_element(env, *result, index++, item);
+        if (status != napi_ok) return (int)status;
+    }
+    return (int)napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int moonbit_napi_set_new(napi_env env, napi_value values, napi_value *result) {
+    napi_value constructor;
+    napi_status status = napi_mbt_get_set_constructor(env, &constructor);
+    if (status == napi_ok) status = napi_new_instance(env, constructor, 1, &values, result);
+    return (int)status;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_iterator_current_env(napi_env *result) {
+    if (!napi_mbt_active) return (int)napi_invalid_arg;
+    *result = napi_mbt_active->env;
+    return (int)napi_ok;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_iterator_factory(
+    napi_env env, int input, napi_value next, napi_value close, napi_value *result) {
+    const char *source =
+        "((input, next, close) => {"
+        " if (input) {"
+        "  if (next == null || typeof next[Symbol.iterator] !== 'function') throw new TypeError('Expected Iterable');"
+        "  const iterator = next[Symbol.iterator]();"
+        "  return { next() { const r = iterator.next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); return r; },"
+        "    close() { if (iterator && typeof iterator.return === 'function') iterator.return(); } };"
+        " }"
+        " let ended = false;"
+        " return { [Symbol.iterator]() { return this; },"
+        "  next() { if (ended) return {done:true}; const r = next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); if (r.done) { ended = true; next = null; close = null; } return r; },"
+        "  close() { if (!ended) { ended = true; const f = close; next = close = null; if (f) f(); } },"
+        "  return(value) { this.close(); return {done:true, value}; } };"
+        "})";
+    napi_value script, factory, undefined, flag, args[3];
+    napi_status status = napi_create_string_utf8(env, source, NAPI_AUTO_LENGTH, &script);
+    if (status == napi_ok) status = napi_run_script(env, script, &factory);
+    if (status == napi_ok) status = napi_get_undefined(env, &undefined);
+    if (status == napi_ok) status = napi_get_boolean(env, input != 0, &flag);
+    args[0] = flag; args[1] = next; args[2] = close;
+    if (status == napi_ok) status = napi_call_function(env, undefined, factory, 3, args, result);
+    return (int)status;
 }

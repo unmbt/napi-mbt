@@ -2,6 +2,7 @@
 
 The current foundation includes error short-circuiting, one validated generator,
 strict configuration/loaders, isolated builds, owned/borrowed value conversion,
+Date/Set/Symbol/synchronous iterators,
 classes/callbacks, a version-pinned Node-driven async host, owned binary types,
 native tasks, isolated process pools, typed Promise inputs and Web streams.
 Mooncakes installation, standalone examples, persistent isolated workspaces and
@@ -30,5 +31,5 @@ cancellation, worker teardown and sanitizer tests. It must remain confined to
 isolated build workspaces.
 
 WASI, cross compilation, shared MoonBit closures, shared-memory TypedArrays,
-zero-copy external buffers, generic exports, Set/Date and Node Readable-specific
+zero-copy external buffers, generic exports, External and Node Readable-specific
 adapters remain outside this implementation.

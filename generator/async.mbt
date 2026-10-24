@@ -9,6 +9,8 @@ fn borrowed_type(
     OptionType(inner)
     | ArrayType(inner)
     | MapType(inner)
+    | SetType(inner)
+    | IteratorType(inner)
     | JsPromiseType(inner)
     | AsyncIteratorType(inner) => borrowed_type(inner, types, seen)
     TupleType(items) => items.any(item => borrowed_type(item, types, seen))

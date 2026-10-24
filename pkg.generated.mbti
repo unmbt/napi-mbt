@@ -2,7 +2,7 @@
 package "unmbt/napi-mbt"
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "13"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "14"
 
 pub fn add(Int32, Int32) -> Int32
 
@@ -32,11 +32,19 @@ pub fn get_NapiFloat32Array(NapiEnv, NapiValue) -> NapiFloat32Array raise NapiEr
 
 pub fn get_NapiFloat64Array(NapiEnv, NapiValue) -> NapiFloat64Array raise NapiError
 
+pub fn get_NapiInt16Array(NapiEnv, NapiValue) -> NapiInt16Array raise NapiError
+
 pub fn get_NapiInt32Array(NapiEnv, NapiValue) -> NapiInt32Array raise NapiError
+
+pub fn get_NapiInt8Array(NapiEnv, NapiValue) -> NapiInt8Array raise NapiError
+
+pub fn get_NapiUint16Array(NapiEnv, NapiValue) -> NapiUint16Array raise NapiError
 
 pub fn get_NapiUint32Array(NapiEnv, NapiValue) -> NapiUint32Array raise NapiError
 
 pub fn get_NapiUint8Array(NapiEnv, NapiValue) -> NapiUint8Array raise NapiError
+
+pub fn get_NapiUint8ClampedArray(NapiEnv, NapiValue) -> NapiUint8ClampedArray raise NapiError
 
 pub fn get_String(NapiEnv, NapiValue) -> String raise NapiError
 
@@ -114,6 +122,10 @@ pub fn napi_read_json(NapiEnv, NapiValue, Array[NapiValue]) -> Json raise NapiEr
 
 pub fn napi_require_object(NapiEnv, NapiValue) -> Unit raise NapiError
 
+pub fn napi_set_new(NapiEnv, NapiValue) -> NapiValue raise NapiError
+
+pub fn napi_set_values(NapiEnv, NapiValue) -> NapiValue raise NapiError
+
 pub fn napi_threadsafe_function_acquire(NapiThreadsafeFunction) -> NapiTsfnStatus raise NapiError
 
 pub fn napi_threadsafe_function_call(NapiThreadsafeFunction, UnmanagedBuffer, NapiTsfnCallMode) -> NapiTsfnStatus raise NapiError
@@ -144,11 +156,19 @@ pub fn set_NapiFloat32Array(NapiEnv, NapiFloat32Array) -> NapiValue raise NapiEr
 
 pub fn set_NapiFloat64Array(NapiEnv, NapiFloat64Array) -> NapiValue raise NapiError
 
+pub fn set_NapiInt16Array(NapiEnv, NapiInt16Array) -> NapiValue raise NapiError
+
 pub fn set_NapiInt32Array(NapiEnv, NapiInt32Array) -> NapiValue raise NapiError
+
+pub fn set_NapiInt8Array(NapiEnv, NapiInt8Array) -> NapiValue raise NapiError
+
+pub fn set_NapiUint16Array(NapiEnv, NapiUint16Array) -> NapiValue raise NapiError
 
 pub fn set_NapiUint32Array(NapiEnv, NapiUint32Array) -> NapiValue raise NapiError
 
 pub fn set_NapiUint8Array(NapiEnv, NapiUint8Array) -> NapiValue raise NapiError
+
+pub fn set_NapiUint8ClampedArray(NapiEnv, NapiUint8ClampedArray) -> NapiValue raise NapiError
 
 pub fn set_String(NapiEnv, String) -> NapiValue raise NapiError
 
@@ -196,6 +216,12 @@ pub fn NapiCallback::new(NapiEnv, NapiValue) -> Self raise NapiError
 #external
 pub type NapiCallbackInfo
 
+pub struct NapiDate {
+  // private fields
+}
+pub fn NapiDate::milliseconds(Self) -> Double
+pub fn NapiDate::new(Double) -> Self
+
 #external
 pub type NapiDeferred
 
@@ -222,12 +248,33 @@ pub fn NapiFloat64Array::length(Self) -> Int32
 pub fn NapiFloat64Array::new(Array[Double]) -> Self
 pub fn NapiFloat64Array::to_array(Self) -> Array[Double]
 
+pub struct NapiInt16Array {
+  // private fields
+}
+pub fn NapiInt16Array::length(Self) -> Int32
+pub fn NapiInt16Array::new(Array[Int32]) -> Self
+pub fn NapiInt16Array::to_array(Self) -> Array[Int32]
+
 pub struct NapiInt32Array {
   // private fields
 }
 pub fn NapiInt32Array::length(Self) -> Int32
 pub fn NapiInt32Array::new(Array[Int32]) -> Self
 pub fn NapiInt32Array::to_array(Self) -> Array[Int32]
+
+pub struct NapiInt8Array {
+  // private fields
+}
+pub fn NapiInt8Array::length(Self) -> Int32
+pub fn NapiInt8Array::new(Array[Int32]) -> Self
+pub fn NapiInt8Array::to_array(Self) -> Array[Int32]
+
+pub struct NapiIterator[T] {
+  // private fields
+}
+pub fn[T] NapiIterator::close(Self[T]) -> Unit raise
+pub fn[T] NapiIterator::new(() -> T? raise, close? : () -> Unit raise) -> Self[T] raise NapiError
+pub fn[T] NapiIterator::next(Self[T]) -> T? raise
 
 pub struct NapiPromise {
   promise : NapiValue
@@ -239,6 +286,18 @@ pub type NapiReference
 pub fn NapiReference::dispose(Self) -> Unit raise NapiError
 pub fn NapiReference::get(Self, NapiEnv) -> NapiValue raise NapiError
 pub fn NapiReference::new(NapiEnv, NapiValue) -> Self raise NapiError
+
+pub struct NapiSet[T] {
+  // private fields
+}
+pub fn[T] NapiSet::length(Self[T]) -> Int32
+pub fn[T] NapiSet::new(Array[T]) -> Self[T]
+pub fn[T] NapiSet::to_array(Self[T]) -> Array[T]
+
+pub struct NapiSymbol {
+  // private fields
+}
+pub fn NapiSymbol::new(NapiEnv, String) -> Self raise NapiError
 
 #external
 pub type NapiThreadsafeFunction
@@ -259,6 +318,13 @@ pub(all) enum NapiTsfnStatus {
   Closing
 }
 
+pub struct NapiUint16Array {
+  // private fields
+}
+pub fn NapiUint16Array::length(Self) -> Int32
+pub fn NapiUint16Array::new(Array[UInt32]) -> Self
+pub fn NapiUint16Array::to_array(Self) -> Array[UInt32]
+
 pub struct NapiUint32Array {
   // private fields
 }
@@ -272,6 +338,13 @@ pub struct NapiUint8Array {
 pub fn NapiUint8Array::length(Self) -> Int32
 pub fn NapiUint8Array::new(Array[Byte]) -> Self
 pub fn NapiUint8Array::to_array(Self) -> Array[Byte]
+
+pub struct NapiUint8ClampedArray {
+  // private fields
+}
+pub fn NapiUint8ClampedArray::length(Self) -> Int32
+pub fn NapiUint8ClampedArray::new(Array[Byte]) -> Self
+pub fn NapiUint8ClampedArray::to_array(Self) -> Array[Byte]
 
 #external
 pub type NapiValue

@@ -157,7 +157,10 @@ console.log(summarize('orders', [10, 20, 30]));
 | `String` | `string` | 直接在 UTF-16 字符串之间桥接，避免多余的 UTF-8 中间转码。 |
 | `Bytes` | `Buffer` | 跨边界拥有所有权的字节拷贝（`N-API 7`），可安全持久化或在异步函数中返回。 |
 | `NapiBufferView` | `Buffer` | 零拷贝同步只读借用（`N-API 7`），仅在当前同步调用栈帧内有效。 |
-| `NapiUint8Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | `Uint8Array` / `Int32Array` / `Uint32Array` / `Float32Array` / `Float64Array` / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝，完整保留元素长度。 |
+| `NapiInt8Array` / `NapiUint8Array` / `NapiUint8ClampedArray` / `NapiInt16Array` / `NapiUint16Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | 对应 JavaScript TypedArray / `ArrayBuffer` | 拥有所有权的 TypedArray 与 `ArrayBuffer` 拷贝；8/16 位元素在 MoonBit 中使用可安全表达其范围的整数数组。 |
+| `NapiDate` | `Date` | 通过 ECMAScript 毫秒时间值拷贝；非法 Date 在边界处拒绝（N-API 5）。 |
+| `NapiSymbol` | `symbol` | 通过环境归属的持久引用保留 Symbol 身份；描述文本只用于创建。 |
+| `NapiSet[T]` | `Set<T>` | 通过 `Set` 的插入顺序复制元素，递归使用同一转换器并保留集合去重语义。 |
 | `T?`, `Array[T]`, `Map[String, T]`, `(A, B, ...)`, `Json` | `T \| null`, `Array<T>`, `Record<string, T>`, `[A, B, ...]`, `JsonValue` | 递归结构化校验；`Option::None` 输出为 `null`（输入同时接受 `null` 或 `undefined`）。 |
 | `pub struct` / `pub enum` | Object / 判别联合类型 | 结构体映射为强类型 JS 对象；枚举映射为构造器名称字符串或 `{ tag: "Variant", args: [...] }` 判别联合。 |
 | 配置类 (`napi-mbt.json`) | 带 `dispose()` 的 `class` | 原生对象句柄封装，支持构造函数、静态工厂、属性读写、实例方法与确定性释放。 |
@@ -165,6 +168,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub async fn(...) -> T` | `Promise<T>`（支持 `{ signal?: AbortSignal }`） | 运行于内嵌的 `moonbitlang/async@0.22.4` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
 | `NapiJsPromise[T]` | `Promise<T>` | 在 MoonBit `async fn` 中直接等待 JavaScript Promise 并校验返回值类型。 |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` 与 `ReadableStream<T>` | 按需驱动的异步流输入与输出，支持背压控制与消费端提前终止（`return()`）。 |
+| `NapiIterator[T]` | `IterableIterator<T>` | 同步消费 JavaScript Iterable，并提供带 `return()` 的惰性迭代器；关闭和异常会释放回调资源。 |
 | `nativeTasks` / `workerTasks` (`napi-mbt.json`) | `Promise<T>` / Worker 进程池 | 将 C 计算任务卸载至 libuv 线程池（`nativeTasks`），或将纯 MoonBit 计算放入隔离的 Node 子进程池（`workerTasks`）。 |
 
 ---

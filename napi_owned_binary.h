@@ -1,15 +1,19 @@
 #ifndef NAPI_MBT_OWNED_BINARY_H
 #define NAPI_MBT_OWNED_BINARY_H
 
+#include <stdlib.h>
+
 /* Owner-thread-only conversion. Both directions copy; no JS backing pointer or
  * JS handle is stored in a MoonBit value. The arrays may outlive this call. */
 static size_t napi_mbt_binary_width(int kind) {
-    return kind == 1 || kind == -1 ? 1 : kind == 8 ? 8 : 4;
+    return kind == 1 || kind == 0 || kind == 2 || kind == -1 ? 1 :
+        kind == 3 || kind == 4 ? 2 : kind == 8 ? 8 : 4;
 }
 
 static void *napi_mbt_binary_allocate(int kind, int32_t length) {
     switch (kind) {
-    case 5: case 6: return moonbit_make_int32_array_raw(length);
+    case 0: case 3: case 5: return moonbit_make_int32_array_raw(length);
+    case 4: case 6: return moonbit_make_int32_array_raw(length);
     case 7: return moonbit_make_float_array_raw(length);
     case 8: return moonbit_make_double_array_raw(length);
     default: return moonbit_make_bytes_raw(length);
@@ -57,8 +61,17 @@ done:
     status = napi_generic_failure;
 #endif
     *error = (int32_t)status;
-    void *result = napi_mbt_binary_allocate(kind, status == napi_ok ? (int32_t)length : 0);
-    if (status == napi_ok && length) memcpy(result, data, length * napi_mbt_binary_width(kind));
+    int32_t count = status == napi_ok ? (int32_t)length : 0;
+    void *result = napi_mbt_binary_allocate(kind, count);
+    if (status == napi_ok && length) {
+        switch (kind) {
+        case 0: { int32_t *out = result; int8_t *in = data; for (size_t i = 0; i < length; ++i) out[i] = in[i]; break; }
+        case 1: case 2: case -1: memcpy(result, data, length); break;
+        case 3: { int32_t *out = result; int16_t *in = data; for (size_t i = 0; i < length; ++i) out[i] = in[i]; break; }
+        case 4: { uint32_t *out = result; uint16_t *in = data; for (size_t i = 0; i < length; ++i) out[i] = in[i]; break; }
+        default: memcpy(result, data, length * napi_mbt_binary_width(kind)); break;
+        }
+    }
     return result;
 }
 
@@ -68,10 +81,34 @@ static int napi_mbt_write_owned_binary(
     size_t width = napi_mbt_binary_width(kind);
     if (length > SIZE_MAX / width) return 1002;
     void *data = NULL;
+    void *temporary = NULL;
     napi_value backing;
     napi_status status = napi_create_arraybuffer(env, length * width, &data, &backing);
     if (status != napi_ok) return (int)status;
-    if (length) memcpy(data, array, length * width);
+    if (length) {
+        if (kind == 0) {
+            temporary = malloc(length);
+            if (!temporary) return 1002;
+            int8_t *out = temporary; const int32_t *in = array;
+            for (size_t i = 0; i < length; ++i) out[i] = (int8_t)in[i];
+        } else if (kind == 2) {
+            temporary = malloc(length);
+            if (!temporary) return 1002;
+            memcpy(temporary, array, length);
+        } else if (kind == 3) {
+            temporary = malloc(length * 2);
+            if (!temporary) return 1002;
+            int16_t *out = temporary; const int32_t *in = array;
+            for (size_t i = 0; i < length; ++i) out[i] = (int16_t)in[i];
+        } else if (kind == 4) {
+            temporary = malloc(length * 2);
+            if (!temporary) return 1002;
+            uint16_t *out = temporary; const uint32_t *in = array;
+            for (size_t i = 0; i < length; ++i) out[i] = (uint16_t)in[i];
+        }
+        memcpy(data, temporary ? temporary : array, length * width);
+        free(temporary);
+    }
     if (kind == -1) { *result = backing; return (int)napi_ok; }
     return (int)napi_create_typedarray(env, (napi_typedarray_type)kind, length, backing, 0, result);
 }
@@ -85,6 +122,10 @@ MOONBIT_FFI_EXPORT int moonbit_napi_write_##tag(napi_env env, const type *data, 
 }
 
 NAPI_MBT_BINARY_API(Uint8Array, uint8_t, 1)
+NAPI_MBT_BINARY_API(Int8Array, int32_t, 0)
+NAPI_MBT_BINARY_API(Uint8ClampedArray, uint8_t, 2)
+NAPI_MBT_BINARY_API(Int16Array, int32_t, 3)
+NAPI_MBT_BINARY_API(Uint16Array, uint32_t, 4)
 NAPI_MBT_BINARY_API(Int32Array, int32_t, 5)
 NAPI_MBT_BINARY_API(Uint32Array, uint32_t, 6)
 NAPI_MBT_BINARY_API(Float32Array, float, 7)
