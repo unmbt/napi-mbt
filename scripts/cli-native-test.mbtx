@@ -75,10 +75,12 @@ async fn main {
   if @env.get_env_var("OS") != Some("Windows_NT") {
     let named_dir = temp + "/named project 空格"
     ignore(checked(installed, ["init", named_dir, "--name", "named-fixture"], temp, env))
-    let old_path = env["PATH"]
-    env["PATH"] = install_dir + ":" + old_path
+    let old_process_path = @env.get_env_var("PATH").unwrap_or("")
+    let named_path = install_dir + ":" + env["PATH"]
+    env["PATH"] = named_path
+    @env.set_env_var("PATH", named_path)
+    defer @env.set_env_var("PATH", old_process_path)
     ignore(checked("napi-mbt-cli", ["build", named_dir, "--release"], temp, env))
-    env["PATH"] = old_path
   }
   for (label, executable) in [("release", binary), ("installed", installed)] {
     let dir = temp + "/" + label + " project 空格"
