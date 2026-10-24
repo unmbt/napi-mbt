@@ -7,7 +7,7 @@
 | 主 Node CI | 七种原生宿主上的 22、24、26 |
 | 最低版本消费者 | Node 10.16：CJS/N-API 4；12.20：双入口/N-API 4；12.22：async/N-API 8 |
 | 原生构建门禁 | Windows x64 MSVC、Linux x64/ARM64 glibc 与 musl、macOS x64/ARM64 |
-| 新平台验证状态 | Linux ARM64、macOS x64 与 Alpine musl 已配置门禁，等待 CI 实际执行 |
+| 新平台验证状态 | Linux ARM64、macOS x64 与 Alpine musl 已配置并由托管 CI 执行 |
 | 交叉编译 | CLI 要求匹配宿主，拒绝不同目标 |
 | libc | glibc 与 musl；工具链探测及 addon 的 ELF 动态依赖必须与宿主一致 |
 
@@ -28,8 +28,9 @@
 | freeze/seal、type tag | 8 |
 | Symbol.for、SyntaxError、module filename | 9 |
 | property key、external string、ArrayBuffer-backed Buffer | 10 |
+| 高层 typed TSFN | 4 |
 
-N-API 原始 Promise API 属于 v1；async 宿主需要 v8 cleanup。
+N-API 原始 Promise API 属于 v1；内嵌 async 宿主明确需要 N-API 8 cleanup API。
 结构化值嵌入 bigint/Buffer 时继承更高版本要求。
 `moonbitlang/async` 必须恰好为 0.22.4。
 
@@ -48,8 +49,8 @@ CMake 包含当前 Windows runner 使用的 Visual Studio 18 2026 生成器。
 本机 Windows 使用 MSVC 19.44.35211、MSBuild 17.14.14、SDK 10.0.26100.0。
 托管 runner 的编译器/SDK 仍可能更新；`doctor --json` 记录实际选择，构建以真实
 compile/link probe 验收。新 MoonBit 兼容性另设 job。
-2026-10-19 的 [CI 运行 39229142895](https://github.com/unmbt/napi-mbt/actions/runs/39229142895)
-已在提交 `00503d9` 上通过全部 18 个验证任务，覆盖三个发布平台、Node 22/24/26、
-最低 Node 版本消费者，以及 Windows/Linux 内存检查。
+2026-10-24 的 [PR #4](https://github.com/unmbt/napi-mbt/pull/4) 已在低层与高级 API
+提交上通过 native gates、Node 22/24/26、最低 Node 版本消费者、最新 MoonBit
+兼容性以及 Windows/Linux 内存检查。
 仅 tag 触发的发布任务本次正常跳过；打包验收通过不代表已完成正式发布。
 托管与本机验证证据、剩余平台限制见[验证记录](../validation.md#hosted-ci-confirmation)。

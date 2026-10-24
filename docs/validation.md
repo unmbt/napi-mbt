@@ -23,8 +23,8 @@ Windows parser and addon ASan orchestration passed, including the combined
 fixture and the stream teardown regression. The local cache benchmark remains
 3.812 s warm median versus 24.510 s without cache (84.4% reduction), with no
 project compile/link on warm builds. The final platform matrix and Linux leak
-checks are configured in CI but were not executed on this Windows host; their
-configuration is not reported as a pass.
+checks were not executed on this Windows host; the later hosted PR confirmation
+below records their actual result.
 
 Local execution environment (2026-10-19): Windows x64, Moon 0.1.20261012,
 moonc v0.10.15+943464bfa, Node 26.4.0, CMake 4.0.3, MSBuild 17.14.14,
@@ -62,12 +62,12 @@ runtime, structured, class, callback and async ASan orchestration passed on
 Windows. Node 22.22.1 additionally passed native runtime/lifecycle/async tests.
 The pinned CI gates cover Node 22/24/26 and minimum Node 10.16/12.20/12.22,
 Linux/Windows sanitizer jobs, and a separate latest-MoonBit compatibility job.
-These configured jobs are not a claim of GitHub execution. Local Linux
-validation is tracked separately; macOS has not been executed locally.
+This local record predates the hosted PR run documented below; local Linux
+validation is tracked separately and macOS was not executed on this host.
 
 Test orchestration is in `.mbtx` files. Node fixtures exercise built binaries;
-they do not stand in for native CLI tests. No registry publication or remote
-push has been performed. The downloaded `napi-rs/` checkout is reference material.
+they do not stand in for native CLI tests. This local run did not publish a
+registry artifact. The downloaded `napi-rs/` checkout is reference material.
 
 ## Final integration
 
@@ -216,6 +216,18 @@ also passed for the same commit.
 
 The native jobs include CLI/npm packaging, dry-run and clean-install checks,
 Mooncake archive extraction/checking and artifact uploads. `Release archives`
-was correctly skipped because this was a branch push, not a version tag. This
-run does not establish GitHub Release or registry publication. Linux ARM64 and
-macOS x64 remain outside the release matrix; macOS has no sanitizer job.
+was correctly skipped because this was a branch push, not a version tag. That
+historical run does not establish GitHub Release or registry publication and did
+not include Linux ARM64 or macOS x64 in its release matrix; the current PR's
+seven-profile result is recorded below.
+
+## Low-level and advanced API PR confirmation
+
+On 2026-10-24, [PR #4](https://github.com/unmbt/napi-mbt/pull/4) passed the full
+hosted matrix for the low-level JS, External/zero-copy, extended binary,
+N-API 8/9/10 and encoded typed-TSFN changes. The run included native gates for
+all seven target profiles, Node 22/24/26 consumers, Node 10/12 minimum consumers,
+latest-MoonBit compatibility, and Linux/Windows memory jobs. Local checks also
+passed the generator and structured snapshots, owned-binary Node consumer, and
+the structured ASan fixture. The PR did not publish a release or registry
+artifact.

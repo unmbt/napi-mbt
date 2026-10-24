@@ -11,5 +11,5 @@
   "reduction": 0.8444716442268462,
   "warmProjectCompileOrLink": false,
   "command": "moon run scripts/build-cache-test.mbtx _build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe --benchmark",
-  "scope": "Local Windows measurement during stage 7; other hosts await CI. Timing is not a CI gate."
+  "scope": "Local Windows measurement during stage 7; other hosts were not measured. Timing is not a CI gate."
 }

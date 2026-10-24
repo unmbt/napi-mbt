@@ -11,7 +11,7 @@
 [![CI](https://github.com/unmbt/napi-mbt/actions/workflows/build-and-release.yml/badge.svg?branch=master)](https://github.com/unmbt/napi-mbt/actions/workflows/build-and-release.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey?style=flat-square)](docs/support.md)
-[![Node-API](https://img.shields.io/badge/ABI-Node--API%20v4--v8-339933?style=flat-square)](docs/support.md)
+[![Node-API](https://img.shields.io/badge/ABI-Node--API%20v4--v10-339933?style=flat-square)](docs/support.md)
 
 </div>
 
@@ -42,7 +42,7 @@ Crucially, **`napi-mbt-cli` is a standalone native binary**. You can install it 
 | ⚡ **Full Async & Concurrency Stack** | Supports cancellable `pub async fn` Promises (`moonbitlang/async@0.22.4` + libuv with `AbortSignal`), native C worker pool tasks (`nativeTasks`), isolated MoonBit worker process pools (`workerTasks`), awaited JS Promises (`NapiJsPromise`), and demand-driven async streams (`NapiAsyncIterator`). |
 | 🧱 **Safe Classes & Callbacks** | Native classes include constructors, static factories, getters/setters, methods, and explicit idempotent `.dispose()`. Callbacks support typed MoonBit signatures `(Args) -> Ret raise`, returned closures with `.dispose()`, and threadsafe functions (`NapiCallback`). |
 | 🔒 **Isolated, Cached Builds** | Compiles inside isolated workspaces without mutating user source files. Includes content-addressed build caching, watch mode (`--watch`), and native symbol collision inspection (`nm` / `dumpbin`). |
-| 📦 **Precise ABI & Engine Ranges** | Targets **N-API v4** by default and automatically raises the required N-API level (up to v8) only when higher-level features are used, computing the exact `engines.node` intersection in `package.json`. |
+| 📦 **Precise ABI & Engine Ranges** | Targets **N-API v4** by default and automatically raises the required N-API level (up to v10) only when higher-level features are used, computing the exact `engines.node` intersection in `package.json`. |
 
 ---
 
@@ -71,7 +71,11 @@ Crucially, **`napi-mbt-cli` is a standalone native binary**. You can install it 
 | Stored / threadsafe callbacks (`NapiCallback`, default CLI target) | **4** | `>=12.20.0 <13 \|\| >=14.13.1` (Dual default) |
 | Exact 64-bit `Int64` / `UInt64` (`bigint`) | **6** | Node 10.7.0+ (intersected with loader mode) |
 | `Bytes` (`Buffer`) & synchronous borrowed `NapiBufferView` | **7** | Node 10.16.0+ (intersected with loader mode) |
+| External/zero-copy Buffer, ArrayBuffer, DataView and BigInt typed arrays | **7** | Node 10.16.0+ (intersected with loader mode) |
 | `pub async fn`, `NapiTask`, `NapiJsPromise`, `NapiAsyncIterator`, async host cleanup | **8** | `>=12.22.0 <13 \|\| >=14.17.0 <15 \|\| >=15.12.0 <16 \|\| >=16.0.0` |
+| Freeze/seal and type tags | **8** | Node 12.22.0+ (intersected with loader mode) |
+| `Symbol.for`, SyntaxError and module filename | **9** | Node 18.0.0+ (intersected with loader mode) |
+| Property keys, external strings and ArrayBuffer-backed Buffer views | **10** | Node 22.0.0+ (intersected with loader mode) |
 | Web `ReadableStream` helper (`*Stream`) | **8** | **Node 18.0.0+** |
 
 CI continuously validates Node **22, 24, and 26**, alongside minimum-version consumer compatibility gates and Windows/Linux memory-leak verification.
@@ -157,7 +161,10 @@ console.log(summarize('orders', [10, 20, 30]));
 | `String` | `string` | Direct UTF-16 string conversion without intermediate UTF-8 transcoding. |
 | `Bytes` | `Buffer` | Owned byte copy across the boundary (`N-API 7`); safe to store and return from async functions. |
 | `NapiBufferView` | `Buffer` | Zero-copy synchronous borrow (`N-API 7`); valid only during the synchronous call frame. |
+| `NapiObject` / `NapiFunction` / `NapiArray` | JavaScript object/function/array | Environment-bound low-level handles for properties, calls, construction, prototypes and `instanceof`; never cross async or worker boundaries. |
 | `NapiInt8Array` / `NapiUint8Array` / `NapiUint8ClampedArray` / `NapiInt16Array` / `NapiUint16Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | Corresponding JavaScript TypedArrays / `ArrayBuffer` | Owned typed-array and `ArrayBuffer` copies; 8/16-bit elements use range-safe MoonBit integer arrays. |
+| `NapiBigInt64Array` / `NapiBigUint64Array` / `NapiDataView` | BigInt64Array / BigUint64Array / DataView | Owned copies; detached and shared backing stores are rejected. |
+| `NapiExternal` and external helpers | External / Buffer / ArrayBuffer / string | Explicit caller-managed pointers or GC-retained Bytes backing stores; use owned wrappers when a copy is required. |
 | `NapiDate` | `Date` | Copies the ECMAScript millisecond time value and rejects invalid dates at the boundary (N-API 5). |
 | `NapiSymbol` | `symbol` | Retains symbol identity with an environment-owned reference; the description is used only when creating one. |
 | `NapiSet[T]` | `Set<T>` | Copies insertion order through JavaScript Set and recursively applies the same converter. |
@@ -168,6 +175,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub async fn(...) -> T` | `Promise<T>` (with `{ signal?: AbortSignal }`) | Runs on the embedded `moonbitlang/async@0.22.4` + libuv loop (`N-API 8`) with cooperative cancellation. |
 | `NapiJsPromise[T]` | `Promise<T>` | Awaits JavaScript Promises inside MoonBit `async fn` exports with typed resolution. |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` & `ReadableStream<T>` | Demand-driven streaming input/output with backpressure and early consumer cancellation (`return()`). |
+| `NapiTypedThreadsafeFunction[T]` | Threadsafe producer to JS callback | Encodes `T` to copied Bytes on a producer thread; the owner-thread callback receives a Buffer. |
 | `NapiIterator[T]` | `IterableIterator<T>` | Consumes JavaScript Iterables synchronously and releases callback resources on close or exhaustion. |
 | `nativeTasks` / `workerTasks` (`napi-mbt.json`) | `Promise<T>` / Worker Pool | Offloads C jobs to the libuv threadpool (`nativeTasks`) or pure MoonBit jobs to isolated Node worker process pools (`workerTasks`). |
 
@@ -212,7 +220,7 @@ Common flags:
 | **Platform & ABI Policy** | [Support Policy](docs/support.md) · [Platform Validation](docs/platforms.md) · [Validation Record](docs/validation.md) |
 | **Type System & Objects** | [Type Mapping](docs/types.md) · [Classes & Callbacks](docs/classes-callbacks.md) · [Threadsafe Functions](docs/tsfn.md) |
 | **Async, Streams & Workers** | [Async Functions](docs/async.md) · [Async Adapter](docs/async-adapter.md) · [JS Promises](docs/js-promises.md) · [Async Streams](docs/streams.md) · [Native Tasks](docs/native-tasks.md) · [Worker Pools](docs/workers.md) |
-| **Engineering & Benchmarks** | [Performance Benchmarks](docs/performance.md) · [Development Workflow](docs/en/development.md) · [Roadmap](docs/roadmap.md) |
+| **Engineering & Benchmarks** | [Software Design Description](docs/sdd.md) · [Advanced APIs](docs/en/advanced-api.md) · [Performance Benchmarks](docs/performance.md) · [Development Workflow](docs/en/development.md) · [Roadmap](docs/roadmap.md) |
 
 ### Standalone Examples
 

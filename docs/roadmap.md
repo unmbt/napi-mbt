@@ -19,8 +19,8 @@ Further work follows this order:
    inputs, generated outputs, toolchains and binaries; they are local consistency
    records, not signed provenance attestations.
 4. Expand platforms only with real builds, install tests and memory validation.
-   Seven native profiles now have gates; additional Linux ARM64/macOS x64/musl
-   jobs still require their first execution for this change.
+   Seven native profiles now have gates, and the low-level/advanced API change
+   has passed the hosted Linux ARM64, macOS and musl jobs.
 5. Optimize from measured workloads: cache invalidation, stream throughput and
    pool startup are useful next measurements. The recorded conversion
    results are local measurements, not a blanket zero-overhead claim.
@@ -31,5 +31,7 @@ cancellation, worker teardown and sanitizer tests. It must remain confined to
 isolated build workspaces.
 
 WASI, cross compilation, shared MoonBit closures, shared-memory TypedArrays,
-zero-copy external buffers, generic exports, External and Node Readable-specific
-adapters remain outside this implementation.
+generic exports and Node Readable-specific adapters remain outside this
+implementation. External/zero-copy memory, DataView and BigInt typed arrays,
+low-level JS handles, N-API 8/9/10 helpers and encoded typed TSFN are now part
+of the supported runtime surface.

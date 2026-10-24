@@ -3,18 +3,18 @@
 The CLI builds for its own host. No cross compiler or architecture emulation is
 used. All seven target names select matching loader paths and npm os/cpu/libc
 metadata. CI runs installed CLI/examples, real consumers and package installation
-for the available hosts; macOS x64 and both Linux musl profiles remain CI-pending
-because the current MoonBit/action host combinations are unavailable.
+for the seven target profiles; the current low-level/advanced API change passed
+the hosted native and memory gates.
 
-| Target | Native CI host | Current change validated locally |
+| Target | Native CI host | Current change evidence |
 | --- | --- | --- |
 | win32-x64-msvc | windows-2025 | Windows x64 |
-| darwin-x64 | macos-15-intel | CI pending |
-| darwin-arm64 | macos-15 | CI pending |
-| linux-x64-gnu | ubuntu-24.04 | CI pending |
-| linux-arm64-gnu | ubuntu-24.04-arm | CI pending |
-| linux-x64-musl | Alpine on ubuntu-24.04 | CI pending |
-| linux-arm64-musl | Alpine on ubuntu-24.04-arm | CI pending |
+| darwin-x64 | macos-15-intel | Hosted CI |
+| darwin-arm64 | macos-15 | Hosted CI |
+| linux-x64-gnu | ubuntu-24.04 | Hosted CI |
+| linux-arm64-gnu | ubuntu-24.04-arm | Hosted CI |
+| linux-x64-musl | Alpine on ubuntu-24.04 | Hosted CI |
+| linux-arm64-musl | Alpine on ubuntu-24.04-arm | Hosted CI |
 
 Musl builds use Alpine's native C toolchain. `gcompat` runs the pinned MoonBit
 compiler binaries; it must not become the addon libc. The CLI is compiled inside

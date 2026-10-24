@@ -28,11 +28,21 @@ managed files. `napi-mbt.json` is strict JSON; the generated
 }
 ```
 
-Use `napiVersion: 4` for a basic new project, 6 for bigint, 7 for checked Buffers,
-and 8 for async exports. Features required by signatures are inferred and checked.
+Use `napiVersion: 4` for a basic new project, 6 for bigint, 7 for checked Buffers
+and owned binary views, and 8 for async exports. Low-level JS handles and typed
+TSFN work from N-API 4; freeze/seal and type tags require 8, `Symbol.for` and
+SyntaxError helpers require 9, and property keys, external strings and
+ArrayBuffer-backed Buffer views require 10. Features required by signatures are
+inferred and checked.
 Set `targets` only to constrain host profiles; it does not enable cross-compiling.
 Disabling both module modes is an error. [Support policy](../support.md) explains
 Node minimums and release platforms.
+
+For advanced bindings, see [low-level and advanced APIs](advanced-api.md). The
+page covers environment injection, `NapiObject`/`NapiFunction`/`NapiArray`,
+External lifetime rules, owned DataView and BigInt arrays, version-gated helpers,
+and encoded typed TSFN. Add the relevant names to `features` when you want the
+configuration schema to reject an insufficient `napiVersion` early.
 
 Put exports in the root MoonBit package. The parser resolves exported signatures
 and referenced value types across that package's source files. Generic exports,

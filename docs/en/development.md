@@ -103,8 +103,8 @@ CI pins Moon/core and CMake, builds the currently supported native target profil
 22/24/26 matrix and minimum consumers, and gates release archives on tests.
 A separate job checks latest MoonBit compatibility. Test orchestration uses
 `.mbtx`; `.cjs/.mts/.cts` files are real consumers. Keep downloaded `napi-rs/`
-as local reference only. The MoonBit setup action currently cannot provide a
-macOS x64 compiler, and the pinned MoonBit toolchain currently cannot start in
-the Alpine musl image; macOS x64 and both musl profiles remain CI-pending.
+as local reference only. The latest hosted run for this change covers macOS
+x64, Linux ARM64 and both musl profiles through the native gates; keep the
+platform table and CI results synchronized when the hosted toolchain changes.
 [Benchmarks](../performance.md) and the
 [roadmap](../roadmap.md) describe remaining performance and platform work.

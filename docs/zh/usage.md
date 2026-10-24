@@ -27,9 +27,17 @@ JSON，生成的 `napi-mbt.schema.json` 提供编辑器校验。例如：
 }
 ```
 
-基础新工程用 N-API 4；bigint 用 6；带分离检查的 Buffer 用 7；异步导出用 8。
-签名需要的 feature 会自动推导和检查。`targets` 仅限制宿主目标，不启用交叉编译。
+基础新工程用 N-API 4；bigint 用 6；带检查的 Buffer、DataView 与 BigInt TypedArray 用 7；
+异步导出用 8。低层 JS handle 与 typed TSFN 使用 N-API 4；freeze/seal、type tag 用 8；
+`Symbol.for` 与 SyntaxError helper 用 9；property key、external string、
+ArrayBuffer-backed Buffer view 用 10。签名需要的 feature 会自动推导和检查。
+`targets` 仅限制宿主目标，不启用交叉编译。
 不能同时关闭 CJS 和 ESM。[支持策略](support.md)说明 Node 最低版本和发布平台。
+
+需要手写低层绑定时阅读[低层 JS 与高级 API](advanced-api.md)，其中说明环境注入、
+`NapiObject`/`NapiFunction`/`NapiArray`、External 生命周期、拥有型 DataView/BigInt
+数组、版本门槛和编码型 typed TSFN。将相应名称加入 `features` 可让 schema 在生成前
+拒绝过低的 `napiVersion`。
 
 导出放在根 MoonBit 包中，解析器跨该包源码文件解析签名和引用的值类型。
 泛型导出、未解析类型及不支持的签名会带文件名、行号报错。
