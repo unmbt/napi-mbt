@@ -2,7 +2,9 @@
 fn config_schema() -> Json raise {
   let features = [
     "promise", "threadsafe_function", "bigint", "buffer", "class", "callback", "async",
-    "native_tasks", "streams",
+    "native_tasks", "streams", "type_tag", "freeze", "seal", "external", "zero_copy",
+    "binary_extended", "instance_data", "symbol_for", "syntax_error", "module_filename",
+    "property_key", "external_string", "buffer_from_arraybuffer", "typed_tsfn",
   ]
   let conditions : Array[Json] = features.map(name => {
     let level = feature_version(name)

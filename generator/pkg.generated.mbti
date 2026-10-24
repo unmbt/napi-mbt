@@ -21,6 +21,9 @@ pub(all) enum BinaryKind {
   Uint32
   Float32
   Float64
+  BigInt64
+  BigUint64
+  DataView
   ArrayBuffer
 }
 
@@ -105,6 +108,12 @@ pub(all) enum TypeShape {
 }
 
 pub(all) enum ValueType {
+  EnvType
+  RawValueType
+  ObjectValueType
+  FunctionValueType
+  ArrayValueType
+  ExternalValueType
   IntType
   UIntType
   FloatType

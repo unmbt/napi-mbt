@@ -5,7 +5,13 @@ fn borrowed_type(
   seen : Array[String],
 ) -> Bool {
   match value {
-    BufferViewType => true
+    BufferViewType
+    | EnvType
+    | RawValueType
+    | ObjectValueType
+    | FunctionValueType
+    | ArrayValueType
+    | ExternalValueType => true
     OptionType(inner)
     | ArrayType(inner)
     | MapType(inner)

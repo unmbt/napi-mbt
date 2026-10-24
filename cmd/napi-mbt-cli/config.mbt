@@ -113,6 +113,13 @@ fn feature_version(name : String) -> Int32 raise {
     "buffer" => 7
     "class" | "callback" => 3
     "async" | "native_tasks" | "streams" => 8
+    "type_tag" | "freeze" | "seal" => 8
+    "external" | "zero_copy" => 1
+    "binary_extended" => 7
+    "instance_data" => 6
+    "symbol_for" | "syntax_error" | "module_filename" => 9
+    "property_key" | "external_string" | "buffer_from_arraybuffer" => 10
+    "typed_tsfn" => 4
     _ => fail("Unknown N-API feature: \{name}")
   }
 }

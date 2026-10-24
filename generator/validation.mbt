@@ -81,6 +81,18 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
         fail(
           "\{location}: BufferView is only supported as a direct synchronous parameter",
         )
+      EnvType if nested || !read =>
+        fail(
+          "\{location}: NapiEnv is only supported as a direct synchronous parameter",
+        )
+      RawValueType
+      | ObjectValueType
+      | FunctionValueType
+      | ArrayValueType
+      | ExternalValueType if nested =>
+        fail(
+          "\{location}: low-level JS values must be direct parameters or returns",
+        )
       UnitType if nested || read =>
         fail("\{location}: Unit is only supported as a return type")
       Int64Type | UInt64Type if napi_version < 6 =>

@@ -15,6 +15,8 @@
 | NapiBufferView | Buffer | 同步调用的直接借用参数，调用结束后失效 |
 | NapiInt8Array / NapiUint8Array / NapiUint8ClampedArray / NapiInt16Array / NapiUint16Array / NapiInt32Array / NapiUint32Array | 对应 TypedArray | 严格匹配视图类型，双向复制，需要 N-API 7 |
 | NapiFloat32Array / NapiFloat64Array | Float32Array / Float64Array | 拥有型副本，保留 IEEE 数值，需要 N-API 7 |
+| NapiBigInt64Array / NapiBigUint64Array | BigInt64Array / BigUint64Array | 拥有型 64 位整数副本，需要 N-API 7 |
+| NapiDataView | DataView | 拥有型字节快照，需要 N-API 7 |
 | NapiArrayBuffer | ArrayBuffer | 拥有型字节序列，输出独立 backing store，需要 N-API 7 |
 | NapiDate | Date | 复制毫秒时间值；Invalid Date 输入抛 `ERR_NAPI_DATE`，需要 N-API 5 |
 | NapiSymbol | symbol | 通过环境归属引用保留 identity；可用 `NapiSymbol::new` 创建 |
@@ -82,5 +84,7 @@ store。输入输出均复制，不保留 JS 句柄或借用指针，可以跨 a
 TypedArray 包装提供 `new(Array[T])`、`length()` 和 `to_array()`；ArrayBuffer 包装
 提供 `from_bytes()`、`to_bytes()` 和 `byte_length()`，使用不可变的 MoonBit Bytes。
 现有 Bytes 和 NapiBufferView 接口不变。
+`napi_external_buffer` 和 `napi_external_arraybuffer` 保留 MoonBit Bytes 的 backing
+store，JavaScript GC 回收时释放持有的 Bytes；`NapiExternal` 用于显式管理外部指针。
 运行 `moon run scripts/owned-binary-test.mbtx` 验证复制隔离、偏移、分离、共享存储、
 嵌套及异步生命周期。

@@ -7,7 +7,7 @@
  * JS handle is stored in a MoonBit value. The arrays may outlive this call. */
 static size_t napi_mbt_binary_width(int kind) {
     return kind == 1 || kind == 0 || kind == 2 || kind == -1 ? 1 :
-        kind == 3 || kind == 4 ? 2 : kind == 8 ? 8 : 4;
+        kind == 3 || kind == 4 ? 2 : kind == 8 || kind == 9 || kind == 10 ? 8 : 4;
 }
 
 static void *napi_mbt_binary_allocate(int kind, int32_t length) {
@@ -16,6 +16,7 @@ static void *napi_mbt_binary_allocate(int kind, int32_t length) {
     case 4: case 6: return moonbit_make_int32_array_raw(length);
     case 7: return moonbit_make_float_array_raw(length);
     case 8: return moonbit_make_double_array_raw(length);
+    case 9: case 10: return moonbit_make_int64_array_raw(length);
     default: return moonbit_make_bytes_raw(length);
     }
 }
@@ -130,6 +131,8 @@ NAPI_MBT_BINARY_API(Int32Array, int32_t, 5)
 NAPI_MBT_BINARY_API(Uint32Array, uint32_t, 6)
 NAPI_MBT_BINARY_API(Float32Array, float, 7)
 NAPI_MBT_BINARY_API(Float64Array, double, 8)
+NAPI_MBT_BINARY_API(BigInt64Array, int64_t, 9)
+NAPI_MBT_BINARY_API(BigUint64Array, uint64_t, 10)
 NAPI_MBT_BINARY_API(ArrayBuffer, uint8_t, -1)
 #undef NAPI_MBT_BINARY_API
 #endif

@@ -19,5 +19,7 @@ Mooncakes 安装闭环、独立样例、隔离增量缓存、构建记录、拥�
 async 补丁固定 0.22.4 并核对源码校验值。升级必须审阅上游调度器/所有权变化，
 重跑 I/O、取消、worker teardown 和 sanitizer；补丁只能应用到隔离构建工作区。
 
-本轮不支持 WASI、交叉编译、跨线程共享 MoonBit 闭包、共享内存 TypedArray、
-外部零拷贝缓冲区、通用泛型导出、Symbol/External 和 Node Readable 专用适配。
+WASI、交叉编译、跨线程共享 MoonBit 闭包和 Node Readable 专用适配仍待后续推进。
+当前已提供 External/零拷贝内存、DataView/BigInt TypedArray、通用低层 JS API、
+N-API 8/9/10 扩展，以及编码型高层 typed TSFN；共享内存 TypedArray 仍明确拒绝，
+避免把不可安全复制的 backing store 带入拥有型值。

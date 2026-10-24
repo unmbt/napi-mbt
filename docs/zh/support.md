@@ -23,7 +23,11 @@
 | Threadsafe Function | 4 |
 | Int64/UInt64 bigint | 6 |
 | Bytes、带检查的 BufferView | 7 |
+| DataView、BigInt64Array/BigUint64Array、External/零拷贝 Buffer | 7（External 基础值为 1） |
 | 内嵌 async 宿主、Promise 导出和异步 cleanup | 8 |
+| freeze/seal、type tag | 8 |
+| Symbol.for、SyntaxError、module filename | 9 |
+| property key、external string、ArrayBuffer-backed Buffer | 10 |
 
 N-API 原始 Promise API 属于 v1；async 宿主需要 v8 cleanup。
 结构化值嵌入 bigint/Buffer 时继承更高版本要求。

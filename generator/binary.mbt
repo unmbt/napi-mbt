@@ -9,6 +9,9 @@ pub(all) enum BinaryKind {
   Uint32
   Float32
   Float64
+  BigInt64
+  BigUint64
+  DataView
   ArrayBuffer
 }
 
@@ -24,6 +27,9 @@ fn BinaryKind::javascript(self : BinaryKind) -> String {
     Uint32 => "Uint32Array"
     Float32 => "Float32Array"
     Float64 => "Float64Array"
+    BigInt64 => "BigInt64Array"
+    BigUint64 => "BigUint64Array"
+    DataView => "DataView"
     ArrayBuffer => "ArrayBuffer"
   }
 }
