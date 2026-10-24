@@ -245,5 +245,13 @@ Local Windows x64 / Node 26.4.0 validation passed strict native checking, all 64
 MoonBit tests, generator snapshots, owned-binary consumers, advanced runtime and
 NodeNext/Bundler consumers, and the advanced Windows ASan fixture. Windows ASan
 checks memory access, with leak detection disabled by the existing runner;
-Linux leak validation is provided by the CI memory job. These local results
-do not establish execution on other hosts.
+all ten standalone examples also passed with a freshly packed/installed CLI.
+Public `.mbti` interfaces are unchanged.
+
+The first PR #5 Linux memory run found a Node `ExternalWrapper` still rooted by
+the example's ESM module at shutdown. The test now releases that token before
+forced collection. A subsequent local Fedora 43 WSL run with the pinned MoonBit
+toolchain and Node 26.4.0 passed the advanced ASan/LSan fixture, including the
+bare-Node baseline and intentional unrelated-leak detector check. No new leak
+suppression was added. These local results do not establish execution on macOS
+or other Linux architectures; the PR's hosted matrix remains the merge gate.
