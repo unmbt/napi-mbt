@@ -75,6 +75,8 @@ fn class_type(value : ValueType, configs : Array[ClassConfig]) -> ValueType {
       value
     }
     OptionType(inner) => OptionType(class_type(inner, configs))
+    SetType(inner) => SetType(class_type(inner, configs))
+    IteratorType(inner) => IteratorType(class_type(inner, configs))
     JsPromiseType(inner) => JsPromiseType(class_type(inner, configs))
     AsyncIteratorType(inner) => AsyncIteratorType(class_type(inner, configs))
     ArrayType(inner) => ArrayType(class_type(inner, configs))

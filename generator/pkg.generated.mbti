@@ -12,7 +12,11 @@ pub fn render(ParsedSource, String, Int32, package_version~ : String, cjs? : Boo
 
 // Types and methods
 pub(all) enum BinaryKind {
+  Int8
   Uint8
+  Uint8Clamped
+  Int16
+  Uint16
   Int32
   Uint32
   Float32
@@ -104,6 +108,10 @@ pub(all) enum ValueType {
   IntType
   UIntType
   FloatType
+  DateType
+  SymbolType
+  SetType(ValueType)
+  IteratorType(ValueType)
   JsonType
   JsPromiseType(ValueType)
   AsyncIteratorType(ValueType)

@@ -23,7 +23,8 @@ async fn generate(
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
     "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt",
     "napi_callbacks.mbt", "napi_reference.mbt", "napi_collections.mbt", "napi_owned_binary.mbt",
-    "napi_arraybuffer.mbt", "napi_native_tasks.mbt", "napi_native_exports.mbt",
+    "napi_arraybuffer.mbt", "napi_dates.mbt", "napi_symbols.mbt", "napi_iterators.mbt",
+    "napi_native_tasks.mbt", "napi_native_exports.mbt",
   ]
   let features = conf.features.copy()
   let seen : Map[String, String] = Map([])

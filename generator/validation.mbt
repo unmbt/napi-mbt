@@ -54,8 +54,11 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
           check(ret, location, true, read)
         }
       }
-      OptionType(inner) | ArrayType(inner) | MapType(inner) =>
-        check(inner, location, true, read)
+      OptionType(inner)
+      | ArrayType(inner)
+      | MapType(inner)
+      | SetType(inner)
+      | IteratorType(inner) => check(inner, location, true, read)
       TupleType(items) =>
         for item in items {
           check(item, location, true, read)
@@ -82,6 +85,7 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
         fail("\{location}: Unit is only supported as a return type")
       Int64Type | UInt64Type if napi_version < 6 =>
         fail("\{location}: bigint requires N-API 6")
+      DateType if napi_version < 5 => fail("\{location}: Date requires N-API 5")
       BytesType | BufferViewType | OwnedBinaryType(_) if napi_version < 7 =>
         fail("\{location}: checked Buffer access requires N-API 7")
       _ => ()

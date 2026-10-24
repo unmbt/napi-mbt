@@ -9,8 +9,11 @@ fn worker_owned(
     | CallbackType(_, _, _)
     | ClassType(_, _, _)
     | JsPromiseType(_)
-    | AsyncIteratorType(_) => false
-    OptionType(t) | ArrayType(t) | MapType(t) => worker_owned(t, types, seen)
+    | AsyncIteratorType(_)
+    | SymbolType
+    | IteratorType(_) => false
+    OptionType(t) | ArrayType(t) | MapType(t) | SetType(t) =>
+      worker_owned(t, types, seen)
     TupleType(items) => items.all(t => worker_owned(t, types, seen))
     NamedType(name) if !seen.contains(name) => {
       guard types.iter().find_first(t => t.name == name) is Some(definition) else {

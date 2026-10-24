@@ -35,6 +35,37 @@ test "class configuration resolves private members and hides unlisted methods" {
 }
 
 ///|
+test "class members use the same value, Set and binary conversions" {
+  let value_class_source : String =
+    #|struct Box { value : Int }
+    #|fn Box::new(value : Int) -> Box { { value, } }
+    #|fn Box::replace(self : Box, date : NapiDate, values : NapiSet[Int], data : NapiInt8Array) -> NapiDate { ignore(values); ignore(data); date }
+  let source = @generator.parse_sources(
+    [("value_class.mbt", value_class_source)],
+    classes=[
+      {
+        name: "Box",
+        type_name: "Box",
+        construct: "Box::new",
+        methods: [("replace", "Box::replace")],
+        static_methods: [],
+        properties: [],
+      },
+    ],
+  )
+  let types = rendered(source, "index.d.ts")
+  assert_true(
+    types.contains(
+      "replace(date: Date, values: Set<number>, data: Int8Array): Date;",
+    ),
+  )
+  let adapters = rendered(source, "napi_exports.mbt")
+  assert_true(adapters.contains("get_NapiDate"))
+  assert_true(adapters.contains("napi_set_values(env, value)"))
+  assert_true(adapters.contains("get_NapiInt8Array"))
+}
+
+///|
 test "class constructors receivers members and adapter collisions are validated" {
   for
     source in [

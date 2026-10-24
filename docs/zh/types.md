@@ -13,12 +13,16 @@
 | String | string | 精确保留 UTF-16 code units，包括 NUL 和孤立 surrogate |
 | Bytes | Buffer | 拥有数据副本；backing store 检查需要 N-API 7 |
 | NapiBufferView | Buffer | 同步调用的直接借用参数，调用结束后失效 |
-| NapiUint8Array / NapiInt32Array / NapiUint32Array | Uint8Array / Int32Array / Uint32Array | 严格匹配视图类型，双向复制，需要 N-API 7 |
+| NapiInt8Array / NapiUint8Array / NapiUint8ClampedArray / NapiInt16Array / NapiUint16Array / NapiInt32Array / NapiUint32Array | 对应 TypedArray | 严格匹配视图类型，双向复制，需要 N-API 7 |
 | NapiFloat32Array / NapiFloat64Array | Float32Array / Float64Array | 拥有型副本，保留 IEEE 数值，需要 N-API 7 |
 | NapiArrayBuffer | ArrayBuffer | 拥有型字节序列，输出独立 backing store，需要 N-API 7 |
+| NapiDate | Date | 复制毫秒时间值；Invalid Date 输入抛 `ERR_NAPI_DATE`，需要 N-API 5 |
+| NapiSymbol | symbol | 通过环境归属引用保留 identity；可用 `NapiSymbol::new` 创建 |
 | Option[T] / T? | T 或 null | missing、undefined、null 输入均为 None；None 输出 null |
 | Array[T] | Array | 递归转换；稀疏位置按 undefined 处理 |
 | Map[String, T] | Record<string, T> | 自有可枚举字符串键；输出使用安全的数据属性 |
+| NapiSet[T] | Set<T> | 按插入顺序复制集合元素；递归转换并保留 Set 去重 |
+| NapiIterator[T] | IterableIterator<T> | 同步拉取 Iterable，耗尽或显式 close 时释放资源 |
 | Json | $NapiJson | 有限 JSON 值，不隐式转换或调用 toJSON |
 | (T, U, ...) | [T, U, ...] | 固定数组长度，按位置递归转换 |
 | 普通 struct | object | 必填自有字段必须存在；忽略额外字段 |
@@ -54,6 +58,10 @@ Map 和 tuple 可以与其他拥有型数据嵌套。Map 键精确保留 UTF-16�
 不可枚举属性及 symbol 键；`__proto__` 输出为普通数据属性。Json 拒绝 undefined、
 函数、symbol、bigint、非有限数及循环，也会检查嵌套值和稀疏数组。
 getter 抛出的异常保留原身份，数值转换不接受字符串或包装对象。
+
+Set、Date、Symbol 和同步迭代器也可以作为 class 方法或 struct/enum 字段中的
+直接值。`NapiSet` 不要求 MoonBit 元素实现 `Eq`/`Hash`，集合去重由 JavaScript
+Set 完成；`NapiSymbol` 和 `NapiIterator` 不能跨环境保存到另一个 Node 实例。
 
 只有连续的尾部 Option 参数生成 TypeScript 可选参数。
 对于 `(a: Int?, b: Int, c: Int?)`，JS 必须传前两个参数。

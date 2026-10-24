@@ -4,6 +4,7 @@ test "worker tasks require owned synchronous signatures" {
     source in [
       "#export_name(\"work\")\npub async fn work() -> Int { 1 }", "#export_name(\"work\")\npub fn work(value : NapiBufferView) -> Int { 1 }",
       "#export_name(\"work\")\npub fn work(value : (Int) -> Int raise) -> Int { 1 }",
+      "#export_name(\"work\")\npub fn work(value : NapiSymbol) -> Int { 1 }", "#export_name(\"work\")\npub fn work(value : NapiIterator[Int]) -> Int { 1 }",
       "pub struct Item { callback : (Int) -> Int raise }\n#export_name(\"work\")\npub fn work(value : Array[Item]) -> Int { 1 }",
     ] {
     try {

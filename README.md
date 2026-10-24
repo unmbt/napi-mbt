@@ -157,7 +157,10 @@ console.log(summarize('orders', [10, 20, 30]));
 | `String` | `string` | Direct UTF-16 string conversion without intermediate UTF-8 transcoding. |
 | `Bytes` | `Buffer` | Owned byte copy across the boundary (`N-API 7`); safe to store and return from async functions. |
 | `NapiBufferView` | `Buffer` | Zero-copy synchronous borrow (`N-API 7`); valid only during the synchronous call frame. |
-| `NapiUint8Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | `Uint8Array` / `Int32Array` / `Uint32Array` / `Float32Array` / `Float64Array` / `ArrayBuffer` | Owned typed-array and `ArrayBuffer` copies with full element length preservation. |
+| `NapiInt8Array` / `NapiUint8Array` / `NapiUint8ClampedArray` / `NapiInt16Array` / `NapiUint16Array` / `NapiInt32Array` / `NapiUint32Array` / `NapiFloat32Array` / `NapiFloat64Array` / `NapiArrayBuffer` | Corresponding JavaScript TypedArrays / `ArrayBuffer` | Owned typed-array and `ArrayBuffer` copies; 8/16-bit elements use range-safe MoonBit integer arrays. |
+| `NapiDate` | `Date` | Copies the ECMAScript millisecond time value and rejects invalid dates at the boundary (N-API 5). |
+| `NapiSymbol` | `symbol` | Retains symbol identity with an environment-owned reference; the description is used only when creating one. |
+| `NapiSet[T]` | `Set<T>` | Copies insertion order through JavaScript Set and recursively applies the same converter. |
 | `T?`, `Array[T]`, `Map[String, T]`, `(A, B, ...)`, `Json` | `T \| null`, `Array<T>`, `Record<string, T>`, `[A, B, ...]`, `JsonValue` | Recursive structural validation; `Option::None` maps to `null` (and accepts `null` or `undefined` on input). |
 | `pub struct` / `pub enum` | Object / Discriminated Union | Exported structs map to typed JS objects; enums map to variant name string or `{ tag: "Variant", args: [...] }` discriminated unions. |
 | Configured Class (`napi-mbt.json`) | `class` with `dispose()` | Native handle wrapping with constructors, static factories, properties, methods, and deterministic disposal. |
@@ -165,6 +168,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub async fn(...) -> T` | `Promise<T>` (with `{ signal?: AbortSignal }`) | Runs on the embedded `moonbitlang/async@0.22.4` + libuv loop (`N-API 8`) with cooperative cancellation. |
 | `NapiJsPromise[T]` | `Promise<T>` | Awaits JavaScript Promises inside MoonBit `async fn` exports with typed resolution. |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` & `ReadableStream<T>` | Demand-driven streaming input/output with backpressure and early consumer cancellation (`return()`). |
+| `NapiIterator[T]` | `IterableIterator<T>` | Consumes JavaScript Iterables synchronously and releases callback resources on close or exhaustion. |
 | `nativeTasks` / `workerTasks` (`napi-mbt.json`) | `Promise<T>` / Worker Pool | Offloads C jobs to the libuv threadpool (`nativeTasks`) or pure MoonBit jobs to isolated Node worker process pools (`workerTasks`). |
 
 ---

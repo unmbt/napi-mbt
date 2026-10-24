@@ -8,6 +8,72 @@ extern "c" fn napi_keys_raw(
 
 ///|
 #borrow(result)
+extern "c" fn napi_set_values_raw(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_set_values"
+
+///|
+#borrow(values, result)
+extern "c" fn napi_set_new_raw(
+  env : NapiEnv,
+  values : NapiValue,
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_set_new"
+
+///|
+/// A copied JavaScript Set. The elements are converted by the generated
+/// adapter, so this container does not impose MoonBit `Eq`/`Hash` constraints.
+pub struct NapiSet[T] {
+  priv data : Array[T]
+}
+
+///|
+pub fn[T] NapiSet::new(values : Array[T]) -> NapiSet[T] {
+  { data: values, }
+}
+
+///|
+pub fn[T] NapiSet::length(self : NapiSet[T]) -> Int32 {
+  self.data.length()
+}
+
+///|
+pub fn[T] NapiSet::to_array(self : NapiSet[T]) -> Array[T] {
+  self.data.copy()
+}
+
+///|
+pub fn napi_set_values(
+  env : NapiEnv,
+  value : NapiValue,
+) -> NapiValue raise NapiError {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(
+    env,
+    napi_set_values_raw(env, value, result),
+    b"Reading JavaScript Set",
+  )
+  result.val
+}
+
+///|
+pub fn napi_set_new(
+  env : NapiEnv,
+  values : NapiValue,
+) -> NapiValue raise NapiError {
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(
+    env,
+    napi_set_new_raw(env, values, result),
+    b"Creating JavaScript Set",
+  )
+  result.val
+}
+
+///|
+#borrow(result)
 extern "c" fn napi_key_get_raw(
   env : NapiEnv,
   value : NapiValue,

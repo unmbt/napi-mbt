@@ -7,12 +7,13 @@
 | --- | --- |
 | 生成器 | 单一 AST/类型 IR；整体校验后生成 adapter、C、TS、loader 和元数据 |
 | 错误 | 可传播 NapiError；转换失败短路；保留原 JS 异常身份 |
-| 类型 | 严格 Int/UInt、IEEE Float/Double、bigint、UTF-16、Buffer、Option/Array、Map、Json、tuple、struct/enum |
+| 类型 | 严格 Int/UInt、IEEE Float/Double、bigint、UTF-16、Date、Symbol、Buffer、Option/Array、Map/Set、Json、tuple、struct/enum |
 | 生命周期 | 显式 class、receiver 验证、dispose、callback 引用、重入和 worker 清理 |
 | 异步 | 固定 async 0.22.4 的隔离补丁，Node 驱动调度，Promise 和 AbortSignal |
 | 后台计算 | C ABI 原生 async work；纯 MoonBit 同步导出通过隔离子 Node 进程池执行 |
 | 流与输入 Promise | 类型化 JS Promise 输入、双向 AsyncIterable/Web 流、按需生产与统一关闭 |
-| 二进制值 | 拥有型 TypedArray/ArrayBuffer 双向复制；拒绝 detached/SharedArrayBuffer |
+| 迭代器 | 同步 Iterable 与异步 AsyncIterable 双向转换；同步迭代器在耗尽/关闭时释放回调 |
+| 二进制值 | 拥有型 Int8/Uint8/Uint8Clamped/Int16/Uint16/Int32/Uint32/Float32/Float64 TypedArray 与 ArrayBuffer 双向复制；拒绝 detached/SharedArrayBuffer |
 | 开发体验 | doctor、严格 schema、独立 CJS/ESM、watch、计时和明确加载错误 |
 | 工程 | 持久隔离增量缓存、跨进程锁、源码/工具链/产物构建记录、事务更新 |
 | 分发 | 工具通过 Mooncakes 安装；用户 addon 保留 npm 平台包、干净安装、TS、ASan 门禁 |

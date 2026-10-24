@@ -1,7 +1,7 @@
 # 后续推进顺序
 
 当前基础已经包括错误短路、单一校验生成器、严格配置/loader、隔离构建、
-拥有/借用值转换、class/callback 和固定版本的 Node 驱动 async 宿主。
+拥有/借用值转换、Date/Set/Symbol/同步迭代器、class/callback 和固定版本的 Node 驱动 async 宿主。
 Mooncakes 安装闭环、独立样例、隔离增量缓存、构建记录、拥有型二进制类型、
 原生任务、进程池、JS Promise 输入和 Web 流已实现。
 
@@ -20,4 +20,4 @@ async 补丁固定 0.22.4 并核对源码校验值。升级必须审阅上游调
 重跑 I/O、取消、worker teardown 和 sanitizer；补丁只能应用到隔离构建工作区。
 
 本轮不支持 WASI、交叉编译、跨线程共享 MoonBit 闭包、共享内存 TypedArray、
-外部零拷贝缓冲区、通用泛型导出、Set/Date 和 Node Readable 专用适配。
+外部零拷贝缓冲区、通用泛型导出、Symbol/External 和 Node Readable 专用适配。
