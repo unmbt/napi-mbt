@@ -25,7 +25,7 @@ Further work follows this order:
    pool startup are useful next measurements. The recorded conversion
    results are local measurements, not a blanket zero-overhead claim.
 
-The async patch is tied to 0.22.4, including exact source checksums. Updating it
+The async patch is tied to 0.22.5, including exact source checksums. Updating it
 requires reviewing upstream scheduler/ownership changes and repeating I/O,
 cancellation, worker teardown and sanitizer tests. It must remain confined to
 isolated build workspaces.

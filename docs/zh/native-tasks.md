@@ -2,7 +2,7 @@
 
 在 `napi-mbt.json` 中设置 `"napiVersion": 8` 和
 `"nativeTasks": { "compute": "compute_task" }`，将 C 文件加入 `native-stub`。
-项目需添加并解析 `moonbitlang/async@0.22.4`；CLI 在隔离工作区加入适配器引用。
+项目需添加并解析 `moonbitlang/async@0.22.5`；CLI 在隔离工作区加入适配器引用。
 JS 接口为 `compute(Buffer, { signal? }): Promise<Buffer>`，MoonBit `async fn`
 可以调用 `napi_native_task("compute", bytes)`。普通同步项目的最低版本不变。
 

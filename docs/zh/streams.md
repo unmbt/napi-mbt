@@ -1,6 +1,6 @@
 # 异步迭代器与 Web 流
 
-使用 `NapiAsyncIterator[T]`，配置 N-API 8 并依赖 `moonbitlang/async@0.22.4`。
+使用 `NapiAsyncIterator[T]`，配置 N-API 8 并依赖 `moonbitlang/async@0.22.5`。
 CLI 自动推导 async/streams 和 Node >=18（更高 N-API 要求仍有效）。
 完整用法见 [独立样例](../../examples/streams) 和 [行为契约](../streams.md)。
 

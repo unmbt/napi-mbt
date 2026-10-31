@@ -39,7 +39,7 @@ installation and again at prepublish. See [platform validation](platforms.md).
 Bare N-API Promise operations exist in v1; the embedded async host intentionally
 requires the N-API 8 cleanup APIs. Features can compose: a structured value
 containing bigint or Buffer inherits the higher requirement.
-`moonbitlang/async` must be exactly 0.22.4.
+`moonbitlang/async` must be exactly 0.22.5.
 
 The checked napi-rs CLI declares `^20.17.0 || ^22.13.0 || >= 23.5.0`, while its
 core defaults to `napi4` and `dyn-symbols`. It does not impose Node 22 on every

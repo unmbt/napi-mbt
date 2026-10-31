@@ -1,6 +1,6 @@
 # MoonBit async 嵌入适配
 
-原生构建器提供由 Node 驱动的 `moonbitlang/async` **0.22.4** 适配。
+原生构建器提供由 Node 驱动的 `moonbitlang/async` **0.22.5** 适配。
 启用 `async` feature 时要求 N-API **8** 起，使用异步 cleanup hook
 在 worker 终止时等待任务取消和未完成的 OS I/O 清理。
 

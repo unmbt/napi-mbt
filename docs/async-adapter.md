@@ -1,6 +1,6 @@
 # Embedded MoonBit async runtime
 
-The native builder supports a Node-driven host for `moonbitlang/async` **0.22.4**.
+The native builder supports a Node-driven host for `moonbitlang/async` **0.22.5**.
 Enable the `async` feature with N-API **8** or newer. Async cleanup hooks are
 required so worker termination can wait for cancellation and outstanding OS I/O.
 

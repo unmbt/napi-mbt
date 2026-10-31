@@ -1,4 +1,5 @@
 import {
+  "unmbt/native-toolchain" @native_toolchain,
   "moonbitlang/async",
   "moonbitlang/async/process",
   "moonbitlang/async/fs",

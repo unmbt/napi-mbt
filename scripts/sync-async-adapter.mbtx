@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/core/env", "moonbitlang/core/json", "moonbitlang/core/encoding/utf8" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/core/env", "moonbitlang/core/json", "moonbitlang/core/encoding/utf8" }
 
 ///|
 fn checksum(text : String) -> String {
@@ -48,7 +48,7 @@ async fn main {
     ("  bus : EventBus", "  stdio : Map[@fd_util.Fd, IoHandle]\n  stdin_buffer : @io.ReaderBuffer\n  bus : EventBus"),
     ("    fds: Map([]),", "    fds: Map([]),\n    stdio: Map([]),\n    stdin_buffer: @io.ReaderBuffer::new(),"),
     ("fn EventLoop::cleanup(self : Self) -> Unit raise {", "fn EventLoop::cleanup(self : Self) -> Unit raise {\n  for _, handle in self.stdio { handle.detach_from_event_loop() }\n  self.stdio.clear()"),
-    ("  mut job_id : Int", "  mut timer_id : Int\n  mut job_id : Int"),
+    ("  mut job_id : Int32", "  mut timer_id : Int32\n  mut job_id : Int32"),
     ("    job_id: 0,", "    timer_id: 0,\n    job_id: 0,"),
     ("  guard! curr_loop.val is None", "  if curr_loop.val is Some(_) { raise Failure::Failure(\"Nested event loop is not supported by the Node host\") }"),
     ("      let worker = Worker::spawn(job_id, job)", "      let worker = Worker::spawn(job_id, job)\n      if worker.is_null() { @os_error.check_errno(\"Starting async worker\") }"),
@@ -89,7 +89,7 @@ async fn main {
   ]
   changes["src/internal/event_loop/thread_pool.mbt"] = [("priv type Worker", "priv type Worker\n\n///|\nextern \"C\" fn Worker::is_null(worker : Worker) -> Bool = \"napi_mbt_async_worker_is_null\"")]
   changes["src/internal/event_loop/timer.mbt"] = [
-    ("let timer_id : Ref[Int] = { val: 0, }", "// Timer identifiers belong to the active environment."),
+    ("let timer_id : Ref[Int32] = { val: 0, }", "// Timer identifiers belong to the active environment."),
     ("timer_id.val", "evloop.timer_id"),
   ]
   let thread_pool = "src/internal/event_loop/thread_pool.c"
@@ -120,7 +120,7 @@ async fn main {
     resources["async/files/" + path] = Json(text)
   }
   let manifest : Json = {
-    "dependency": "moonbitlang/async", "version": "0.22.4", "patchVersion": 6,
+    "dependency": "moonbitlang/async", "version": "0.22.5", "patchVersion": 7,
     "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
   }
   resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")

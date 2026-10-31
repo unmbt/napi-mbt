@@ -1,6 +1,6 @@
 # 异步导出
 
-在 `moon.mod` 固定 `moonbitlang/async@0.22.4`，导入需要的包，
+在 `moon.mod` 固定 `moonbitlang/async@0.22.5`，导入需要的包，
 并在 `napi-mbt.json` 设置 `"napiVersion": 8`。CLI 校验依赖版本和源码校验值后，
 只修改隔离构建副本，不修改依赖缓存，也不注册进程信号处理器。
 

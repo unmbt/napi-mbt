@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
 
 ///|
 async fn checked(program : String, args : Array[String], cwd? : StringView) -> Unit {
@@ -14,7 +14,7 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   let dir = temp + "/project"
   checked(binary, ["init", dir])
-  @fs.write_file(dir + "/moon.mod", "name = \"test/js-promises\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.mod", "name = \"test/js-promises\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
   @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
   checked("moon", ["check", "--target", "native"], cwd=dir)
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")

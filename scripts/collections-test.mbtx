@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
 
 ///|
 async fn checked(program : String, args : Array[String]) -> Unit {

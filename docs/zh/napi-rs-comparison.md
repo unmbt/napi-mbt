@@ -9,7 +9,7 @@
 | 错误 | 可传播 NapiError；转换失败短路；保留原 JS 异常身份 |
 | 类型 | 严格 Int/UInt、IEEE Float/Double、bigint、UTF-16、Date、Symbol、Buffer、Option/Array、Map/Set、Json、tuple、struct/enum |
 | 生命周期 | 显式 class、receiver 验证、dispose、callback 引用、重入和 worker 清理 |
-| 异步 | 固定 async 0.22.4 的隔离补丁，Node 驱动调度，Promise 和 AbortSignal |
+| 异步 | 固定 async 0.22.5 的隔离补丁，Node 驱动调度，Promise 和 AbortSignal |
 | 后台计算 | C ABI 原生 async work；纯 MoonBit 同步导出通过隔离子 Node 进程池执行 |
 | 流与输入 Promise | 类型化 JS Promise 输入、双向 AsyncIterable/Web 流、按需生产与统一关闭 |
 | 迭代器 | 同步 Iterable 与异步 AsyncIterable 双向转换；同步迭代器在耗尽/关闭时释放回调 |

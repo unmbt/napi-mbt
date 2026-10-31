@@ -39,7 +39,7 @@
 | :--- | :--- |
 | 🎯 **直接导出** | 使用 `#export_name("...")` 导出 `pub fn` 与 `pub async fn`，并直接导出拥有所有权的 `pub struct` 与 `pub enum` 值类型；原生类在 `napi-mbt.json` 中集中配置。 |
 | 🛡️ **严格边界校验** | 在进入 MoonBit 逻辑前的 C 边界层直接拦截 `NaN`、`±Infinity`、传给整数参数的小数、超出 32/64 位范围的数值以及非法 UTF-16 / Buffer 输入。 |
-| ⚡ **全栈异步与并发能力** | 原生支持可取消的 `pub async fn` Promise（基于 `moonbitlang/async@0.22.4` + libuv 与 `AbortSignal`）、C 线程池任务（`nativeTasks`）、隔离的 MoonBit 进程池（`workerTasks`）、等待 JS Promise（`NapiJsPromise`）以及按需拉取的异步流（`NapiAsyncIterator`）。 |
+| ⚡ **全栈异步与并发能力** | 原生支持可取消的 `pub async fn` Promise（基于 `moonbitlang/async@0.22.5` + libuv 与 `AbortSignal`）、C 线程池任务（`nativeTasks`）、隔离的 MoonBit 进程池（`workerTasks`）、等待 JS Promise（`NapiJsPromise`）以及按需拉取的异步流（`NapiAsyncIterator`）。 |
 | 🧱 **安全的原生类与回调** | 原生类支持构造函数、静态工厂、读写属性、实例方法以及显式幂等的 `.dispose()`；回调函数支持强类型 MoonBit 签名 `(Args) -> Ret raise`、带 `.dispose()` 的返回闭包与线程安全函数（`NapiCallback`）。 |
 | 🔒 **非侵入式隔离构建** | 所有中间产物均在隔离工作区中合成与编译，绝不污染用户源码树；内置内容哈希增量缓存、监听模式（`--watch`）与原生符号冲突检查（`nm` / `dumpbin`）。 |
 | 📦 **精准 ABI 与引擎范围** | 默认面向 **N-API v4**，仅在使用 `BigInt`、`Bytes`/`BufferView`、External、低层 JS 或异步运行时等高阶特性时按需提升至对应 N-API 版本（最高 v10），并自动计算精确的 `package.json` `engines.node` 范围。 |
@@ -172,7 +172,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub struct` / `pub enum` | Object / 判别联合类型 | 结构体映射为强类型 JS 对象；枚举映射为构造器名称字符串或 `{ tag: "Variant", args: [...] }` 判别联合。 |
 | 配置类 (`napi-mbt.json`) | 带 `dispose()` 的 `class` | 原生对象句柄封装，支持构造函数、静态工厂、属性读写、实例方法与确定性释放。 |
 | `(Args) -> Ret raise` / `NapiCallback` | `(...args) => Ret` | 支持同步调用期借用、带 `dispose()` 的返回闭包以及线程安全函数（`N-API 4`）。 |
-| `pub async fn(...) -> T` | `Promise<T>`（支持 `{ signal?: AbortSignal }`） | 运行于内嵌的 `moonbitlang/async@0.22.4` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
+| `pub async fn(...) -> T` | `Promise<T>`（支持 `{ signal?: AbortSignal }`） | 运行于内嵌的 `moonbitlang/async@0.22.5` + libuv 事件循环桥接层（`N-API 8`），支持协作式取消。 |
 | `NapiJsPromise[T]` | `Promise<T>` | 在 MoonBit `async fn` 中直接等待 JavaScript Promise 并校验返回值类型。 |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` 与 `ReadableStream<T>` | 按需驱动的异步流输入与输出，支持背压控制与消费端提前终止（`return()`）。 |
 | `NapiTypedThreadsafeFunction[T]` | 后台 producer 到 JS callback | 后台把 `T` 编码为拷贝的 Bytes，JS 线程 callback 收到 Buffer。 |
@@ -251,7 +251,7 @@ pnpm test
 
 ## 🧪 本地开发与验证门禁
 
-本仓库固定使用 **MoonBit `0.10.17+093cb8f9c`**、**CMake `4.4.4`** 与 **`moonbitlang/async@0.22.4`**。常用本地验证命令如下：
+本仓库固定使用 **MoonBit `0.10.17+093cb8f9c`**、**CMake `4.4.4`** 与 **`moonbitlang/async@0.22.5`**。常用本地验证命令如下：
 
 ```bash
 moon run scripts/toolchain-check.mbtx   # 校验固定的 MoonBit、CMake 与宿主编译器版本
@@ -282,5 +282,5 @@ moon run scripts/examples-test.mbtx     # 打包当前 CLI 并完整构建/测�
 | **Unicode Character Database** | Unicode Consortium（随附于 Tree-sitter） | Tree-sitter 词法分析器使用的 Unicode 字符分类表 | **Unicode-DFS-2016** | [`internal/syntax/vendor/runtime/unicode/LICENSE`](internal/syntax/vendor/runtime/unicode/LICENSE)（`licenses/UNICODE-LICENSE`） |
 | **Tree-sitter MoonBit Grammar** | Commit `190881df` (ABI 15) · [unmbt/tree-sitter-moonbit](https://github.com/unmbt/tree-sitter-moonbit) | 内置 MoonBit 语法分析表（`parser.c` / `scanner.c`） | **Apache-2.0 AND MIT** | [`internal/syntax/vendor/GRAMMAR-LICENSE`](internal/syntax/vendor/GRAMMAR-LICENSE)（`licenses/GRAMMAR-LICENSE`） |
 | **Node-API Headers (`node-api-headers`)** | `v1.9.0` · [nodejs/node-api-headers](https://github.com/nodejs/node-api-headers) | 内嵌 `node_api.h` 与 `js_native_api.h` 头文件，支持离线编译 `.node` | **MIT** | 内嵌于 [`internal/assets/data/resources.json`](internal/assets/data/resources.json)（`licenses/NODE-API-LICENSE`） |
-| **MoonBit Async Runtime (`moonbitlang/async`)** | `v0.22.4` · [moonbitlang/async](https://github.com/moonbitlang/async) | 内嵌原生异步事件循环桥接层与运行时支持代码 | **Apache-2.0** | 内嵌于 [`internal/assets/data/resources.json`](internal/assets/data/resources.json)（`licenses/MOONBIT-ASYNC-LICENSE`） |
+| **MoonBit Async Runtime (`moonbitlang/async`)** | `v0.22.5` · [moonbitlang/async](https://github.com/moonbitlang/async) | 内嵌原生异步事件循环桥接层与运行时支持代码 | **Apache-2.0** | 内嵌于 [`internal/assets/data/resources.json`](internal/assets/data/resources.json)（`licenses/MOONBIT-ASYNC-LICENSE`） |
 | **libuv Headers & Declarations** | [libuv/libuv](https://github.com/libuv/libuv) | 内嵌 libuv 类型与函数声明，用于接入 Node.js 事件循环 | **MIT** | 内嵌于 [`internal/assets/data/resources.json`](internal/assets/data/resources.json)（`licenses/LIBUV-LICENSE`） |

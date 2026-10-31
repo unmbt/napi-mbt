@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
 
 ///|
 async fn checked(program : String, args : Array[String], cwd? : StringView) -> String {
@@ -33,7 +33,7 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   let dir = temp + "/project"
   ignore(checked(binary, ["init", dir, "--name", "combined-fixture"]))
-  @fs.write_file(dir + "/moon.mod", "name = \"test/combined\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.mod", "name = \"test/combined\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
   ignore(checked("moon", ["check", "--target", "native"], cwd=dir))
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"nativeTasks\":{\"uppercase\":\"uppercase_task\"},\"workerTasks\":[\"digest\"],\"workerPool\":{\"idleTimeoutMs\":100}}")
   @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/combined.mbt.txt"))

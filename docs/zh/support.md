@@ -32,7 +32,7 @@
 
 N-API 原始 Promise API 属于 v1；内嵌 async 宿主明确需要 N-API 8 cleanup API。
 结构化值嵌入 bigint/Buffer 时继承更高版本要求。
-`moonbitlang/async` 必须恰好为 0.22.4。
+`moonbitlang/async` 必须恰好为 0.22.5。
 
 所检查 napi-rs CLI 声明 `^20.17.0 || ^22.13.0 || >= 23.5.0`，其核心默认开启
 `napi4` 和 `dyn-symbols`，并非所有 addon 都要求 Node 22。

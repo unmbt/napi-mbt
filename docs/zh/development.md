@@ -5,7 +5,7 @@
 [来源记录](../../internal/syntax/VENDOR.md)说明固定版本和许可证。
 
 根目录 runtime 源码是唯一来源。修改后运行 `moon run scripts/sync-runtime.mbtx`，
-资源构建规则再生成内嵌文本。async 0.22.4 适配有独立源码、校验值和许可证，使用
+资源构建规则再生成内嵌文本。async 0.22.5 适配有独立源码、校验值和许可证，使用
 `moon run scripts/sync-async-adapter.mbtx` 同步。两者都支持 `--check`，并进入 CI。
 不要手工修改 `resources.json` 中的 runtime 副本。
 

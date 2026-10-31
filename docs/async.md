@@ -1,6 +1,6 @@
 # Async exports
 
-Pin `moonbitlang/async@0.22.4` in `moon.mod`, import the packages you use,
+Pin `moonbitlang/async@0.22.5` in `moon.mod`, import the packages you use,
 and set `"napiVersion": 8` in `napi-mbt.json`. The CLI validates the exact
 dependency version and source checksums, then adapts a private build copy.
 It does not change the dependency cache or install process signal handlers.

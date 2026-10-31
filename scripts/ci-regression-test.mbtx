@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/process" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/process" }
 async fn main {
   let status = @process.run("moon", ["run", "scripts/release-check-test.mbtx"])
   if status != 0 { fail("Release preparation regression tests failed") }

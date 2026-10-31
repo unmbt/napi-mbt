@@ -1,4 +1,4 @@
 name = "examples/streams"
 version = "0.1.0"
 preferred_target = "native"
-import { "moonbitlang/async@0.22.4" }
+import { "moonbitlang/async@0.22.5" }

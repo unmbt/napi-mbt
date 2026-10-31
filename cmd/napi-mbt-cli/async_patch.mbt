@@ -15,7 +15,7 @@ async fn patch_async_dependency(workspace : String) -> Unit {
   let root = workspace + "/.mooncakes/moonbitlang/async"
   if !@fs.exists(root + "/moon.mod") {
     fail(
-      "Async exports require moonbitlang/async@0.22.4; run moon add moonbitlang/async@0.22.4 first",
+      "Async exports require moonbitlang/async@0.22.5; run moon add moonbitlang/async@0.22.5 first",
     )
   }
   let manifest = read_text(root + "/moon.mod")
@@ -28,9 +28,9 @@ async fn patch_async_dependency(workspace : String) -> Unit {
       break
     }
   }
-  if version != Some("0.22.4") {
+  if version != Some("0.22.5") {
     fail(
-      "Async adapter requires exactly moonbitlang/async 0.22.4; found " +
+      "Async adapter requires exactly moonbitlang/async 0.22.5; found " +
       version.unwrap_or("no version"),
     )
   }
@@ -54,7 +54,7 @@ async fn patch_async_dependency(workspace : String) -> Unit {
           .text()
           .replace_all(old="\r\n", new="\n")
         if adapter_checksum(source) != checksum {
-          fail("Async 0.22.4 source checksum mismatch: \{path}")
+          fail("Async 0.22.5 source checksum mismatch: \{path}")
         }
       }
       Null =>

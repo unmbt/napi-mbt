@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/json", "moonbitlang/core/env" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/json", "moonbitlang/core/env" }
 
 ///|
 async fn copy_tree(source : String, destination : String) -> Unit {
@@ -14,7 +14,7 @@ async fn copy_tree(source : String, destination : String) -> Unit {
 async fn main {
   let temp = @fs.tmpdir(prefix="napi-mbt-async-adapter-")
   defer @fs.rmdir(temp, recursive=true)
-  @fs.write_file(temp + "/moon.mod", "name = \"test/async-adapter\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(temp + "/moon.mod", "name = \"test/async-adapter\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
   @fs.write_file(temp + "/moon.pkg", "import { \"moonbitlang/async/napi_host\", \"moonbitlang/async\", \"moonbitlang/core/env\" }\n")
   copy_tree(".mooncakes/moonbitlang/async", temp + "/.mooncakes/moonbitlang/async")
   guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is Object(resources) else { fail("Invalid resources") }

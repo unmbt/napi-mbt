@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
 
 ///|
 async fn copy_tree(source : String, destination : String) -> Unit {
@@ -26,7 +26,7 @@ async fn main {
   defer @fs.rmdir(temp, recursive=true)
   let dir = temp + "/fixture"
   checked(binary, ["init", dir, "--name", "async-exports"])
-  @fs.write_file(dir + "/moon.mod", "name = \"test/async-exports\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.mod", "name = \"test/async-exports\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
   @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\", \"moonbitlang/async/fs\", \"moonbitlang/async/socket\", \"moonbitlang/async/stdio\","))
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
   copy_tree(".mooncakes/moonbitlang/async", dir + "/.mooncakes/moonbitlang/async")

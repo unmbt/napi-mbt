@@ -7,7 +7,7 @@ records source versions and licenses.
 
 Root runtime sources are authoritative. After editing them, run
 `moon run scripts/sync-runtime.mbtx`; the resource build rule embeds that result.
-The async 0.22.4 adaptation has separate sources, checksums and licenses:
+The async 0.22.5 adaptation has separate sources, checksums and licenses:
 `moon run scripts/sync-async-adapter.mbtx`. Both support `--check` and run in CI.
 Do not hand-edit duplicated runtime text in `resources.json`.
 

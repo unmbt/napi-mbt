@@ -39,7 +39,7 @@ Crucially, **`napi-mbt-cli` is a standalone native binary**. You can install it 
 | :--- | :--- |
 | 🎯 **Zero-Boilerplate Exports** | Export `pub fn` and `pub async fn` with `#export_name("...")`, alongside owned `pub struct` and `pub enum` value types. Native classes are configured cleanly in `napi-mbt.json`. |
 | 🛡️ **Strict Boundary Validation** | Rejects `NaN`, `±Infinity`, fractional floats passed to integers, out-of-range 32-bit/64-bit numbers, and invalid UTF-16/Buffer inputs at the C boundary before entering MoonBit. |
-| ⚡ **Full Async & Concurrency Stack** | Supports cancellable `pub async fn` Promises (`moonbitlang/async@0.22.4` + libuv with `AbortSignal`), native C worker pool tasks (`nativeTasks`), isolated MoonBit worker process pools (`workerTasks`), awaited JS Promises (`NapiJsPromise`), and demand-driven async streams (`NapiAsyncIterator`). |
+| ⚡ **Full Async & Concurrency Stack** | Supports cancellable `pub async fn` Promises (`moonbitlang/async@0.22.5` + libuv with `AbortSignal`), native C worker pool tasks (`nativeTasks`), isolated MoonBit worker process pools (`workerTasks`), awaited JS Promises (`NapiJsPromise`), and demand-driven async streams (`NapiAsyncIterator`). |
 | 🧱 **Safe Classes & Callbacks** | Native classes include constructors, static factories, getters/setters, methods, and explicit idempotent `.dispose()`. Callbacks support typed MoonBit signatures `(Args) -> Ret raise`, returned closures with `.dispose()`, and threadsafe functions (`NapiCallback`). |
 | 🔒 **Isolated, Cached Builds** | Compiles inside isolated workspaces without mutating user source files. Includes content-addressed build caching, watch mode (`--watch`), and native symbol collision inspection (`nm` / `dumpbin`). |
 | 📦 **Precise ABI & Engine Ranges** | Targets **N-API v4** by default and automatically raises the required N-API level (up to v10) only when higher-level features are used, computing the exact `engines.node` intersection in `package.json`. |
@@ -172,7 +172,7 @@ console.log(summarize('orders', [10, 20, 30]));
 | `pub struct` / `pub enum` | Object / Discriminated Union | Exported structs map to typed JS objects; enums map to variant name string or `{ tag: "Variant", args: [...] }` discriminated unions. |
 | Configured Class (`napi-mbt.json`) | `class` with `dispose()` | Native handle wrapping with constructors, static factories, properties, methods, and deterministic disposal. |
 | `(Args) -> Ret raise` / `NapiCallback` | `(...args) => Ret` | Supports synchronous call-scoped invocations, returned closures with `dispose()`, and threadsafe functions (`N-API 4`). |
-| `pub async fn(...) -> T` | `Promise<T>` (with `{ signal?: AbortSignal }`) | Runs on the embedded `moonbitlang/async@0.22.4` + libuv loop (`N-API 8`) with cooperative cancellation. |
+| `pub async fn(...) -> T` | `Promise<T>` (with `{ signal?: AbortSignal }`) | Runs on the embedded `moonbitlang/async@0.22.5` + libuv loop (`N-API 8`) with cooperative cancellation. |
 | `NapiJsPromise[T]` | `Promise<T>` | Awaits JavaScript Promises inside MoonBit `async fn` exports with typed resolution. |
 | `NapiAsyncIterator[T]` | `AsyncIterableIterator<T>` & `ReadableStream<T>` | Demand-driven streaming input/output with backpressure and early consumer cancellation (`return()`). |
 | `NapiTypedThreadsafeFunction[T]` | Threadsafe producer to JS callback | Encodes `T` to copied Bytes on a producer thread; the owner-thread callback receives a Buffer. |
@@ -251,7 +251,7 @@ pnpm test
 
 ## 🧪 Development & Validation
 
-This repository pins **MoonBit `0.10.17+093cb8f9c`**, **CMake `4.4.4`**, and **`moonbitlang/async@0.22.4`**. Common repository validation commands:
+This repository pins **MoonBit `0.10.17+093cb8f9c`**, **CMake `4.4.4`**, and **`moonbitlang/async@0.22.5`**. Common repository validation commands:
 
 ```bash
 moon run scripts/toolchain-check.mbtx   # Verify pinned MoonBit, CMake, and host toolchain
@@ -282,5 +282,5 @@ See [Development Workflow](docs/en/development.md) and [Validation Record](docs/
 | **Unicode Character Database** | Unicode Consortium (bundled in Tree-sitter) | Unicode character tables in Tree-sitter lexer | **Unicode-DFS-2016** | [`internal/syntax/vendor/runtime/unicode/LICENSE`](internal/syntax/vendor/runtime/unicode/LICENSE) (`licenses/UNICODE-LICENSE`) |
 | **Tree-sitter MoonBit Grammar** | Commit `190881df` (ABI 15) · [unmbt/tree-sitter-moonbit](https://github.com/unmbt/tree-sitter-moonbit) | Vendored MoonBit grammar tables (`parser.c` / `scanner.c`) | **Apache-2.0 AND MIT** | [`internal/syntax/vendor/GRAMMAR-LICENSE`](internal/syntax/vendor/GRAMMAR-LICENSE) (`licenses/GRAMMAR-LICENSE`) |
 | **Node-API Headers (`node-api-headers`)** | `v1.9.0` · [nodejs/node-api-headers](https://github.com/nodejs/node-api-headers) | Embedded `node_api.h` & `js_native_api.h` headers for standalone builds | **MIT** | Embedded in [`internal/assets/data/resources.json`](internal/assets/data/resources.json) (`licenses/NODE-API-LICENSE`) |
-| **MoonBit Async Runtime (`moonbitlang/async`)** | `v0.22.4` · [moonbitlang/async](https://github.com/moonbitlang/async) | Embedded native async event-loop bridge and runtime support | **Apache-2.0** | Embedded in [`internal/assets/data/resources.json`](internal/assets/data/resources.json) (`licenses/MOONBIT-ASYNC-LICENSE`) |
+| **MoonBit Async Runtime (`moonbitlang/async`)** | `v0.22.5` · [moonbitlang/async](https://github.com/moonbitlang/async) | Embedded native async event-loop bridge and runtime support | **Apache-2.0** | Embedded in [`internal/assets/data/resources.json`](internal/assets/data/resources.json) (`licenses/MOONBIT-ASYNC-LICENSE`) |
 | **libuv Headers & Declarations** | [libuv/libuv](https://github.com/libuv/libuv) | Embedded libuv declarations for Node.js event-loop integration | **MIT** | Embedded in [`internal/assets/data/resources.json`](internal/assets/data/resources.json) (`licenses/LIBUV-LICENSE`) |

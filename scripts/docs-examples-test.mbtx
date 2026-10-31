@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process", "moonbitlang/core/env" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
 
 ///|
 async fn checked(program : String, args : Array[String]) -> Unit {
@@ -24,7 +24,7 @@ async fn main {
   defer @fs.rmdir(directory, recursive=true)
   let dir = directory + "/fixture"
   checked(binary, ["init", dir, "--name", "documented-addon"])
-  @fs.write_file(dir + "/moon.mod", "name = \"test/documented-addon\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.4\" }\n")
+  @fs.write_file(dir + "/moon.mod", "name = \"test/documented-addon\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
   @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
   @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/documented-addon.mbt.txt"))
   @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")

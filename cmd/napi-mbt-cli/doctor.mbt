@@ -51,6 +51,11 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
       "version": Json(command(cmake, ["--version"], dir).trim().to_owned()),
     },
   }
+  // Keep the shared discovery result in doctor output while the existing
+  // CMake probe remains the source of truth for addon-specific validation.
+  let shared = @native_toolchain.discover(builder~)
+  report["sharedToolchainUsable"] = Json(shared.is_usable())
+  report["sharedToolchainDiagnostics"] = Json(shared.diagnostics)
   let args = []
   let mut librarian = None
   let probe = @fs.tmpdir(prefix="napi-mbt-toolchain-")

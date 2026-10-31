@@ -6,8 +6,8 @@ Configure `nativeTasks` as an export-name to C-symbol object and select N-API 8:
 { "napiVersion": 8, "nativeTasks": { "compute": "compute_task" } }
 ```
 
-Add `moonbitlang/async@0.22.4` to `moon.mod` (`moon add
-moonbitlang/async@0.22.4`) and resolve it before building. Tasks reuse the existing
+Add `moonbitlang/async@0.22.5` to `moon.mod` (`moon add
+moonbitlang/async@0.22.5`) and resolve it before building. Tasks reuse the existing
 async Promise/AbortSignal adapter; the CLI supplies its package import in the
 isolated workspace. Add your C file to `native-stub`. The generated public API is
 `compute(input: Buffer, options?: { signal?: AbortSignal }): Promise<Buffer>`.

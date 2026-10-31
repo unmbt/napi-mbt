@@ -12,7 +12,7 @@ pub async fn twice(value : NapiJsPromise[Int]) -> Int {
 
 Its JS signature is `twice(value: Promise<number>, options?: { signal?:
 AbortSignal }): Promise<number>`. Like other async exports it requires N-API 8
-and the pinned `moonbitlang/async@0.22.4` dependency. An actual JS Promise is
+and the pinned `moonbitlang/async@0.22.5` dependency. An actual JS Promise is
 required; arbitrary thenables are rejected. This is an input wrapper; use
 `async fn` for Promise output. Borrowed BufferView values are forbidden inside it.
 

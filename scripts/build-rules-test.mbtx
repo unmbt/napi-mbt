@@ -1,4 +1,4 @@
-import { "moonbitlang/async", "moonbitlang/async/fs", "moonbitlang/async/process" }
+import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process" }
 ///|
 async fn checked(args : Array[String], cwd : String) -> String {
   let (code, out, err) = @process.collect_output("moon", args, cwd~)

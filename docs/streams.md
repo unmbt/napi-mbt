@@ -1,6 +1,6 @@
 # Async iterators and Web streams
 
-Use `NapiAsyncIterator[T]` with N-API 8 and `moonbitlang/async@0.22.4`. The CLI
+Use `NapiAsyncIterator[T]` with N-API 8 and `moonbitlang/async@0.22.5`. The CLI
 infers async/stream support and a Node >=18 engine floor (higher N-API choices
 retain their higher minimum). See the [standalone example](../examples/streams).
 
