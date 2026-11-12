@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "unmbt/napi-mbt"
 
+import {
+  "moonbitlang/core/json",
+}
+
 // Values
 pub const NAPI_MBT_RUNTIME_VERSION : String = "14"
 
@@ -154,7 +158,7 @@ pub fn napi_promise_resolve(NapiEnv, NapiPromise, NapiValue) -> Unit raise NapiE
 
 pub fn napi_property_key(NapiEnv, String) -> NapiValue raise NapiError
 
-pub fn napi_read_json(NapiEnv, NapiValue, Array[NapiValue]) -> Json raise NapiError
+pub fn napi_read_json(NapiEnv, NapiValue, Array[NapiValue]) -> @json.Json raise NapiError
 
 pub fn napi_require_object(NapiEnv, NapiValue) -> Unit raise NapiError
 
@@ -188,7 +192,7 @@ pub fn napi_value_type(NapiEnv, NapiValue) -> NapiValueType raise NapiError
 
 pub fn napi_version(NapiEnv) -> UInt32 raise NapiError
 
-pub fn napi_write_json(NapiEnv, Json, Int32) -> NapiValue raise NapiError
+pub fn napi_write_json(NapiEnv, @json.Json, Int32) -> NapiValue raise NapiError
 
 pub fn roundtrip_bytes(Bytes) -> Bytes
 

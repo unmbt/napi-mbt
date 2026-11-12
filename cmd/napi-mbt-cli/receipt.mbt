@@ -53,7 +53,7 @@ async fn verify_receipt(
   }
   if target == host_target() {
     let toolchain = build_toolchain(dir, config(dir).builder, true)
-    defer toolchain.close()
+    defer @async.protect_from_cancel(() => toolchain.close())
     if cache_identity(dir, toolchain, target, mode) != identity {
       fail(
         "Build toolchain or configuration changed; rebuild before prepublish",

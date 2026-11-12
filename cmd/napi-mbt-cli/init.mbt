@@ -102,8 +102,8 @@ async fn initialize(
     #|      - uses: actions/checkout@v4
     #|      - uses: hustcer/setup-moonbit@v1
     #|        with:
-    #|          version: '0.10.17+093cb8f9c'
-    #|          core-version: '0.10.17+093cb8f9c'
+    #|          version: '0.10.20+65efd5b93'
+    #|          core-version: '0.10.20+65efd5b93'
     #|      - run: moon install unmbt/napi-mbt/cmd/napi-mbt-cli
     #|      - name: Add Moon binaries to PATH (Unix)
     #|        if: runner.os != 'Windows'

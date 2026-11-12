@@ -251,7 +251,7 @@ pnpm test
 
 ## 🧪 Development & Validation
 
-This repository pins **MoonBit `0.10.17+093cb8f9c`**, **CMake `4.4.4`**, and **`moonbitlang/async@0.22.5`**. Common repository validation commands:
+This repository pins **MoonBit `0.10.20+65efd5b93`**, **CMake `4.4.4`**, and **`moonbitlang/async@0.22.5`**. Common repository validation commands:
 
 ```bash
 moon run scripts/toolchain-check.mbtx   # Verify pinned MoonBit, CMake, and host toolchain
