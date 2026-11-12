@@ -1,6 +1,10 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "unmbt/napi-mbt/generator"
 
+import {
+  "moonbitlang/core/json",
+}
+
 // Values
 pub fn parse_source(String, String) -> ParsedSource raise
 
@@ -68,7 +72,7 @@ pub(all) struct ParsedClass {
   construct : ParsedExport
   members : Array[ClassMember]
 }
-pub fn ParsedClass::manifest(Self) -> Json
+pub fn ParsedClass::manifest(Self) -> @json.Json
 
 pub(all) struct ParsedExport {
   source_name : String
@@ -83,7 +87,7 @@ pub(all) struct ParsedExport {
   documentation : Array[String]
 }
 pub fn ParsedExport::error_contract(Self) -> Array[String]
-pub fn ParsedExport::manifest(Self) -> Json
+pub fn ParsedExport::manifest(Self) -> @json.Json
 
 pub(all) struct ParsedSource {
   exports : Array[ParsedExport]
@@ -100,7 +104,7 @@ pub(all) struct TypeDefinition {
   line : Int32
   documentation : Array[String]
 }
-pub fn TypeDefinition::manifest(Self) -> Json
+pub fn TypeDefinition::manifest(Self) -> @json.Json
 
 pub(all) enum TypeShape {
   StructShape(Array[Parameter])

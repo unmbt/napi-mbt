@@ -161,7 +161,7 @@ async fn build_toolchain(
     }
   }
   let toolchain = detect_toolchain(dir, builder)
-  errdefer toolchain.close()
+  errdefer @async.protect_from_cancel(() => toolchain.close())
   if reuse {
     mkdirp(dir + "/.napi-mbt/cache")
     let signature = toolchain_signature(dir, builder, toolchain.report)

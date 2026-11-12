@@ -55,7 +55,7 @@ async fn build(
     eprintln("[napi-mbt] cache disabled: " + reason)
   }
   let toolchain = build_toolchain(dir, conf.builder, cached)
-  defer toolchain.close()
+  defer @async.protect_from_cancel(() => toolchain.close())
   timer.stage("toolchain")
   let staging = @fs.tmpdir(prefix="napi-mbt-build-")
   defer @fs.rmdir(staging, recursive=true)
@@ -215,7 +215,11 @@ async fn build(
     ignore(validate_linux_libc(binary_data, target))
   }
   write_file(pending, binary_data)
-  errdefer (if @fs.exists(pending) { @fs.remove(pending) })
+  errdefer @async.protect_from_cancel(() => {
+    if @fs.exists(pending) {
+      @fs.remove(pending)
+    }
+  })
   let package_after = if @fs.exists(dir + "/package.json") {
     Some(@fs.read_file(dir + "/package.json").binary())
   } else {
@@ -234,10 +238,12 @@ async fn build(
   if had_binary {
     write_file(backup, @fs.read_file(destination))
   }
-  errdefer (if had_binary {
-    @fs.rename(backup, destination, replace=true)
-  } else if @fs.exists(destination) {
-    @fs.remove(destination)
+  errdefer @async.protect_from_cancel(() => {
+    if had_binary {
+      @fs.rename(backup, destination, replace=true)
+    } else if @fs.exists(destination) {
+      @fs.remove(destination)
+    }
   })
   @fs.rename(pending, destination, replace=true)
   mkdirp(dir + "/.napi-mbt")

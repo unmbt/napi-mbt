@@ -43,7 +43,7 @@ async fn install_outputs(
   let backups : Array[Int32] = []
   let installed : Array[Int32] = []
   let removed : Array[Int32] = []
-  errdefer {
+  errdefer @async.protect_from_cancel(() => {
     for i in installed.rev() {
       @fs.remove(dir + "/" + outputs[i].0)
     }
@@ -57,7 +57,7 @@ async fn install_outputs(
         replace=true,
       )
     }
-  }
+  })
   for i, name in removals {
     if @fs.exists(dir + "/" + name) {
       @fs.rename(dir + "/" + name, staging + "/\{i}.removed")

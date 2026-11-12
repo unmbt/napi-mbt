@@ -59,12 +59,12 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
   let args = []
   let mut librarian = None
   let probe = @fs.tmpdir(prefix="napi-mbt-toolchain-")
-  errdefer {
+  errdefer @async.protect_from_cancel(() => {
     if @fs.exists(probe + "/msbuild") {
       @fs.remove(probe + "/msbuild")
     }
     @fs.rmdir(probe, recursive=true)
-  }
+  })
   if windows() {
     let (root, version) = visual_studio(dir)
     let msbuild = root + "/MSBuild/Current/Bin/MSBuild.exe"
@@ -192,7 +192,7 @@ async fn doctor(directory : String, json : Bool) -> Unit {
     let dir = @fs.realpath(directory)
     let conf = config(dir)
     let toolchain = detect_toolchain(dir, conf.builder)
-    defer toolchain.close()
+    defer @async.protect_from_cancel(() => toolchain.close())
     toolchain.report
   } catch {
     error => {

@@ -251,7 +251,7 @@ pnpm test
 
 ## 🧪 本地开发与验证门禁
 
-本仓库固定使用 **MoonBit `0.10.17+093cb8f9c`**、**CMake `4.4.4`** 与 **`moonbitlang/async@0.22.5`**。常用本地验证命令如下：
+本仓库固定使用 **MoonBit `0.10.20+65efd5b93`**、**CMake `4.4.4`** 与 **`moonbitlang/async@0.22.5`**。常用本地验证命令如下：
 
 ```bash
 moon run scripts/toolchain-check.mbtx   # 校验固定的 MoonBit、CMake 与宿主编译器版本
