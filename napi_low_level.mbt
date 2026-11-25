@@ -109,23 +109,25 @@ extern "c" fn napi_object_has_raw(
 ) -> Int32 = "napi_mbt_has_named_property"
 
 ///|
-#borrow(result)
-extern "c" fn napi_call_array_raw(
+#borrow(argv, result)
+extern "c" fn napi_call_argv_raw(
   env : NapiEnv,
   function : NapiValue,
   receiver : NapiValue,
-  args : NapiValue,
+  argc : Int32,
+  argv : FixedArray[NapiValue],
   result : Ref[NapiValue],
-) -> Int32 = "napi_mbt_call_function_array"
+) -> Int32 = "napi_mbt_call_function_argv"
 
 ///|
-#borrow(result)
-extern "c" fn napi_new_instance_array_raw(
+#borrow(argv, result)
+extern "c" fn napi_new_instance_argv_raw(
   env : NapiEnv,
   function : NapiValue,
-  args : NapiValue,
+  argc : Int32,
+  argv : FixedArray[NapiValue],
   result : Ref[NapiValue],
-) -> Int32 = "napi_mbt_new_instance_array"
+) -> Int32 = "napi_mbt_new_instance_argv"
 
 ///|
 #borrow(result)
@@ -407,14 +409,11 @@ pub fn NapiFunction::call(
   receiver : NapiValue,
   args : Array[NapiValue],
 ) -> NapiValue raise NapiError {
-  let js_args = napi_array_new(env, args.length())
-  for i, arg in args {
-    napi_array_set(env, js_args, i, arg)
-  }
+  let argv = FixedArray::makei(args.length(), i => args[i])
   let result = Ref(moonbit_dummy_napi_value())
   result_from_status(
     env,
-    napi_call_array_raw(env, self.value, receiver, js_args, result),
+    napi_call_argv_raw(env, self.value, receiver, args.length(), argv, result),
     b"Calling JavaScript function",
   )
   result.val
@@ -426,14 +425,11 @@ pub fn NapiFunction::new_instance(
   env : NapiEnv,
   args : Array[NapiValue],
 ) -> NapiObject raise NapiError {
-  let js_args = napi_array_new(env, args.length())
-  for i, arg in args {
-    napi_array_set(env, js_args, i, arg)
-  }
+  let argv = FixedArray::makei(args.length(), i => args[i])
   let result = Ref(moonbit_dummy_napi_value())
   result_from_status(
     env,
-    napi_new_instance_array_raw(env, self.value, js_args, result),
+    napi_new_instance_argv_raw(env, self.value, args.length(), argv, result),
     b"Constructing JavaScript object",
   )
   NapiObject::from_value(env, result.val)

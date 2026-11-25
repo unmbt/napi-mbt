@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  MOONBIT_VERSION: '0.10.20+65efd5b93'
+  MOONBIT_VERSION: '0.10.22+124d61d05'
   CMAKE_VERSION: '4.4.4'
 
 jobs:
@@ -58,6 +58,7 @@ jobs:
       # Project checking downloads dependencies; `moon update` only updates the registry.
       - run: moon check --target native --warn-list +73 --deny-warn
       - run: moon run scripts/sync-runtime.mbtx --check
+      - run: moon fetch moonbitlang/async@0.22.10
       - run: moon run scripts/sync-async-adapter.mbtx --check
       - run: moon run scripts/release-check.mbtx
       - run: moon run scripts/docs-check.mbtx

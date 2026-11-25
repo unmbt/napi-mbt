@@ -46,21 +46,24 @@ fn callback_conversion(
   readers : Array[ValueType],
   writers : Array[ValueType],
   read : Bool,
+  rt~ : String = "",
 ) -> String {
   let out = StringBuilder()
   if read {
-    out.write_string("  let callback = NapiCallback::new(env, value)\n  fn(")
-    out.write_string(params.mapi((i, p) => "p\{i} : " + p.moonbit()).join(", "))
     out.write_string(
-      ") raise {\n    let env = callback.environment()\n    let args = napi_array_new(env, \{params.length()})\n",
+      "  let callback = \{rt}NapiCallback::new(env, value)\n  fn(",
     )
-    for i, p in params {
-      out.write_string(
-        "    napi_array_set(env, args, \{i}, \{conversion_name(p, writers, false)}(env, p\{i}, 0))\n",
-      )
-    }
     out.write_string(
-      "    let result = callback.call(args)\n    \{conversion_name(ret, readers, true)}(env, result, [])\n  }\n",
+      params.mapi((i, p) => "p\{i} : " + p.moonbit_with(rt)).join(", "),
+    )
+    out.write_string(") raise {\n    let env = callback.environment()\n")
+    let argv = params
+      .mapi((i, p) => convert_write_expr(p, "p\{i}", writers, rt))
+      .join(", ")
+    out.write_string(
+      "    let result = callback.call_argv([\{argv}])\n    " +
+      convert_read_expr(ret, "result", readers, rt, typed=true) +
+      "\n  }\n",
     )
   } else {
     let mut required = 0
@@ -70,17 +73,17 @@ fn callback_conversion(
       }
     }
     out.write_string(
-      "  napi_closure_new(env, fn(env, args) {\n    try {\n      args.require(\{required})\n",
+      "  \{rt}napi_closure_new(env, fn(env, args) {\n    try {\n      args.require(\{required})\n",
     )
     for i, p in params {
       out.write_string(
-        "      let p\{i} = \{conversion_name(p, readers, true)}(env, args.get(env, \{i}), [])\n",
+        "      let p\{i} : \{p.moonbit_with(rt)} = \{convert_read_expr(p, "args.get(env, \{i})", readers, rt, typed=false)}\n",
       )
     }
     out.write_string(
-      "      let result = value(" +
+      "      let result : \{ret.moonbit_with(rt)} = value(" +
       params.mapi((i, _) => "p\{i}").join(", ") +
-      ")\n      \{conversion_name(ret, writers, false)}(env, result, 0)\n    } catch { error => { throw_napi_error(env, error); moonbit_dummy_napi_value() } }\n  })\n",
+      ")\n      \{convert_write_expr(ret, "result", writers, rt)}\n    } catch { error => { \{rt}throw_napi_error(env, error); \{rt}moonbit_dummy_napi_value() } }\n  })\n",
     )
   }
   out.to_string()

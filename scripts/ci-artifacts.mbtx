@@ -1,17 +1,19 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/env" }
+----
 
 ///|
 async fn copy(source : String, destination : String) -> Unit {
   if @fs.kind(source) == Directory {
-    @fs.mkdir(destination, recursive=true, allow_exist=true)
+    @fs.mkdir(destination, recursive=true, allow_existing=true)
     for name in @fs.readdir(source) { copy(source + "/" + name, destination + "/" + name) }
-  } else { @fs.write_file(destination, @fs.read_file(source)) }
+  } else { @fs.write_binary(destination, @fs.read_binary(source)) }
 }
 
 ///|
 async fn main {
   let destination = @env.args().get(1).unwrap_or("dist/consumer-fixtures")
-  @fs.mkdir(destination + "/.napi-mbt", recursive=true, allow_exist=true)
+  @fs.mkdir(destination + "/.napi-mbt", recursive=true, allow_existing=true)
   for name in ["native-smoke", "isolation-smoke", "boundary-smoke", "structured-smoke", "owned-binary-smoke", "tsfn-smoke", "native-tasks-smoke", "workers-smoke", "js-promises-smoke", "streams-smoke", "combined-smoke", "class-smoke", "callback-smoke", "lifecycle-smoke", "async-smoke", "async-exports", "minimum-cjs", "minimum-dual", "minimum-async"] {
     copy(".napi-mbt/" + name, destination + "/.napi-mbt/" + name)
   }

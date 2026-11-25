@@ -1,8 +1,8 @@
 ///|
-let ignored_build_directories : Array[String] = [
-  ".git", ".github", ".githooks", ".codegraph", ".napi-mbt", ".moonagent", ".vscode",
-  ".idea", "_build", "target", "node_modules", "artifacts", "dist", "npm", "licenses",
-  "docs", "napi-rs", "packages",
+let ignored_build_directories : ReadOnlyArray[String] = [
+  ".git", ".github", ".githooks", ".codegraph", ".napi-mbt", ".moonagent", ".repos",
+  ".vscode", ".idea", "_build", "target", "node_modules", "artifacts", "dist", "npm",
+  "licenses", "docs", "napi-rs", "packages",
 ]
 
 ///|
@@ -31,7 +31,7 @@ async fn copy_build_workspace(
     if @fs.kind(src) == Directory {
       copy_build_workspace(src, dst, parents, excluded~)
     } else {
-      write_file(dst, @fs.read_file(src))
+      write_file(dst, @fs.read_binary(src))
       if !windows() && @fs.can_execute(src) {
         @fs.chmod(dst, 0o755)
       }

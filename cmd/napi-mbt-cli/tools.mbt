@@ -25,8 +25,8 @@ async fn mkdirp(path : String, recursive~ : Bool = true) -> Unit {
 }
 
 ///|
-async fn write_file(path : String, data : &@io.Data) -> Unit {
-  @fs.write_file(path, data, create_mode=CreateOrTruncate)
+async fn write_file(path : String, data : BytesView) -> Unit {
+  @fs.write_binary(path, data, create_mode=CreateOrTruncate)
 }
 
 ///|
@@ -34,15 +34,15 @@ async fn write_file(path : String, data : &@io.Data) -> Unit {
 // This keeps project files portable across Windows code pages and prevents a
 // native build from later failing while MoonBit decodes a generated source.
 async fn write_text_file(path : String, text : String) -> Unit {
-  @fs.write_file(path, @utf8.encode(text), create_mode=CreateOrTruncate)
+  @fs.write_binary(path, @utf8.encode(text), create_mode=CreateOrTruncate)
 }
 
 ///|
 // Native Windows tools may write diagnostics in the active code page instead
 // of UTF-8. Their output is informational, so invalid byte sequences must not
 // abort the build while being decoded.
-fn command_output(data : &@io.Data) -> String {
-  @utf8.decode_lossy(data.binary())
+fn command_output(data : Bytes) -> String {
+  @utf8.decode_lossy(data)
 }
 
 ///|
@@ -50,8 +50,8 @@ fn command_output(data : &@io.Data) -> String {
 // `Malformed.Malformed` exception from the UTF-8 decoder.  Project source is
 // required to be UTF-8 because the generator parses it as MoonBit text.
 async fn read_text(path : String) -> String {
-  let data = @fs.read_file(path)
-  data.text() catch {
+  let data = @fs.read_binary(path)
+  @utf8.decode(data) catch {
     _ => fail("File is not valid UTF-8: \{path}")
   }
 }
@@ -74,18 +74,20 @@ async fn command(
       "]",
     )
   }
-  let (code, out, err) = @process.collect_output(
+  let res = @process.run(
     program,
     args,
     cwd=dir,
     extra_env=env.unwrap_or(Map([])),
+    stdout=Collect,
+    stderr=Collect,
   )
-  if code != 0 {
-    fail(
-      "\{program} exited with status \{code}:\n\{command_output(out)}\{command_output(err)}",
-    )
+  let out = command_output(res.stdout_binary())
+  let err = command_output(res.stderr_binary())
+  if res.exit_code != 0 {
+    fail("\{program} exited with status \{res.exit_code}:\n\{out}\{err}")
   }
-  command_output(out) + command_output(err)
+  out + err
 }
 
 ///|

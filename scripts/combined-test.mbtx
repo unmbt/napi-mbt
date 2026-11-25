@@ -1,12 +1,17 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], cwd? : StringView) -> String {
   let environment : Map[String, String] = Map([])
   if program == "node" && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
-  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(program, args, cwd?, extra_env=environment))
-  if code != 0 { fail(out.text() + err.text()) }
-  out.text()
+  let _proc_res = @async.with_timeout(300000, () => @process.run(program, args, cwd?, extra_env=environment, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  out
 }
 
 ///|
@@ -30,19 +35,19 @@ async fn main {
   let root = @fs.realpath(".")
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-combined-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let dir = temp + "/project"
   ignore(checked(binary, ["init", dir, "--name", "combined-fixture"]))
-  @fs.write_file(dir + "/moon.mod", "name = \"test/combined\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
+  @fs.write_text(dir + "/moon.mod", "name = \"test/combined\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.10\" }\n")
   ignore(checked("moon", ["check", "--target", "native"], cwd=dir))
-  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"nativeTasks\":{\"uppercase\":\"uppercase_task\"},\"workerTasks\":[\"digest\"],\"workerPool\":{\"idleTimeoutMs\":100}}")
-  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/combined.mbt.txt"))
-  @fs.write_file(dir + "/tasks.c", @fs.read_file("examples/native-tasks/tasks.c"))
-  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"tasks.c\""))
+  @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"nativeTasks\":{\"uppercase\":\"uppercase_task\"},\"workerTasks\":[\"digest\"],\"workerPool\":{\"idleTimeoutMs\":100}}")
+  @fs.write_binary(dir + "/lib.mbt", @fs.read_binary("scripts/fixtures/combined.mbt.txt"))
+  @fs.write_binary(dir + "/tasks.c", @fs.read_binary("examples/native-tasks/tasks.c"))
+  @fs.write_text(dir + "/moon.pkg", @fs.read_text(dir + "/moon.pkg").replace_all(old="\"stub.c\"", new="\"stub.c\", \"tasks.c\""))
   let asan = @env.args().contains("--asan")
   if asan {
     let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
-    @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
+    @fs.write_text(dir + "/moon.pkg", @fs.read_text(dir + "/moon.pkg").replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"" + flags + "\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"" + flags + "\""))
   }
   ignore(checked(binary, ["build", dir, "--release"]))
   assert_true(checked(binary, ["build", dir, "--release", "--verbose"]).contains("no work to do"))
@@ -52,9 +57,9 @@ async fn main {
   println(checked("node", [root + "/scripts/combined.test.cjs", dir]))
   let target = @fs.readdir(dir + "/artifacts")[0]
   let saved = root + "/.napi-mbt/combined-smoke"
-  @fs.mkdir(saved + "/artifacts/" + target, recursive=true, allow_exist=true)
-  for name in ["index.cjs", "index.mjs", "napi_workers.cjs", "napi_worker_entry.cjs"] { @fs.write_file(saved + "/" + name, @fs.read_file(dir + "/" + name)) }
-  @fs.write_file(saved + "/artifacts/" + target + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  @fs.mkdir(saved + "/artifacts/" + target, recursive=true, allow_existing=true)
+  for name in ["index.cjs", "index.mjs", "napi_workers.cjs", "napi_worker_entry.cjs"] { @fs.write_binary(saved + "/" + name, @fs.read_binary(dir + "/" + name)) }
+  @fs.write_binary(saved + "/artifacts/" + target + "/napi_mbt.node", @fs.read_binary(dir + "/artifacts/" + target + "/napi_mbt.node"))
   ignore(checked(binary, ["prepublish", dir]))
   let packages = []
   for project in [dir + "/npm/" + target, dir] {
@@ -63,12 +68,12 @@ async fn main {
   }
   let installed = temp + "/consumer"
   @fs.mkdir(installed)
-  @fs.write_file(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
+  @fs.write_text(installed + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
   ignore(pnpm(["add", "--offline", "--ignore-scripts", "--save-prod"] + packages, installed))
   let package_dir = installed + "/node_modules/combined-fixture"
   assert_true(!@fs.exists(package_dir + "/artifacts"))
   println(checked("node", [root + "/scripts/combined.test.cjs", package_dir]))
-  @fs.write_file(installed + "/consumer.mts", "import a from 'combined-fixture';\nconst stream: ReadableStream<Uint8Array> = a.pipeline(new ReadableStream<Buffer>()).toReadableStream();\nconst task: Promise<Record<string,[number,number]>> = a.digest(new Uint8Array());\na.settle(Promise.resolve(Buffer.from('ok')));\n// @ts-expect-error owned binary worker input required\na.digest(stream);\n// @ts-expect-error Promise resolves to Buffer\na.settle(Promise.resolve('bad'));\n")
+  @fs.write_text(installed + "/consumer.mts", "import a from 'combined-fixture';\nconst stream: ReadableStream<Uint8Array> = a.pipeline(new ReadableStream<Buffer>()).toReadableStream();\nconst task: Promise<Record<string,[number,number]>> = a.digest(new Uint8Array());\na.settle(Promise.resolve(Buffer.from('ok')));\n// @ts-expect-error owned binary worker input required\na.digest(stream);\n// @ts-expect-error Promise resolves to Buffer\na.settle(Promise.resolve('bad'));\n")
   for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
     ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", mode, "--moduleResolution", resolution, installed + "/consumer.mts"]))
   }

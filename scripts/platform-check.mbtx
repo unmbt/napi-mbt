@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn output(program : String, args : Array[String]) -> String {
-  let (code, out, err) = @process.collect_output(program, args)
-  if code != 0 { fail(out.text() + err.text()) }
-  out.text()
+  let _proc_res = @process.run(program, args, stdout=Collect, stderr=Collect)
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  out
 }
 
 ///|

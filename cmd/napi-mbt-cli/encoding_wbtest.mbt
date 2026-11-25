@@ -7,11 +7,11 @@ test "external diagnostics tolerate non UTF-8 tool output" {
 ///|
 async test "project text is UTF-8 and malformed input names its source" {
   let dir = @fs.tmpdir(prefix="napi-mbt-encoding-")
-  defer @fs.rmdir(dir, recursive=true)
+  defer @fs.remove(dir, recursive=true)
   let path = dir + "/中文.mbt"
   let text = "/// 中文 🌙\n#export_name(\"hello\")\npub fn hello() -> String { \"你好\" }\n"
   write_text_file(path, text)
-  assert_eq(@fs.read_file(path).binary(), @utf8.encode(text))
+  assert_eq(@fs.read_binary(path), @utf8.encode(text))
   assert_eq(read_text(path), text)
   write_file(path, b"\xff")
   try read_text(path) catch {

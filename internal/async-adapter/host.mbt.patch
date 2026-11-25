@@ -6,7 +6,22 @@ pub struct Loop { priv inner : @event_loop.EmbeddedLoop }
 pub struct Task { priv owner : Loop; priv inner : @coroutine.Coroutine }
 
 ///|
+pub type WakeupCallback = @event_loop.WakeupCallback
+
+///|
+pub type WakeupContext = @event_loop.WakeupContext
+
+///|
 pub fn Loop::new() -> Loop raise { { inner: @event_loop.EmbeddedLoop::new() } }
+
+///|
+pub fn Loop::enable_wakeup(
+  self : Loop,
+  wakeup_cb : WakeupCallback,
+  wakeup_ctx : WakeupContext,
+) -> Unit raise {
+  self.inner.enable_wakeup(wakeup_cb, wakeup_ctx)
+}
 
 ///|
 pub fn Loop::submit(self : Loop, f : async () -> Unit) -> Task raise {

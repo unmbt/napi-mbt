@@ -41,7 +41,10 @@ extern "c" fn napi_write_date_raw(
 
 ///|
 #warnings("-unused_value")
-fn get_NapiDate(env : NapiEnv, value : NapiValue) -> NapiDate raise NapiError {
+pub fn get_NapiDate(
+  env : NapiEnv,
+  value : NapiValue,
+) -> NapiDate raise NapiError {
   let result = Ref(0.0)
   result_from_status(
     env,
@@ -61,7 +64,10 @@ fn get_NapiDate(env : NapiEnv, value : NapiValue) -> NapiDate raise NapiError {
 
 ///|
 #warnings("-unused_value")
-fn set_NapiDate(env : NapiEnv, value : NapiDate) -> NapiValue raise NapiError {
+pub fn set_NapiDate(
+  env : NapiEnv,
+  value : NapiDate,
+) -> NapiValue raise NapiError {
   if !valid_date_time(value.milliseconds) {
     raise napi_failure(
       1,

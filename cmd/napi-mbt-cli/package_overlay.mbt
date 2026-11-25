@@ -400,11 +400,43 @@ fn dependency_pic_overlay(text : String) -> String raise {
 }
 
 ///|
+fn runtime_package_overlay(
+  text : String,
+  napi_version : Int32,
+  is_windows : Bool,
+) -> String raise {
+  let mut text = text
+  let tokens = package_tokens(text)
+  if package_call(tokens, "options") is None {
+    text += "\noptions()\n"
+  }
+  let tokens = package_tokens(text)
+  let options = package_call(tokens, "options").unwrap()
+  if package_call(tokens, "link") is None {
+    match package_field(tokens, options, "link") {
+      None => text = package_set(text, options, "link", "{\"native\": {}}")
+      Some((link, _)) =>
+        if package_field(tokens, link, "native") is None {
+          text = package_set(text, link, "native", "{}")
+        }
+    }
+  }
+  let flag = if is_windows { "/utf-8" } else { "-fPIC" }
+  text = append_native_flag(text, "cc-flags", flag)
+  append_native_flag(
+    text,
+    "stub-cc-flags",
+    flag + " -I./.napi-mbt/include -DNAPI_VERSION=\{napi_version}",
+  )
+}
+
+///|
 fn build_package_overlay(
   text : String,
   exports : Array[String],
   napi_version : Int32,
   is_windows : Bool,
+  is_package_runtime~ : Bool = false,
 ) -> String raise {
   let mut text = text
   let tokens = package_tokens(text)
@@ -431,7 +463,12 @@ fn build_package_overlay(
   }
   let options = package_call(package_tokens(text), "options").unwrap()
   let stubs = package_strings(package_value(text, options, "native-stub"))
-  for name in ["stub.c", "napi_glue.c"] {
+  let required_stubs = if is_package_runtime {
+    ["napi_glue.c"]
+  } else {
+    ["stub.c", "napi_glue.c"]
+  }
+  for name in required_stubs {
     if !stubs.contains(name) {
       stubs.push(name)
     }

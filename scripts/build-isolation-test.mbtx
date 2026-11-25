@@ -1,9 +1,14 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String], cwd : String) -> Unit {
-  let (status, out, err) = @process.collect_output(binary, args, cwd~)
-  if status != 0 { fail(out.text() + err.text()) }
+  let _proc_res = @process.run(binary, args, cwd~, stdout=Collect, stderr=Collect)
+  let status = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if status != 0 { fail(out + err) }
 }
 
 ///|
@@ -11,19 +16,19 @@ async fn main {
   let root = @fs.realpath(".")
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-isolation-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let project = temp + "/项目 with spaces"
   checked(binary, ["init", project, "--name", "isolation-fixture"], root)
   @fs.mkdir(project + "/native_dep")
-  @fs.write_file(project + "/native_dep/moon.pkg", "options(\"native-stub\": [\"answer.c\"])\n")
-  @fs.write_file(project + "/native_dep/answer.c", "#include <moonbit.h>\nMOONBIT_FFI_EXPORT int native_answer(void) { return 2; }\n")
-  @fs.write_file(project + "/native_dep/answer.mbt", "///|\npub extern \"c\" fn answer() -> Int = \"native_answer\"\n")
+  @fs.write_text(project + "/native_dep/moon.pkg", "options(\"native-stub\": [\"answer.c\"])\n")
+  @fs.write_text(project + "/native_dep/answer.c", "#include <moonbit.h>\nMOONBIT_FFI_EXPORT int native_answer(void) { return 2; }\n")
+  @fs.write_text(project + "/native_dep/answer.mbt", "///|\npub extern \"c\" fn answer() -> Int = \"native_answer\"\n")
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
   let ccflags = if windows { "/DUSER_CC=1" } else { "-DUSER_CC=1" }
   let stubflags = if windows { "/DUSER_STUB=40" } else { "-DUSER_STUB=40" }
   let links = if windows { "user32.lib" } else { "-lm" }
   let pkg = "import { \"moonbitlang/core/encoding/utf8\", \"isolation-fixture/native_dep\" }\npkgtype(kind: \"foreign_library\")\noptions(\"native-stub\": [\"stub.c\", \"extra.c\"], link: {\"native\": {\"cc-flags\": \"\{ccflags}\", \"stub-cc-flags\": \"\{stubflags}\", \"cc-link-flags\": \"\{links}\", \"exports\": [\"keep\"]}})\n"
-  @fs.write_file(project + "/moon.pkg", pkg)
+  @fs.write_text(project + "/moon.pkg", pkg)
   let stub =
     #|#include <moonbit.h>
     #|#ifndef USER_STUB
@@ -37,25 +42,26 @@ async fn main {
     #|MOONBIT_FFI_EXPORT int extra_stub(void) { volatile double x = 0; return USER_STUB + (int)cos(x) - 1; }
     #|#endif
     #|
-  @fs.write_file(project + "/extra.c", stub)
-  @fs.write_file(project + "/lib.mbt", "///|\nextern \"c\" fn extra_stub() -> Int = \"extra_stub\"\n///|\npub fn keep() -> Int { 7 }\n///|\n#export_name(\"answer\")\npub fn answer() -> Int { extra_stub() + @native_dep.answer() }\n")
-  let module_before = @fs.read_file(project + "/moon.mod").binary()
-  let dep_before = @fs.read_file(project + "/native_dep/moon.pkg").binary()
+  @fs.write_text(project + "/extra.c", stub)
+  @fs.write_text(project + "/lib.mbt", "///|\nextern \"c\" fn extra_stub() -> Int = \"extra_stub\"\n///|\npub fn keep() -> Int { 7 }\n///|\n#export_name(\"answer\")\npub fn answer() -> Int { extra_stub() + @native_dep.answer() }\n")
+  let module_before = @fs.read_binary(project + "/moon.mod")
+  let dep_before = @fs.read_binary(project + "/native_dep/moon.pkg")
   checked(binary, ["build", project, "--release"], root)
-  assert_eq(@fs.read_file(project + "/moon.pkg").text(), pkg)
-  assert_eq(@fs.read_file(project + "/moon.mod").binary(), module_before)
-  assert_eq(@fs.read_file(project + "/native_dep/moon.pkg").binary(), dep_before)
+  assert_eq(@fs.read_text(project + "/moon.pkg"), pkg)
+  assert_eq(@fs.read_binary(project + "/moon.mod"), module_before)
+  assert_eq(@fs.read_binary(project + "/native_dep/moon.pkg"), dep_before)
   assert_true(!@fs.exists(project + "/_build"))
   let targets = @fs.readdir(project + "/artifacts")
   let artifact = project + "/artifacts/" + targets[0] + "/napi_mbt.node"
-  let successful = @fs.read_file(artifact).binary()
-  @fs.write_file(project + "/extra.c", "#error expected failed build\n")
-  let (status, _, _) = @process.collect_output(binary, ["build", project, "--release"], cwd=root)
+  let successful = @fs.read_binary(artifact)
+  @fs.write_text(project + "/extra.c", "#error expected failed build\n")
+  let _proc_res = @process.run(binary, ["build", project, "--release"], cwd=root, stdout=Collect, stderr=Collect)
+  let status = _proc_res.exit_code
   assert_true(status != 0)
-  assert_eq(@fs.read_file(artifact).binary(), successful)
-  assert_eq(@fs.read_file(project + "/moon.pkg").text(), pkg)
+  assert_eq(@fs.read_binary(artifact), successful)
+  assert_eq(@fs.read_text(project + "/moon.pkg"), pkg)
   let output = root + "/.napi-mbt/isolation-smoke"
   if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
-  @fs.write_file(output + "/napi_mbt.node", successful)
+  @fs.write_binary(output + "/napi_mbt.node", successful)
   println("Isolated build preserved user configuration, extra stubs, dependency stubs and the last successful addon")
 }

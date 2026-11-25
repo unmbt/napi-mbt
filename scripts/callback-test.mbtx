@@ -1,12 +1,17 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String], cwd? : StringView) -> Unit {
   @async.with_timeout(120000, () => {
     let environment : Map[String, String] = Map([])
     if binary == "node" && @env.get_env_var("NAPI_MBT_TEST_NODE_PRELOAD") is Some(library) { environment["LD_PRELOAD"] = library }
-    let (code, out, err) = @process.collect_output(binary, args, cwd?, extra_env=environment)
-    if code != 0 { fail(out.text() + err.text()) }
+    let _proc_res = @process.run(binary, args, cwd?, extra_env=environment, stdout=Collect, stderr=Collect)
+    let code = _proc_res.exit_code
+    let out = _proc_res.stdout_text()
+    let err = _proc_res.stderr_text()
+    if code != 0 { fail(out + err) }
   })
 }
 
@@ -15,7 +20,7 @@ async fn main {
   let root = @fs.realpath(".")
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-callback-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let dir = temp + "/fixture"
   checked(binary, ["init", dir, "--name", "callback-fixture"])
   let source =
@@ -56,12 +61,12 @@ async fn main {
     #|#export_name("resource_kind")
     #|pub fn count_kind(kind : Int) -> Int { resource_kind(kind) }
     #|
-  @fs.write_file(dir + "/lib.mbt", source)
+  @fs.write_text(dir + "/lib.mbt", source)
   let asan = @env.args().contains("--asan")
   if asan {
     let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
-    let pkg = @fs.read_file(dir + "/moon.pkg").text().replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
-    @fs.write_file(dir + "/moon.pkg", pkg)
+    let pkg = @fs.read_text(dir + "/moon.pkg").replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
+    @fs.write_text(dir + "/moon.pkg", pkg)
   }
   checked(binary, ["build", dir, "--release"])
   checked("moon", ["check", "--target", "native", "--warn-list", "+73", "--deny-warn"], cwd=dir)
@@ -70,14 +75,14 @@ async fn main {
   let update = @env.args().contains("--update")
   if update && !@fs.exists(snapshots) { @fs.mkdir(snapshots, recursive=true) }
   for name in ["napi_exports.mbt", "napi_glue.c", "index.d.cts", "index.d.mts", "napi_manifest.json"] {
-    let text = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
-    if update { @fs.write_file(snapshots + "/" + name + ".snap", text) }
-    assert_eq(text, @fs.read_file(snapshots + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+    let text = @fs.read_text(dir + "/" + name).replace_all(old="\r\n", new="\n")
+    if update { @fs.write_text(snapshots + "/" + name + ".snap", text) }
+    assert_eq(text, @fs.read_text(snapshots + "/" + name + ".snap").replace_all(old="\r\n", new="\n"), msg=name)
   }
   let output = root + "/.napi-mbt/" + (if asan { "callback-asan" } else { "callback-smoke" })
   if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
-  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
-  for name in ["index.d.cts", "index.d.mts"] { @fs.write_file(output + "/" + name, @fs.read_file(dir + "/" + name)) }
+  @fs.write_binary(output + "/napi_mbt.node", @fs.read_binary(dir + "/artifacts/" + target + "/napi_mbt.node"))
+  for name in ["index.d.cts", "index.d.mts"] { @fs.write_binary(output + "/" + name, @fs.read_binary(dir + "/" + name)) }
   checked("node", ["--expose-gc", "scripts/callback.test.cjs", output + "/napi_mbt.node"])
   println("Callback conversion, exceptions, references and disposal passed")
 }

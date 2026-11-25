@@ -1,15 +1,16 @@
-///|
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
 
 ///|
 async fn main {
   let write = @env.args().contains("--write")
-  guard @json.parse(@fs.read_file("package.json").text()) is Object(manifest) else {
+  guard @json.parse(@fs.read_text("package.json")) is Object(manifest) else {
     fail("Invalid package manifest")
   }
   assert_eq(manifest.get("private"), Some(Json(true)), msg="The root npm package is for development only")
@@ -19,7 +20,7 @@ async fn main {
   }
   assert_eq(engines.get("pnpm"), Some(Json(">=10")))
   let mut module_version : String? = None
-  for line in @fs.read_file("moon.mod").text().split("\n") {
+  for line in @fs.read_text("moon.mod").split("\n") {
     let line = line.trim()
     if line.has_prefix("version = ") {
       guard module_version is None else { fail("Duplicate version in moon.mod") }
@@ -37,14 +38,14 @@ async fn main {
     assert_eq(tag, "v" + release_version, msg="Release tag must match moon.mod")
   }
   let path = "pnpm-lock.yaml"
-  let original = @fs.read_file(path).text()
+  let original = @fs.read_text(path)
   let normalized = original.replace_all(old="\r\n", new="\n")
   let canonical = normalized.replace_all(
     old="https://mirrors.tencent.com/npm/",
     new="https://registry.npmjs.org/",
   )
   if write {
-    @fs.write_file(path, canonical)
+    @fs.write_text(path, canonical)
   } else {
     assert_eq(normalized, canonical, msg="pnpm lockfile must use the public npm registry")
   }

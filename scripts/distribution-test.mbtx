@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], cwd? : StringView) -> String {
-  let (code, out, err) = @async.with_timeout(120000, () => @process.collect_output(program, args, cwd?))
-  if code != 0 { fail(out.text() + err.text()) }
-  out.text()
+  let _proc_res = @async.with_timeout(120000, () => @process.run(program, args, cwd?, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  out
 }
 
 ///|
@@ -25,7 +30,8 @@ async fn pnpm(args : Array[String], cwd : String) -> String {
 
 ///|
 async fn rejected(binary : String, dir : String, target : String) -> Unit {
-  let (code, _, _) = @process.collect_output(binary, ["prepublish", dir, "--target", target])
+  let _proc_res = @process.run(binary, ["prepublish", dir, "--target", target], stdout=Collect, stderr=Collect)
+  let code = _proc_res.exit_code
   assert_true(code != 0)
 }
 
@@ -34,25 +40,25 @@ async fn main {
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-distribution-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   assert_true(!@env.args().contains("--root"), msg="napi-mbt is distributed through Mooncakes; this test packages a generated addon")
   let dir = temp + "/package with spaces"
   ignore(checked(binary, ["init", dir, "--name", "distribution-fixture"]))
   ignore(checked(binary, ["build", dir, "--release"]))
   let target = @fs.readdir(dir + "/artifacts")[0]
   let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
-  let binary_data = @fs.read_file(artifact).binary()
-  @fs.write_file(artifact, "broken")
+  let binary_data = @fs.read_binary(artifact)
+  @fs.write_text(artifact, "broken")
   rejected(binary, dir, target)
-  @fs.write_file(artifact, binary_data)
-  let declarations = @fs.read_file(dir + "/index.d.ts").text()
-  @fs.write_file(dir + "/index.d.ts", declarations + "// stale\n")
+  @fs.write_binary(artifact, binary_data)
+  let declarations = @fs.read_text(dir + "/index.d.ts")
+  @fs.write_text(dir + "/index.d.ts", declarations + "// stale\n")
   rejected(binary, dir, target)
-  @fs.write_file(dir + "/index.d.ts", declarations)
-  let mod = @fs.read_file(dir + "/moon.mod").text()
-  @fs.write_file(dir + "/moon.mod", mod + "\nversion = \"999.0.0\"\n")
+  @fs.write_text(dir + "/index.d.ts", declarations)
+  let mod = @fs.read_text(dir + "/moon.mod")
+  @fs.write_text(dir + "/moon.mod", mod + "\nversion = \"999.0.0\"\n")
   rejected(binary, dir, target)
-  @fs.write_file(dir + "/moon.mod", mod)
+  @fs.write_text(dir + "/moon.mod", mod)
   ignore(checked(binary, ["prepublish", dir, "--target", target]))
   let tarballs = []
   for package_dir in [dir + "/npm/" + target, dir] {
@@ -68,12 +74,12 @@ async fn main {
   }
   let consumer = temp + "/clean consumer"
   @fs.mkdir(consumer)
-  @fs.write_file(consumer + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
+  @fs.write_text(consumer + "/package.json", "{\"name\":\"consumer\",\"private\":true}")
   ignore(pnpm(["add", "--offline", "--ignore-scripts", "--save-prod"] + tarballs, consumer))
   let package_name = "distribution-fixture"
   let function_name = "mbt_add"
   ignore(checked("node", [root + "/scripts/distribution.test.cjs", consumer, package_name, function_name]))
-  @fs.write_file(consumer + "/check.mts", "import addon, { \{function_name} } from '\{package_name}';\nconst result: number = addon.\{function_name}(1, 2) + \{function_name}(3, 4);\n// @ts-expect-error invalid input\n\{function_name}('1', 2);\n")
+  @fs.write_text(consumer + "/check.mts", "import addon, { \{function_name} } from '\{package_name}';\nconst result: number = addon.\{function_name}(1, 2) + \{function_name}(3, 4);\n// @ts-expect-error invalid input\n\{function_name}('1', 2);\n")
   ignore(checked("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--types", "node", "--typeRoots", root + "/node_modules/@types", "--module", "NodeNext", "--moduleResolution", "NodeNext", consumer + "/check.mts"]))
   println("Release gates, pnpm pack/dry-run, offline clean installation, CJS/ESM and installed declarations passed")
 }

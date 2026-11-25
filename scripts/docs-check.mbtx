@@ -1,8 +1,10 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs" }
+----
 
 ///|
 async fn check(path : String) -> Unit {
-  let source = @fs.read_file(path).text()
+  let source = @fs.read_text(path)
   if source.contains("devenv.com") { fail("Removed tool reference in " + path) }
   let segments = path.split("/").to_array()
   let base = segments[:segments.length() - 1].map(s => s.to_owned()).join("/")

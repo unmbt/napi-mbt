@@ -11,8 +11,18 @@ extern "c" fn napi_async_has(env : NapiEnv) -> Bool = "napi_mbt_async_has"
 extern "c" fn napi_async_get(env : NapiEnv) -> NapiAsyncState = "napi_mbt_async_get"
 
 ///|
+extern "c" fn napi_async_wakeup_fn() -> @napi_mbt_async.WakeupCallback = "napi_mbt_async_wakeup_fn"
+
+///|
+extern "c" fn napi_async_wakeup_ctx(env : NapiEnv) -> @napi_mbt_async.WakeupContext = "napi_mbt_async_wakeup_ctx"
+
+///|
 #borrow(state)
-extern "c" fn napi_async_attach(env : NapiEnv, state : NapiAsyncState, tick : FuncRef[(NapiAsyncState, Bool) -> Int32]) -> Int32 = "napi_mbt_async_attach"
+extern "c" fn napi_async_attach(
+  env : NapiEnv,
+  state : NapiAsyncState,
+  tick : FuncRef[(NapiAsyncState, Bool) -> Int32],
+) -> Int32 = "napi_mbt_async_attach"
 
 ///|
 extern "c" fn napi_async_schedule(env : NapiEnv) -> Int32 = "napi_mbt_async_schedule"
@@ -46,6 +56,19 @@ fn napi_async_submit(env : NapiEnv, task : async () -> Unit) -> @napi_mbt_async.
     let state = { scheduler: @napi_mbt_async.Loop::new(), cancelled: false }
     errdefer { state.scheduler.close() catch { _ => () } }
     result_from_status(env, napi_async_attach(env, state, fn(state, closing) { napi_async_tick(state, closing) }), b"Attaching async scheduler")
+    state.scheduler.enable_wakeup(
+      napi_async_wakeup_fn(),
+      napi_async_wakeup_ctx(env),
+    ) catch {
+      error => {
+        raise napi_failure(
+          1,
+          Error,
+          "ERR_NAPI_ASYNC_WAIT",
+          "Enabling async wakeup: \{error}",
+        )
+      }
+    }
     state
   }
   let handle = state.scheduler.submit(task)
@@ -120,9 +143,7 @@ fn NapiAsyncPromise::settle(self : NapiAsyncPromise, env : NapiEnv, value : Napi
   self.settled = true
   defer self.dispose()
   guard (if reject { self.reject } else { self.resolve }) is Some(callback) else { raise napi_failure(1, Error, "ERR_NAPI_PROMISE_EXECUTOR", "Missing Promise resolver") }
-  let args = napi_array_new(env, 1)
-  napi_array_set(env, args, 0, value)
-  ignore(callback.call(args))
+  ignore(callback.call_argv([value]))
 }
 
 ///|

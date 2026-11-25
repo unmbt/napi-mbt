@@ -32,11 +32,11 @@ async fn install_outputs(
     return
   }
   let token = @fs.tmpdir(prefix="napi-mbt-generate-")
-  defer @fs.rmdir(token)
+  defer @fs.remove(token)
   let parts = token.replace_all(old="\\", new="/").split("/").to_array()
   let staging = dir + "/.napi-mbt/" + parts[parts.length() - 1].to_owned()
   mkdirp(staging)
-  defer @fs.rmdir(staging, recursive=true)
+  defer @fs.remove(staging, recursive=true)
   for i, (_, text) in outputs {
     write_text_file(staging + "/\{i}.new", text)
   }

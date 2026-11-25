@@ -34,6 +34,15 @@ extern "c" fn napi_callback_call_raw(
 ) -> Int32 = "napi_mbt_callback_call"
 
 ///|
+#borrow(callback, argv, result)
+extern "c" fn napi_callback_call_argv_raw(
+  callback : NapiCallback,
+  argc : Int32,
+  argv : FixedArray[NapiValue],
+  result : Ref[NapiValue],
+) -> Int32 = "napi_mbt_callback_call_argv"
+
+///|
 #borrow(callback)
 extern "c" fn napi_callback_dispose_raw(callback : NapiCallback) -> Int32 = "napi_mbt_callback_dispose"
 
@@ -86,6 +95,21 @@ pub fn NapiCallback::call(
   result_from_status(
     env,
     napi_callback_call_raw(self, args, result),
+    b"Calling JavaScript callback",
+  )
+  result.val
+}
+
+///|
+pub fn NapiCallback::call_argv(
+  self : NapiCallback,
+  args : FixedArray[NapiValue],
+) -> NapiValue raise NapiError {
+  let env = self.environment()
+  let result = Ref(moonbit_dummy_napi_value())
+  result_from_status(
+    env,
+    napi_callback_call_argv_raw(self, args.length(), args, result),
     b"Calling JavaScript callback",
   )
   result.val
@@ -165,12 +189,7 @@ pub fn napi_closure_new(
   let result = Ref(moonbit_dummy_napi_value())
   result_from_status(
     env,
-    napi_closure_new_raw(
-      env,
-      callback,
-      fn(f, env, args) { f(env, args) },
-      result,
-    ),
+    napi_closure_new_raw(env, callback, (f, env, args) => f(env, args), result),
     b"Creating MoonBit closure",
   )
   result.val

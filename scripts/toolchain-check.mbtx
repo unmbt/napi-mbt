@@ -1,15 +1,16 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/process" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/process" }
+----
 
 ///|
 async fn main {
-  let (status, out, err) = @process.collect_output("moon", ["-V"])
-  if status != 0 { fail(err.text()) }
-  let report = out.text()
+  let res = @process.run("moon", ["-V"], stdout=Collect, stderr=Collect)
+  if res.exit_code != 0 { fail(res.stderr_text()) }
+  let report = res.stdout_text()
   for expected in [
-    "moon 0.1.20261104 (940aa18 2026-11-04)",
-    "moonc v0.10.20+65efd5b93 (2026-11-05)",
-    "moonrun 0.1.20261104 (940aa18 2026-11-04)",
-    "Feature flags enabled: rr_moon_mod,rr_moon_pkg",
+    "moon 0.1.20261119 (738607b 2026-11-19)",
+    "moonc v0.10.22+124d61d05 (2026-11-19)",
+    "moonrun 0.1.20261119 (738607b 2026-11-19)",
   ] {
     if !report.contains(expected) { fail("Pinned toolchain mismatch; expected " + expected + "\n" + report) }
   }

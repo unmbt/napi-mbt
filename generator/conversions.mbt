@@ -15,6 +15,44 @@ fn conversion_name(
 }
 
 ///|
+fn convert_read_expr(
+  value : ValueType,
+  expression : String,
+  types : Array[ValueType],
+  rt : String,
+  path~ : String = "[]",
+  typed~ : Bool = true,
+) -> String {
+  match value {
+    EnvType => "env"
+    RawValueType => expression
+    _ if value.supports_trait(true) =>
+      if typed {
+        "(\{rt}napi_from_value(env, \{expression}) : \{value.moonbit_with(rt)})"
+      } else {
+        "\{rt}napi_from_value(env, \{expression})"
+      }
+    _ => "\{conversion_name(value, types, true)}(env, \{expression}, \{path})"
+  }
+}
+
+///|
+fn convert_write_expr(
+  value : ValueType,
+  expression : String,
+  types : Array[ValueType],
+  rt : String,
+  depth~ : String = "0",
+) -> String {
+  match value {
+    EnvType => "abort(\"NapiEnv cannot be returned\")"
+    RawValueType => expression
+    _ if value.supports_trait(false) => "\{rt}napi_to_value(env, \{expression})"
+    _ => "\{conversion_name(value, types, false)}(env, \{expression}, \{depth})"
+  }
+}
+
+///|
 fn conversion_types(
   exports : Array[ParsedExport],
   definitions : Array[TypeDefinition],
@@ -40,6 +78,10 @@ fn conversion_types(
       | IteratorType(inner)
       | JsPromiseType(inner)
       | AsyncIteratorType(inner) => collect(inner, read)
+      EitherType(left, right) => {
+        collect(left, read)
+        collect(right, read)
+      }
       TupleType(items) =>
         for item in items {
           collect(item, read)
@@ -91,96 +133,263 @@ fn conversions(
   opposite : Array[ValueType],
   definitions : Array[TypeDefinition],
   read : Bool,
+  rt~ : String = "",
 ) -> String {
   let out = StringBuilder()
-  for value in types {
-    let name = conversion_name(value, types, read)
-    let mbt = value.moonbit()
-    let passthrough = value is RawValueType ||
-      (
-        !read &&
-        value
-        is (ObjectValueType
-        | FunctionValueType
-        | ArrayValueType
-        | ExternalValueType)
-      )
-    let environment = if passthrough { "_env" } else { "env" }
-    let effect = if passthrough || (read && value is UnitType) {
-      ""
+  fn convert(t : ValueType, expression : String) -> String {
+    if read {
+      convert_read_expr(t, expression, types, rt, path="_path", typed=true)
     } else {
-      " raise"
+      convert_write_expr(t, expression, types, rt, depth="_depth + 1")
     }
+  }
+  fn inner_callback_expr(inner : ValueType) -> String {
+    if inner.supports_trait(read) {
+      if read {
+        "fn(env, value) { (\{rt}napi_from_value(env, value) : \{inner.moonbit_with(rt)}) }"
+      } else {
+        "fn(env, value) { \{rt}napi_to_value(env, value) }"
+      }
+    } else {
+      "fn(env, value) { " +
+      conversion_name(inner, types, read) +
+      (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
+      " }"
+    }
+  }
+  for value in types {
+    match value {
+      NamedType(name) => {
+        for def in definitions {
+          if def.name != name {
+            continue
+          }
+          if read {
+            out.write_string(
+              "\n///|\npub impl \{rt}FromNapiValue for \{name} with from_napi_value(\n  env,\n  value,\n) {\n",
+            )
+          } else {
+            out.write_string(
+              "\n///|\npub impl \{rt}ToNapiValue for \{name} with to_napi_value(\n  self,\n  env,\n) {\n",
+            )
+          }
+          match def.shape {
+            StructShape(fields) =>
+              if read {
+                out.write_string(
+                  "  \{rt}napi_with_cycle_guard(env, value, () => {\n    \{rt}napi_require_object(env, value)\n    {\n",
+                )
+                for field in fields {
+                  let required = !(field.value_type is OptionType(_))
+                  let expression = "\{rt}napi_field_get(env, value, " +
+                    Json(field.name).stringify() +
+                    ", \{required})"
+                  out.write_string(
+                    "      \{field.name}: " +
+                    convert_read_expr(
+                      field.value_type,
+                      expression,
+                      types,
+                      rt,
+                      typed=false,
+                    ) +
+                    ",\n",
+                  )
+                }
+                out.write_string("    }\n  })\n")
+              } else {
+                out.write_string(
+                  "  \{rt}napi_with_depth_guard(() => {\n    let result = \{rt}napi_object_new(env)\n",
+                )
+                for field in fields {
+                  out.write_string(
+                    "    \{rt}napi_field_set(env, result, " +
+                    Json(field.name).stringify() +
+                    ", " +
+                    convert_write_expr(
+                      field.value_type,
+                      "self." + field.name,
+                      types,
+                      rt,
+                    ) +
+                    ")\n",
+                  )
+                }
+                out.write_string("    result\n  })\n")
+              }
+            EnumShape(variants) => {
+              let plain = variants.all(v => v.parameters.is_empty())
+              if read {
+                if !plain {
+                  out.write_string(
+                    "  \{rt}napi_with_cycle_guard(env, value, () => {\n",
+                  )
+                }
+                let indent = if plain { "  " } else { "    " }
+                let tag = if plain {
+                  "value"
+                } else {
+                  "\{rt}napi_field_get(env, value, \"tag\", true)"
+                }
+                out.write_string(
+                  "\{indent}let tag = \{rt}get_String(env, \{tag})\n",
+                )
+                if !plain {
+                  out.write_string(
+                    "\{indent}let args = \{rt}napi_field_get(env, value, \"args\", true)\n\{indent}let count = \{rt}napi_array_length(env, args)\n",
+                  )
+                }
+                out.write_string("\{indent}match tag {\n")
+                for v in variants {
+                  let js_tag = v.js_value.unwrap_or(v.name)
+                  out.write_string(
+                    "\{indent}  " + Json(js_tag).stringify() + " => {\n",
+                  )
+                  if !plain {
+                    out.write_string(
+                      "\{indent}    if count != \{v.parameters.length()} { raise \{rt}napi_failure(1, TypeError, \"ERR_NAPI_ENUM_ARGS\", \"Wrong enum payload arity\") }\n",
+                    )
+                  }
+                  let args = []
+                  for i, p in v.parameters {
+                    args.push(
+                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
+                      convert_read_expr(
+                        p.value_type,
+                        "\{rt}napi_array_get(env, args, \{i})",
+                        types,
+                        rt,
+                        typed=false,
+                      ),
+                    )
+                  }
+                  out.write_string(
+                    "\{indent}    \{v.name}" +
+                    (if args.is_empty() {
+                      ""
+                    } else {
+                      "(" + args.join(", ") + ")"
+                    }) +
+                    "\n\{indent}  }\n",
+                  )
+                }
+                out.write_string(
+                  "\{indent}  _ => raise \{rt}napi_failure(1, TypeError, \"ERR_NAPI_ENUM_TAG\", \"Unknown \{name} tag: \" + tag)\n\{indent}}\n",
+                )
+                if !plain {
+                  out.write_string("  })\n")
+                }
+              } else {
+                if !plain {
+                  out.write_string("  \{rt}napi_with_depth_guard(() => {\n")
+                }
+                let indent = if plain { "  " } else { "    " }
+                out.write_string("\{indent}match self {\n")
+                for v in variants {
+                  let args = []
+                  for i, p in v.parameters {
+                    args.push(
+                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
+                      "p\{i}",
+                    )
+                  }
+                  out.write_string(
+                    "\{indent}  \{v.name}" +
+                    (if args.is_empty() {
+                      ""
+                    } else {
+                      "(" + args.join(", ") + ")"
+                    }) +
+                    " => {\n",
+                  )
+                  if plain {
+                    out.write_string(
+                      "\{indent}    \{rt}set_String(env, " +
+                      Json(v.js_value.unwrap_or(v.name)).stringify() +
+                      ")\n",
+                    )
+                  } else {
+                    out.write_string(
+                      "\{indent}    let result = \{rt}napi_object_new(env)\n\{indent}    \{rt}napi_field_set(env, result, \"tag\", \{rt}set_String(env, " +
+                      Json(v.name).stringify() +
+                      "))\n\{indent}    let args = \{rt}napi_array_new(env, \{v.parameters.length()})\n",
+                    )
+                    for i, p in v.parameters {
+                      out.write_string(
+                        "\{indent}    \{rt}napi_array_set(env, args, \{i}, " +
+                        convert_write_expr(p.value_type, "p\{i}", types, rt) +
+                        ")\n",
+                      )
+                    }
+                    out.write_string(
+                      "\{indent}    \{rt}napi_field_set(env, result, \"args\", args)\n\{indent}    result\n",
+                    )
+                  }
+                  out.write_string("\{indent}  }\n")
+                }
+                out.write_string("\{indent}}\n")
+                if !plain {
+                  out.write_string("  })\n")
+                }
+              }
+            }
+          }
+          out.write_string("}\n")
+        }
+        continue
+      }
+      ClassType(type_name, _, id) => {
+        if read {
+          out.write_string(
+            "\n///|\npub impl \{rt}FromNapiValue for \{type_name} with from_napi_value(\n  env,\n  value,\n) {\n  let handle = \{rt}napi_class_handle(env, value, \{id})\n  napi_mbt_class_payload_\{id}(handle)\n}\n",
+          )
+        } else {
+          out.write_string(
+            "\n///|\npub impl \{rt}ToNapiValue for \{type_name} with to_napi_value(\n  self,\n  env,\n) {\n  let result = Ref(\{rt}moonbit_dummy_napi_value())\n  \{rt}result_from_status(env, napi_mbt_class_create_\{id}(env, self, \{id}, result), b\"Creating native instance\")\n  result.val\n}\n",
+          )
+        }
+        continue
+      }
+      _ => ()
+    }
+    if value.supports_trait(read) || value is (EnvType | RawValueType) {
+      continue
+    }
+    let name = conversion_name(value, types, read)
+    let mbt = value.moonbit_with(rt)
     if read {
       out.write_string(
-        "\n///|\nfn \{name}(\n  \{environment} : NapiEnv,\n  value : NapiValue,\n  _path : Array[NapiValue],\n) -> \{mbt}\{effect} {\n",
+        "\n///|\nfn \{name}(\n  env : \{rt}NapiEnv,\n  value : \{rt}NapiValue,\n  _path : Array[\{rt}NapiValue],\n) -> \{mbt} raise {\n",
       )
     } else {
       out.write_string(
-        "\n///|\nfn \{name}(\n  \{environment} : NapiEnv,\n  value : \{mbt},\n  _depth : Int32,\n) -> NapiValue\{effect} {\n",
+        "\n///|\nfn \{name}(\n  env : \{rt}NapiEnv,\n  value : \{mbt},\n  _depth : Int32,\n) -> \{rt}NapiValue raise {\n",
       )
-    }
-    fn convert(t : ValueType, expression : String) -> String {
-      conversion_name(t, types, read) +
-      "(env, " +
-      expression +
-      (if read { ", _path)" } else { ", _depth + 1)" })
     }
     fn enter() -> Unit {
       out.write_string(
         if read {
-          "  napi_enter_value(env, value, _path)\n  defer ignore(_path.pop())\n"
+          "  \{rt}napi_enter_value(env, value, _path)\n  defer ignore(_path.pop())\n"
         } else {
-          "  napi_check_depth(_depth)\n"
+          "  \{rt}napi_check_depth(_depth)\n"
         },
       )
     }
     match value {
-      EnvType =>
-        if read {
-          out.write_string("  env\n")
-        } else {
-          out.write_string("  abort(\"NapiEnv cannot be returned\")\n")
-        }
-      RawValueType => out.write_string("  value\n")
-      ObjectValueType =>
-        if read {
-          out.write_string("  NapiObject::from_value(env, value)\n")
-        } else {
-          out.write_string("  value.value()\n")
-        }
-      FunctionValueType =>
-        if read {
-          out.write_string("  NapiFunction::from_value(env, value)\n")
-        } else {
-          out.write_string("  value.value()\n")
-        }
-      ArrayValueType =>
-        if read {
-          out.write_string("  NapiArray::from_value(env, value)\n")
-        } else {
-          out.write_string("  value.value()\n")
-        }
-      ExternalValueType =>
-        if read {
-          out.write_string("  NapiExternal::from_value(env, value)\n")
-        } else {
-          out.write_string("  value.value()\n")
-        }
       AsyncIteratorType(inner) =>
         out.write_string(
           "  " +
+          rt +
           (if read { "get_" } else { "set_" }) +
-          "NapiAsyncIterator(env, value, fn(env, value) { " +
-          conversion_name(inner, types, read) +
-          (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
-          " })\n",
+          "NapiAsyncIterator(env, value, " +
+          inner_callback_expr(inner) +
+          ")\n",
         )
       JsPromiseType(inner) =>
         out.write_string(
-          "  get_NapiJsPromise(env, value, fn(env, value) { " +
-          conversion_name(inner, types, true) +
-          "(env, value, []) })\n",
+          "  \{rt}get_NapiJsPromise(env, value, " +
+          inner_callback_expr(inner) +
+          ")\n",
         )
       CallbackType(params, ret, _) =>
         out.write_string(
@@ -198,15 +407,8 @@ fn conversions(
               types
             },
             read,
+            rt~,
           ),
-        )
-      JsonType =>
-        out.write_string(
-          if read {
-            "  napi_read_json(env, value, _path)\n"
-          } else {
-            "  napi_write_json(env, value, _depth)\n"
-          },
         )
       MapType(inner) => {
         enter()
@@ -214,13 +416,13 @@ fn conversions(
           out.write_string(
             "  let result : " +
             mbt +
-            " = Map([])\n  for key in napi_object_keys(env, value) {\n    result[key] = " +
-            convert(inner, "napi_key_get(env, value, key)") +
+            " = Map([])\n  for key in \{rt}napi_object_keys(env, value) {\n    result[key] = " +
+            convert(inner, "\{rt}napi_key_get(env, value, key)") +
             "\n  }\n  result\n",
           )
         } else {
           out.write_string(
-            "  let result = napi_object_new(env)\n  for key, item in value {\n    napi_key_set(env, result, key, " +
+            "  let result = \{rt}napi_object_new(env)\n  for key, item in value {\n    \{rt}napi_key_set(env, result, key, " +
             convert(inner, "item") +
             ")\n  }\n  result\n",
           )
@@ -230,44 +432,62 @@ fn conversions(
         enter()
         if read {
           out.write_string(
-            "  let raw = napi_set_values(env, value)\n  let length = napi_array_length(env, raw)\n  NapiSet::new(Array::makei(length, i => " +
-            convert(inner, "napi_array_get(env, raw, i)") +
+            "  let raw = \{rt}napi_set_values(env, value)\n  let length = \{rt}napi_array_length(env, raw)\n  \{rt}NapiSet::new(Array::makei(length, i => " +
+            convert(inner, "\{rt}napi_array_get(env, raw, i)") +
             "))\n",
           )
         } else {
           out.write_string(
-            "  let raw = napi_array_new(env, value.length())\n  for i, item in value.to_array() { napi_array_set(env, raw, i, " +
+            "  let raw = \{rt}napi_array_new(env, value.length())\n  for i, item in value.to_array() { \{rt}napi_array_set(env, raw, i, " +
             convert(inner, "item") +
-            ") }\n  napi_set_new(env, raw)\n",
+            ") }\n  \{rt}napi_set_new(env, raw)\n",
           )
         }
       }
       IteratorType(inner) =>
         out.write_string(
           "  " +
+          rt +
           (if read { "get_" } else { "set_" }) +
-          "NapiIterator(env, value, fn(env, value) { " +
-          conversion_name(inner, types, read) +
-          (if read { "(env, value, [])" } else { "(env, value, 0)" }) +
-          " })\n",
+          "NapiIterator(env, value, " +
+          inner_callback_expr(inner) +
+          ")\n",
         )
+      EitherType(left, right) =>
+        if read {
+          out.write_string(
+            "  try {\n    A(" +
+            convert(left, "value") +
+            ")\n  } catch {\n    error => {\n      if error is \{rt}NapiError::JavaScriptException(_) ||\n        (\{rt}napi_is_exception_pending(env) catch { _ => false }) {\n        raise error\n      }\n      B(" +
+            convert(right, "value") +
+            ")\n    }\n  }\n",
+          )
+        } else {
+          out.write_string(
+            "  match value {\n    A(a) => " +
+            convert(left, "a") +
+            "\n    B(b) => " +
+            convert(right, "b") +
+            "\n  }\n",
+          )
+        }
       TupleType(items) => {
         enter()
         if read {
           out.write_string(
-            "  if napi_array_length(env, value) != \{items.length()} { raise napi_failure(1, TypeError, \"ERR_NAPI_TUPLE_LENGTH\", \"Unexpected tuple length\") }\n  (" +
+            "  if \{rt}napi_array_length(env, value) != \{items.length()} { raise \{rt}napi_failure(1, TypeError, \"ERR_NAPI_TUPLE_LENGTH\", \"Unexpected tuple length\") }\n  (" +
             items
-            .mapi((i, t) => convert(t, "napi_array_get(env, value, \{i})"))
+            .mapi((i, t) => convert(t, "\{rt}napi_array_get(env, value, \{i})"))
             .join(", ") +
             ")\n",
           )
         } else {
           out.write_string(
-            "  let result = napi_array_new(env, \{items.length()})\n",
+            "  let result = \{rt}napi_array_new(env, \{items.length()})\n",
           )
           for i, t in items {
             out.write_string(
-              "  napi_array_set(env, result, \{i}, " +
+              "  \{rt}napi_array_set(env, result, \{i}, " +
               convert(t, "value.\{i}") +
               ")\n",
             )
@@ -275,18 +495,16 @@ fn conversions(
           out.write_string("  result\n")
         }
       }
-      UnitType if read =>
-        out.write_string("  ignore(env)\n  ignore(value)\n  ()\n")
       OptionType(inner) =>
         if read {
           out.write_string(
-            "  if napi_is_nullish(env, value) { None } else { Some(" +
+            "  if \{rt}napi_is_nullish(env, value) { None } else { Some(" +
             convert(inner, "value") +
             ") }\n",
           )
         } else {
           out.write_string(
-            "  match value { None => napi_null(env); Some(inner) => " +
+            "  match value { None => \{rt}napi_null(env); Some(inner) => " +
             convert(inner, "inner") +
             " }\n",
           )
@@ -295,164 +513,20 @@ fn conversions(
         enter()
         if read {
           out.write_string(
-            "  let length = napi_array_length(env, value)\n  Array::makei(length, i => " +
-            convert(inner, "napi_array_get(env, value, i)") +
+            "  let length = \{rt}napi_array_length(env, value)\n  Array::makei(length, i => " +
+            convert(inner, "\{rt}napi_array_get(env, value, i)") +
             ")\n",
           )
         } else {
           out.write_string(
-            "  let result = napi_array_new(env, value.length())\n  for i, element in value { napi_array_set(env, result, i, " +
+            "  let result = \{rt}napi_array_new(env, value.length())\n  for i, element in value { \{rt}napi_array_set(env, result, i, " +
             convert(inner, "element") +
             ") }\n  result\n",
           )
         }
       }
-      NamedType(name) =>
-        for def in definitions {
-          if def.name != name {
-            continue
-          }
-          enter()
-          match def.shape {
-            StructShape(fields) =>
-              if read {
-                out.write_string("  napi_require_object(env, value)\n")
-                out.write_string("  {\n")
-                for field in fields {
-                  let required = !(field.value_type is OptionType(_))
-                  let expression = "napi_field_get(env, value, " +
-                    Json(field.name).stringify() +
-                    ", \{required})"
-                  out.write_string(
-                    "    \{field.name}: " +
-                    convert(field.value_type, expression) +
-                    ",\n",
-                  )
-                }
-                out.write_string("  }\n")
-              } else {
-                out.write_string("  let result = napi_object_new(env)\n")
-                for field in fields {
-                  out.write_string(
-                    "  napi_field_set(env, result, " +
-                    Json(field.name).stringify() +
-                    ", " +
-                    convert(field.value_type, "value." + field.name) +
-                    ")\n",
-                  )
-                }
-                out.write_string("  result\n")
-              }
-            EnumShape(variants) => {
-              let plain = variants.all(v => v.parameters.is_empty())
-              if read {
-                let tag = if plain {
-                  "value"
-                } else {
-                  "napi_field_get(env, value, \"tag\", true)"
-                }
-                out.write_string("  let tag = get_String(env, " + tag + ")\n")
-                if !plain {
-                  out.write_string(
-                    "  let args = napi_field_get(env, value, \"args\", true)\n  let count = napi_array_length(env, args)\n",
-                  )
-                }
-                out.write_string("  match tag {\n")
-                for v in variants {
-                  out.write_string(
-                    "    " + Json(v.name).stringify() + " => {\n",
-                  )
-                  if !plain {
-                    out.write_string(
-                      "      if count != \{v.parameters.length()} { raise napi_failure(1, TypeError, \"ERR_NAPI_ENUM_ARGS\", \"Wrong enum payload arity\") }\n",
-                    )
-                  }
-                  let args = []
-                  for i, p in v.parameters {
-                    args.push(
-                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
-                      convert(p.value_type, "napi_array_get(env, args, \{i})"),
-                    )
-                  }
-                  out.write_string(
-                    "      \{v.name}" +
-                    (if args.is_empty() {
-                      ""
-                    } else {
-                      "(" + args.join(", ") + ")"
-                    }) +
-                    "\n    }\n",
-                  )
-                }
-                out.write_string(
-                  "    _ => raise napi_failure(1, TypeError, \"ERR_NAPI_ENUM_TAG\", \"Unknown \{name} tag: \" + tag)\n  }\n",
-                )
-              } else {
-                out.write_string("  match value {\n")
-                for v in variants {
-                  let args = []
-                  for i, p in v.parameters {
-                    args.push(
-                      (if p.name.is_empty() { "" } else { p.name + "=" }) +
-                      "p\{i}",
-                    )
-                  }
-                  out.write_string(
-                    "    \{v.name}" +
-                    (if args.is_empty() {
-                      ""
-                    } else {
-                      "(" + args.join(", ") + ")"
-                    }) +
-                    " => {\n",
-                  )
-                  if plain {
-                    out.write_string(
-                      "      set_String(env, " +
-                      Json(v.name).stringify() +
-                      ")\n",
-                    )
-                  } else {
-                    out.write_string(
-                      "      let result = napi_object_new(env)\n      napi_field_set(env, result, \"tag\", set_String(env, " +
-                      Json(v.name).stringify() +
-                      "))\n      let args = napi_array_new(env, \{v.parameters.length()})\n",
-                    )
-                    for i, p in v.parameters {
-                      out.write_string(
-                        "      napi_array_set(env, args, \{i}, " +
-                        convert(p.value_type, "p\{i}") +
-                        ")\n",
-                      )
-                    }
-                    out.write_string(
-                      "      napi_field_set(env, result, \"args\", args)\n      result\n",
-                    )
-                  }
-                  out.write_string("    }\n")
-                }
-                out.write_string("  }\n")
-              }
-            }
-          }
-        }
-      ClassType(_, _, id) =>
-        if read {
-          out.write_string(
-            "  let handle = napi_class_handle(env, value, \{id})\n  napi_mbt_class_payload_\{id}(handle)\n",
-          )
-        } else {
-          out.write_string(
-            "  let result = Ref(moonbit_dummy_napi_value())\n  result_from_status(env, napi_mbt_class_create_\{id}(env, value, \{id}, result), b\"Creating native instance\")\n  result.val\n",
-          )
-        }
       _ =>
-        out.write_string(
-          "  " +
-          (if read { "get_" } else { "set_" }) +
-          value.runtime_name() +
-          "(env, value)\n",
-        )
+        abort("Unexpected non-trait conversion type: " + value.runtime_name())
     }
     out.write_string("}\n")
   }

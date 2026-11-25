@@ -1,15 +1,17 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], timeout~ : Int = 300000) -> Unit {
-  let code = @async.with_timeout(timeout, () => @process.run(program, args))
+  let code = @async.with_timeout(timeout, () => @process.run(program, args).exit_code)
   if code != 0 { fail(program + " " + args.join(" ") + " failed") }
 }
 
 ///|
 async fn main {
   let binary = @env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
-  for fixture in ["loader", "collections", "owned-binary", "tsfn", "native-tasks", "workers", "js-promises", "streams", "combined", "build-cache", "cache-races", "class", "callback", "lifecycle", "async-adapter", "async-runtime", "async-exports", "docs-examples", "watch", "distribution", "minimum-fixtures"] {
+  for fixture in ["loader", "collections", "owned-binary", "tsfn", "native-tasks", "workers", "js-promises", "streams", "combined", "build-cache", "cache-races", "class", "callback", "lifecycle", "async-adapter", "async-runtime", "async-exports", "docs-examples", "watch", "distribution", "minimum-fixtures", "p1-features", "p2-features"] {
     let filename = if fixture == "minimum-fixtures" { "scripts/minimum-fixtures.mbtx" } else { "scripts/" + fixture + "-test.mbtx" }
     checked("moon", ["run", filename, binary], timeout=600000)
   }

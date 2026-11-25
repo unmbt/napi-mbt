@@ -106,7 +106,7 @@ async fn input_snapshot(dir : String, excluded : Array[String]) -> Json {
           ),
         )
       } else {
-        files[key] = Json(content_digest(@fs.read_file(full).binary()))
+        files[key] = Json(content_digest(@fs.read_binary(full)))
       }
     }
   }
@@ -140,14 +140,14 @@ async fn sync_cache_tree(
     } catch {
       _ => {
         if @fs.exists(destination) {
-          @fs.rmdir(destination, recursive=true)
+          @fs.remove(destination, recursive=true)
         }
         Map([])
       }
     }
   } else {
     if @fs.exists(destination) {
-      @fs.rmdir(destination, recursive=true)
+      @fs.remove(destination, recursive=true)
     }
     Map([])
   }
@@ -180,10 +180,10 @@ async fn sync_cache_tree(
       if @fs.kind(src) == Directory {
         sync(key + "/")
       } else {
-        let bytes = @fs.read_file(src).binary()
+        let bytes = @fs.read_binary(src)
         current[key] = Json(content_digest(bytes))
         if @fs.exists(dst) && @fs.kind(dst, follow_symlink=false) == Directory {
-          @fs.rmdir(dst, recursive=true)
+          @fs.remove(dst, recursive=true)
         }
         if @fs.exists(dst) && @fs.kind(dst, follow_symlink=false) != Regular {
           fail("Unexpected non-file in build cache: " + key)
@@ -192,7 +192,7 @@ async fn sync_cache_tree(
           (key.has_suffix(".h") || key.has_suffix(".hpp")) {
           invalidate_native.val = true
         }
-        if !@fs.exists(dst) || @fs.read_file(dst).binary() != bytes {
+        if !@fs.exists(dst) || @fs.read_binary(dst) != bytes {
           write_file(dst, bytes)
         }
         if !windows() && @fs.can_execute(src) {
@@ -203,7 +203,7 @@ async fn sync_cache_tree(
   }
   sync("")
   if invalidate_native.val && @fs.exists(destination + "/_build") {
-    @fs.rmdir(destination + "/_build", recursive=true)
+    @fs.remove(destination + "/_build", recursive=true)
   }
   for key, _ in previous {
     if !current.contains(key) && @fs.exists(destination + "/" + key) {
@@ -240,6 +240,13 @@ async fn cache_identity(
 
 ///|
 async fn cache_fallback(dir : String) -> String? {
+  if @fs.exists(dir + "/napi-mbt.json") {
+    let conf = config(dir) catch { _ => return None }
+    if conf.runtime == "package" &&
+      !@fs.exists(dir + "/.mooncakes/unmbt/napi-mbt/runtime") {
+      return Some("external workspace runtime dependency")
+    }
+  }
   for name in ["dev_build.mbt", "dev-build.mbt"] {
     if @fs.exists(dir + "/" + name) {
       return Some(
@@ -273,8 +280,8 @@ async fn cache_fallback(dir : String) -> String? {
     parents.push(canonical)
     for name in @fs.readdir(path) {
       if [
-          ".git", ".codegraph", ".napi-mbt", ".moonagent", "_build", "target", "node_modules",
-          "artifacts", "dist", "npm",
+          ".git", ".codegraph", ".napi-mbt", ".moonagent", ".repos", "_build", "target",
+          "node_modules", "artifacts", "dist", "npm",
         ].contains(name) {
         continue
       }
@@ -317,7 +324,7 @@ async fn clean_cache(directory : String) -> Unit {
     if @fs.kind(path, follow_symlink=false) != Directory {
       fail("Cache must be a real directory")
     }
-    @fs.rmdir(path, recursive=true)
+    @fs.remove(path, recursive=true)
   }
   println("[napi-mbt] removed current project's build cache")
 }

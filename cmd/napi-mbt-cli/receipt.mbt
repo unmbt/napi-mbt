@@ -37,7 +37,7 @@ async fn verify_receipt(
     fail("Build inputs changed; run build --release before prepublish")
   }
   if content_digest(
-      @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
+      @fs.read_binary(artifact_root + "/" + target + "/napi_mbt.node"),
     ) !=
     binary {
     fail("Binary does not match its build receipt; rebuild before prepublish")
@@ -47,7 +47,7 @@ async fn verify_receipt(
       fail("Invalid receipt output: " + name)
     }
     if !@fs.exists(dir + "/" + name) ||
-      Json(content_digest(@fs.read_file(dir + "/" + name).binary())) != digest {
+      Json(content_digest(@fs.read_binary(dir + "/" + name))) != digest {
       fail("Generated output does not match its build receipt: " + name)
     }
   }

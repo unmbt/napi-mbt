@@ -61,11 +61,13 @@ fn definition(
           location,
           true,
         ),
+        label: Positional,
       })
     }
     StructShape(fields)
   } else {
     let variants = []
+    let used_tags : Map[String, Bool] = Map([])
     for item in node.children() {
       if item.kind() != "enum_constructor" {
         continue
@@ -89,10 +91,40 @@ fn definition(
           parameters.push({
             name,
             value_type: parse_value_type(text, location, true),
+            label: Positional,
           })
         }
       }
-      variants.push({ name, parameters, })
+      let variant_location = "\{filename}:\{item.line()}"
+      let mut js_value : String? = None
+      for directive in napi_directives(item.documentation()) {
+        let (keyword, arg) = parse_directive_call(directive, variant_location)
+        if keyword != "value" {
+          fail(
+            "\{variant_location}: unsupported @napi directive on enum variant",
+          )
+        }
+        guard arg is Some(val) else {
+          fail(
+            "\{variant_location}: @napi value(...) requires a string literal",
+          )
+        }
+        if !parameters.is_empty() {
+          fail(
+            "\{variant_location}: @napi value(...) is only supported on plain enum variants",
+          )
+        }
+        if js_value is Some(_) {
+          fail("\{variant_location}: duplicate @napi value on enum variant")
+        }
+        js_value = Some(val)
+      }
+      let effective_tag = js_value.unwrap_or(name)
+      if used_tags.contains(effective_tag) {
+        fail("\{variant_location}: duplicate enum tag value: \{effective_tag}")
+      }
+      used_tags[effective_tag] = true
+      variants.push({ name, parameters, js_value, })
     }
     if variants.is_empty() {
       fail("\{location}: empty enum cannot be exported")
@@ -105,6 +137,7 @@ fn definition(
         fields.map(p => {
           name: p.name,
           value_type: class_type(p.value_type, classes),
+          label: p.label,
         }),
       )
     EnumShape(variants) =>
@@ -114,7 +147,9 @@ fn definition(
           parameters: v.parameters.map(p => {
             name: p.name,
             value_type: class_type(p.value_type, classes),
+            label: p.label,
           }),
+          js_value: v.js_value,
         }),
       )
   }
@@ -176,6 +211,10 @@ fn resolve_type(
     }
     OptionType(inner) | ArrayType(inner) | MapType(inner) =>
       resolve_type(inner, declarations, types, features, location, classes)
+    EitherType(a, b) => {
+      resolve_type(a, declarations, types, features, location, classes)
+      resolve_type(b, declarations, types, features, location, classes)
+    }
     TupleType(items) =>
       for item in items {
         resolve_type(item, declarations, types, features, location, classes)
@@ -246,7 +285,7 @@ fn declarations_types(types : Array[TypeDefinition]) -> String {
         EnumShape(variants) => {
           let plain = variants.all(v => v.parameters.is_empty())
           let alternatives = variants.map(v => {
-            let tag = Json(v.name).stringify()
+            let tag = Json(v.js_value.unwrap_or(v.name)).stringify()
             if plain {
               tag
             } else {

@@ -1,15 +1,20 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String]) -> Unit {
-  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(binary, args))
-  if code != 0 { fail(out.text() + err.text()) }
+  let _proc_res = @async.with_timeout(180000, () => @process.run(binary, args, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
 }
 
 ///|
 async fn started(log : String) -> Unit {
   @async.with_timeout(30000, () => {
-    while !@fs.read_file(log).text().contains("[napi-mbt] command") { @async.sleep(20) }
+    while !@fs.read_text(log).contains("[napi-mbt] command") { @async.sleep(20) }
   })
 }
 
@@ -17,34 +22,34 @@ async fn started(log : String) -> Unit {
 async fn main {
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-cache-races-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let dir = temp + "/project"
   checked(binary, ["init", dir])
   checked(binary, ["build", dir, "--release"])
   let target = @fs.readdir(dir + "/artifacts")[0]
   let artifact = dir + "/artifacts/" + target + "/napi_mbt.node"
-  let previous = @fs.read_file(artifact).binary()
-  let declaration = @fs.read_file(dir + "/index.d.ts").binary()
-  let source = @fs.read_file(dir + "/lib.mbt").text()
+  let previous = @fs.read_binary(artifact)
+  let declaration = @fs.read_binary(dir + "/index.d.ts")
+  let source = @fs.read_text(dir + "/lib.mbt")
   let log = temp + "/race.log"
-  let output = @process.redirect_to_file(log, shared=true)
+  let output = @process.redirect_to_file(log)
   @async.with_task_group(group => {
-    let child = @process.spawn(group, binary, ["build", dir, "--release", "--no-cache", "--verbose"], stdout=output, stderr=output, cancel_handler=@process.hard_cancel())
+    let child = @process.spawn(group, binary, ["build", dir, "--release", "--no-cache", "--verbose"], stdout=Shared(output), stderr=Shared(output), cancel_handler=@process.hard_cancel())
     defer child.cancel()
     started(log)
-    @fs.write_file(dir + "/lib.mbt", source + "\n// modified while toolchain probe is running\n")
+    @fs.write_text(dir + "/lib.mbt", source + "\n// modified while toolchain probe is running\n")
     assert_true(child.wait() != 0)
   })
   output.close()
-  assert_true(@fs.read_file(log).text().contains("inputs changed during build"))
-  assert_eq(@fs.read_file(artifact).binary(), previous)
-  assert_eq(@fs.read_file(dir + "/index.d.ts").binary(), declaration)
-  @fs.write_file(dir + "/lib.mbt", source)
+  assert_true(@fs.read_text(log).contains("inputs changed during build"))
+  assert_eq(@fs.read_binary(artifact), previous)
+  assert_eq(@fs.read_binary(dir + "/index.d.ts"), declaration)
+  @fs.write_text(dir + "/lib.mbt", source)
   checked(binary, ["build", dir, "--release"])
   let killed_log = temp + "/killed.log"
-  let killed_output = @process.redirect_to_file(killed_log, shared=true)
+  let killed_output = @process.redirect_to_file(killed_log)
   @async.with_task_group(group => {
-    let child = @process.spawn(group, binary, ["build", dir, "--release", "--no-cache", "--verbose"], stdout=killed_output, stderr=killed_output, cancel_handler=@process.hard_cancel())
+    let child = @process.spawn(group, binary, ["build", dir, "--release", "--no-cache", "--verbose"], stdout=Shared(killed_output), stderr=Shared(killed_output), cancel_handler=@process.hard_cancel())
     started(killed_log)
     child.cancel()
     ignore(child.wait())
@@ -53,13 +58,13 @@ async fn main {
   // If a crashed process left a userspace lock, this command would time out.
   checked(binary, ["build", dir, "--release"])
   @fs.mkdir(temp + "/neighbor")
-  @fs.write_file(temp + "/neighbor/sentinel", "keep")
+  @fs.write_text(temp + "/neighbor/sentinel", "keep")
   @async.with_task_group(group => {
     let build = group.spawn(() => checked(binary, ["build", dir, "--release"]))
     let clean = group.spawn(() => checked(binary, ["clean", dir, "--cache"]))
     build.wait(); clean.wait()
   })
-  assert_eq(@fs.read_file(temp + "/neighbor/sentinel").text(), "keep")
+  assert_eq(@fs.read_text(temp + "/neighbor/sentinel"), "keep")
   checked(binary, ["build", dir, "--release"])
   checked(binary, ["prepublish", dir, "--target", target])
   println("Input races preserve artifacts; process exit unlocks; clean/build serialize")

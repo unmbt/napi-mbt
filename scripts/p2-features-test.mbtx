@@ -1,0 +1,78 @@
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let _proc_res = @process.run(binary, args, stdout=Collect, stderr=Collect)
+    if _proc_res.exit_code != 0 { fail(_proc_res.stdout_text() + _proc_res.stderr_text()) }
+  })
+}
+
+///|
+async fn main {
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-p2-")
+  defer @fs.remove(temp, recursive=true)
+  let dir = temp + "/fixture"
+  checked(binary, ["init", dir, "--name", "p2-fixture"])
+  @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
+  let source =
+    #|///|
+    #|pub(all) enum Role {
+    #|  /// @napi value("admin-role")
+    #|  Admin
+    #|  /// @napi value("guest-role")
+    #|  Guest
+    #|}
+    #|
+    #|///|
+    #|/// @napi class("Box")
+    #|pub struct NativeBox { mut v : Int }
+    #|
+    #|///|
+    #|/// @napi constructor
+    #|pub fn NativeBox::new(v~ : Int) -> NativeBox { { v, } }
+    #|
+    #|///|
+    #|/// @napi getter("value")
+    #|pub fn NativeBox::get_value(self : NativeBox) -> Int { self.v }
+    #|
+    #|///|
+    #|/// @napi setter("value")
+    #|pub fn NativeBox::set_value(self : NativeBox, v : Int) -> Unit { self.v = v }
+    #|
+    #|///|
+    #|/// @napi method("bump")
+    #|pub fn NativeBox::inc(self : NativeBox, delta? : Int = 1) -> Int { self.v += delta; self.v }
+    #|
+    #|///|
+    #|/// @napi static("fromDefault")
+    #|pub fn NativeBox::make() -> NativeBox { { v: 7 } }
+    #|
+    #|///|
+    #|/// @napi module_exports
+    #|pub fn init_exports(env : NapiEnv, exports : NapiObject) -> Unit raise {
+    #|  exports.set(env, "customFlag", set_String(env, "initialized-by-hook"))
+    #|}
+    #|
+    #|///|
+    #|#export_name("compute")
+    #|pub fn compute(base~ : Int, step? : Int = 2, note? : String) -> Int {
+    #|  ignore(note)
+    #|  base + step
+    #|}
+    #|
+    #|///|
+    #|#export_name("echoRole")
+    #|pub fn echo_role(r : Role) -> Role { r }
+    #|
+  @fs.write_text(dir + "/lib.mbt", source)
+  checked(binary, ["build", dir, "--release"])
+  let dts = @fs.read_text(dir + "/index.d.ts")
+  assert_true(!dts.contains("@napi"))
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  checked("node", ["scripts/p2-features.test.cjs", dir + "/artifacts/" + target + "/napi_mbt.node"])
+  println("P2 directives and labeled parameters E2E checks passed")
+}

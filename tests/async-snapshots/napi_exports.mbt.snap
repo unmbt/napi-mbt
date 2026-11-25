@@ -9,73 +9,9 @@ fn napi_mbt_read_0(
   let callback = NapiCallback::new(env, value)
   fn() raise {
     let env = callback.environment()
-    let args = napi_array_new(env, 0)
-    let result = callback.call(args)
-    napi_mbt_read_1(env, result, [])
+    let result = callback.call_argv([])
+    (napi_from_value(env, result) : Int32)
   }
-}
-
-///|
-fn napi_mbt_read_1(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> Int32 raise {
-  get_Int(env, value)
-}
-
-///|
-fn napi_mbt_read_2(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> String raise {
-  get_String(env, value)
-}
-
-///|
-fn napi_mbt_read_3(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> Bytes raise {
-  get_Bytes(env, value)
-}
-
-///|
-fn napi_mbt_write_0(
-  env : NapiEnv,
-  value : Int32,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_Int(env, value)
-}
-
-///|
-fn napi_mbt_write_1(
-  env : NapiEnv,
-  value : String,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_String(env, value)
-}
-
-///|
-fn napi_mbt_write_2(
-  env : NapiEnv,
-  value : Unit,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_Unit(env, value)
-}
-
-///|
-fn napi_mbt_write_3(
-  env : NapiEnv,
-  value : Bytes,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_Bytes(env, value)
 }
 
 ///|
@@ -90,10 +26,10 @@ pub fn napi_mbt_adapter_callback(
     try {
       call.listen(options)
       if !call.promise.settled {
-        let p0 = napi_mbt_read_0(env, a0, [])
+        let p0 : (() -> Int32 raise) = napi_mbt_read_0(env, a0, [])
         call.start(() => {
           let result : Int32 = callback(p0)
-          napi_mbt_write_0(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -106,7 +42,7 @@ pub fn napi_mbt_adapter_callback(
 pub fn napi_mbt_adapter_count(env : NapiEnv) -> NapiValue {
   try {
     let result : Int32 = count()
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -128,11 +64,11 @@ pub fn napi_mbt_adapter_delay(
     try {
       call.listen(options)
       if !call.promise.settled {
-        let p0 = napi_mbt_read_1(env, a0, [])
-        let p1 = napi_mbt_read_2(env, a1, [])
+        let p0 : Int32 = napi_from_value(env, a0)
+        let p1 : String = napi_from_value(env, a1)
         call.start(() => {
           let result : String = delay(p0, p1)
-          napi_mbt_write_1(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -145,7 +81,7 @@ pub fn napi_mbt_adapter_delay(
 pub fn napi_mbt_adapter_environments(env : NapiEnv) -> NapiValue {
   try {
     let result : Int32 = environments()
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -167,7 +103,7 @@ pub fn napi_mbt_adapter_failure(
       if !call.promise.settled {
         call.start(() => {
           let result : Unit = failure()
-          napi_mbt_write_2(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -188,11 +124,11 @@ pub fn napi_mbt_adapter_file(
     try {
       call.listen(options)
       if !call.promise.settled {
-        let p0 = napi_mbt_read_2(env, a0, [])
-        let p1 = napi_mbt_read_3(env, a1, [])
+        let p0 : String = napi_from_value(env, a0)
+        let p1 : Bytes = napi_from_value(env, a1)
         call.start(() => {
           let result : Bytes = file(p0, p1)
-          napi_mbt_write_3(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -213,7 +149,7 @@ pub fn napi_mbt_adapter_group(
       if !call.promise.settled {
         call.start(() => {
           let result : Int32 = group()
-          napi_mbt_write_0(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -233,10 +169,10 @@ pub fn napi_mbt_adapter_network(
     try {
       call.listen(options)
       if !call.promise.settled {
-        let p0 = napi_mbt_read_1(env, a0, [])
+        let p0 : Int32 = napi_from_value(env, a0)
         call.start(() => {
           let result : String = network(p0)
-          napi_mbt_write_1(env, result, 0)
+          napi_to_value(env, result)
         })
       }
     } catch { error => call.reject(error) }
@@ -249,7 +185,7 @@ pub fn napi_mbt_adapter_network(
 pub fn napi_mbt_adapter_resources(env : NapiEnv) -> NapiValue {
   try {
     let result : Int32 = resources()
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)

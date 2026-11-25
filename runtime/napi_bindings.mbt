@@ -1,0 +1,240 @@
+// 声明 N-API 基础函数的 FFI 绑定
+
+///|
+#borrow(result)
+extern "c" fn napi_create_int32(
+  env : NapiEnv,
+  value : Int32,
+  result : Ref[NapiValue],
+) -> Int32 = "napi_create_int32"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_double(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Double],
+) -> Int32 = "napi_get_value_double"
+
+///|
+#borrow(result)
+extern "c" fn napi_create_double(
+  env : NapiEnv,
+  value : Double,
+  result : Ref[NapiValue],
+) -> Int32 = "napi_create_double"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_value_bool(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Bool],
+) -> Int32 = "napi_get_value_bool"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_boolean(
+  env : NapiEnv,
+  value : Bool,
+  result : Ref[NapiValue],
+) -> Int32 = "napi_get_boolean"
+
+///|
+#borrow(result)
+extern "c" fn napi_get_undefined(
+  env : NapiEnv,
+  result : Ref[NapiValue],
+) -> Int32 = "napi_get_undefined"
+
+///|
+#borrow(status)
+extern "c" fn napi_read_string(
+  env : NapiEnv,
+  value : NapiValue,
+  status : Ref[Int32],
+) -> String = "moonbit_napi_read_string"
+
+///|
+#borrow(str, result)
+extern "c" fn napi_write_string(
+  env : NapiEnv,
+  str : String,
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_write_string"
+
+///|
+extern "c" fn napi_copy_bytes(data : UnmanagedBuffer, length : Int32) -> Bytes = "moonbit_napi_copy_bytes"
+
+///|
+#borrow(data, length)
+extern "c" fn napi_get_buffer_info(
+  env : NapiEnv,
+  value : NapiValue,
+  data : Ref[UnmanagedBuffer],
+  length : Ref[Int32],
+) -> Int32 = "moonbit_napi_get_buffer_info"
+
+///|
+extern "c" fn UnmanagedBuffer::load8(
+  self : UnmanagedBuffer,
+  offset : Int32,
+) -> Int32 = "moonbit_ptr_load8"
+
+///|
+extern "c" fn UnmanagedBuffer::store8(
+  self : UnmanagedBuffer,
+  offset : Int32,
+  val : Int32,
+) = "moonbit_ptr_store8"
+
+///|
+#borrow(src)
+extern "c" fn UnmanagedBuffer::copy_from_bytes(
+  self : UnmanagedBuffer,
+  offset : Int32,
+  src : Bytes,
+  length : Int32,
+) = "moonbit_ptr_copy_from_bytes"
+
+///|
+#borrow(data, result, result_data)
+extern "c" fn napi_create_buffer_copy(
+  env : NapiEnv,
+  length : Int32,
+  data : Bytes,
+  result_data : Ref[UnmanagedBuffer],
+  result : Ref[NapiValue],
+) -> Int32 = "napi_create_buffer_copy"
+
+///|
+pub extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
+
+///|
+#borrow(result)
+extern "c" fn napi_is_exception_pending_raw(
+  env : NapiEnv,
+  result : Ref[Int32],
+) -> Int32 = "napi_mbt_is_exception_pending"
+
+///|
+pub fn napi_is_exception_pending(env : NapiEnv) -> Bool raise NapiError {
+  let result = Ref(0)
+  let status = napi_is_exception_pending_raw(env, result)
+  if status != 0 {
+    raise napi_failure(
+      status,
+      Error,
+      "ERR_NAPI_EXCEPTION_PENDING",
+      "Checking pending exception",
+    )
+  }
+  result.val != 0
+}
+
+///|
+extern "c" fn moonbit_dummy_unmanaged_buffer() -> UnmanagedBuffer = "moonbit_dummy_unmanaged_buffer"
+
+///|
+extern "c" fn moonbit_dummy_deferred() -> NapiDeferred = "moonbit_dummy_deferred"
+
+///|
+#borrow(deferred, promise)
+extern "c" fn napi_create_promise(
+  env : NapiEnv,
+  deferred : Ref[NapiDeferred],
+  promise : Ref[NapiValue],
+) -> Int32 = "napi_create_promise"
+
+///|
+extern "c" fn napi_resolve_deferred(
+  env : NapiEnv,
+  deferred : NapiDeferred,
+  resolution : NapiValue,
+) -> Int32 = "napi_resolve_deferred"
+
+///|
+extern "c" fn napi_reject_deferred(
+  env : NapiEnv,
+  deferred : NapiDeferred,
+  rejection : NapiValue,
+) -> Int32 = "napi_reject_deferred"
+
+///|
+#borrow(is_promise)
+extern "c" fn napi_is_promise(
+  env : NapiEnv,
+  value : NapiValue,
+  is_promise : Ref[Bool],
+) -> Int32 = "moonbit_napi_is_promise"
+
+///|
+#borrow(result)
+extern "c" fn napi_create_bigint_int64(
+  env : NapiEnv,
+  value : Int64,
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_create_bigint_int64"
+
+///|
+#borrow(result)
+extern "c" fn napi_create_bigint_uint64(
+  env : NapiEnv,
+  value : UInt64,
+  result : Ref[NapiValue],
+) -> Int32 = "moonbit_napi_create_bigint_uint64"
+
+///|
+#borrow(result, lossless)
+extern "c" fn napi_get_value_bigint_int64(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[Int64],
+  lossless : Ref[Bool],
+) -> Int32 = "moonbit_napi_get_value_bigint_int64"
+
+///|
+#borrow(result, lossless)
+extern "c" fn napi_get_value_bigint_uint64(
+  env : NapiEnv,
+  value : NapiValue,
+  result : Ref[UInt64],
+  lossless : Ref[Bool],
+) -> Int32 = "moonbit_napi_get_value_bigint_uint64"
+
+///|
+extern "c" fn napi_threadsafe_function_dummy() -> NapiThreadsafeFunction = "moonbit_dummy_threadsafe_function"
+
+///|
+#borrow(result)
+extern "c" fn napi_create_threadsafe_function(
+  env : NapiEnv,
+  func : NapiValue,
+  async_resource : NapiValue,
+  async_resource_name : NapiValue,
+  max_queue_size : Int32,
+  initial_thread_count : Int32,
+  thread_finalize_data : UnmanagedBuffer,
+  thread_finalize_cb : UnmanagedBuffer,
+  context : UnmanagedBuffer,
+  call_js_cb : UnmanagedBuffer,
+  result : Ref[NapiThreadsafeFunction],
+) -> Int32 = "moonbit_napi_create_threadsafe_function"
+
+///|
+extern "c" fn napi_call_threadsafe_function(
+  func : NapiThreadsafeFunction,
+  data : UnmanagedBuffer,
+  mode : Int32,
+) -> Int32 = "moonbit_napi_call_threadsafe_function"
+
+///|
+extern "c" fn napi_acquire_threadsafe_function(
+  func : NapiThreadsafeFunction,
+) -> Int32 = "moonbit_napi_acquire_threadsafe_function"
+
+///|
+extern "c" fn napi_release_threadsafe_function(
+  func : NapiThreadsafeFunction,
+  mode : Int32,
+) -> Int32 = "moonbit_napi_release_threadsafe_function"

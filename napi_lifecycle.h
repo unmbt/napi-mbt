@@ -3,9 +3,11 @@
  * thread. Background I/O code must not use these entry points. */
 #ifndef NAPI_MBT_LIFECYCLE_H
 #define NAPI_MBT_LIFECYCLE_H
+#include <stdint.h>
 #include <stdlib.h>
 #if defined(_WIN32)
 #include <windows.h>
+#define NAPI_MBT_TLS __declspec(thread)
 static INIT_ONCE napi_mbt_once = INIT_ONCE_STATIC_INIT;
 static CRITICAL_SECTION napi_mbt_mutex;
 static BOOL CALLBACK napi_mbt_init_mutex(PINIT_ONCE once, PVOID parameter, PVOID *context) {
@@ -23,6 +25,7 @@ static napi_mbt_thread napi_mbt_thread_self(void) { return GetCurrentThreadId();
 static bool napi_mbt_same_thread(napi_mbt_thread a, napi_mbt_thread b) { return a == b; }
 #else
 #include <pthread.h>
+#define NAPI_MBT_TLS _Thread_local
 static pthread_once_t napi_mbt_once = PTHREAD_ONCE_INIT;
 static pthread_mutex_t napi_mbt_mutex;
 static void napi_mbt_init_mutex(void) {
@@ -67,6 +70,14 @@ struct napi_mbt_environment {
     napi_mbt_thread thread;
     napi_mbt_environment *next;
     napi_mbt_resource *resources;
+    napi_mbt_resource **constructors;
+    size_t constructor_capacity;
+    napi_mbt_resource **resource_table;
+    size_t resource_table_cap;
+    size_t resource_table_count;
+    size_t resource_table_tombstones;
+    napi_ref iterator_factory_ref;
+    napi_ref stream_factory_ref;
     bool closing;
     int cleanup_status;
     napi_mbt_construction *construction;
@@ -75,18 +86,111 @@ struct napi_mbt_environment {
     bool cleanup_requested;
 };
 
+#define NAPI_MBT_TOMBSTONE ((napi_mbt_resource *)(uintptr_t)1)
+
 static napi_mbt_environment *napi_mbt_environments = NULL;
 static napi_mbt_environment *napi_mbt_active = NULL;
+static NAPI_MBT_TLS napi_mbt_environment *napi_mbt_tls_env = NULL;
 static bool napi_mbt_initialized = false;
 static int napi_mbt_environment_count = 0;
 static int napi_mbt_resource_count = 0;
 extern void moonbit_runtime_init(int argc, char **argv);
 extern void moonbit_init(void);
 
+static size_t napi_mbt_hash_ptr(const void *ptr) {
+    uint64_t x = (uint64_t)(uintptr_t)ptr;
+    x ^= x >> 33;
+    x *= 0xff51afd7ed558ccdULL;
+    x ^= x >> 33;
+    x *= 0xc4ceb9fe1a85ec53ULL;
+    x ^= x >> 33;
+    return (size_t)x;
+}
+
+static bool napi_mbt_table_rehash(napi_mbt_environment *owner, size_t new_cap) {
+    napi_mbt_resource **table = (napi_mbt_resource **)calloc(new_cap, sizeof(*table));
+    if (!table) return false;
+    size_t mask = new_cap - 1;
+    for (size_t i = 0; i < owner->resource_table_cap; ++i) {
+        napi_mbt_resource *entry = owner->resource_table[i];
+        if (!entry || entry == NAPI_MBT_TOMBSTONE) continue;
+        size_t idx = napi_mbt_hash_ptr(entry) & mask;
+        while (table[idx]) idx = (idx + 1) & mask;
+        table[idx] = entry;
+    }
+    free(owner->resource_table);
+    owner->resource_table = table;
+    owner->resource_table_cap = new_cap;
+    owner->resource_table_tombstones = 0;
+    return true;
+}
+
+static bool napi_mbt_table_insert(napi_mbt_environment *owner, napi_mbt_resource *resource) {
+    if (owner->resource_table_cap == 0) {
+        if (!napi_mbt_table_rehash(owner, 64)) return false;
+    } else if ((owner->resource_table_count + owner->resource_table_tombstones) * 10 >= owner->resource_table_cap * 6) {
+        size_t next_cap = owner->resource_table_tombstones > owner->resource_table_count
+            ? owner->resource_table_cap
+            : owner->resource_table_cap * 2;
+        if (!napi_mbt_table_rehash(owner, next_cap)) return false;
+    }
+    size_t mask = owner->resource_table_cap - 1;
+    size_t idx = napi_mbt_hash_ptr(resource) & mask;
+    size_t first_tombstone = (size_t)-1;
+    for (;;) {
+        napi_mbt_resource *cur = owner->resource_table[idx];
+        if (!cur) {
+            size_t slot = first_tombstone != (size_t)-1 ? first_tombstone : idx;
+            if (first_tombstone != (size_t)-1) owner->resource_table_tombstones--;
+            owner->resource_table[slot] = resource;
+            owner->resource_table_count++;
+            return true;
+        }
+        if (cur == resource) return true;
+        if (cur == NAPI_MBT_TOMBSTONE && first_tombstone == (size_t)-1) first_tombstone = idx;
+        idx = (idx + 1) & mask;
+    }
+}
+
+static void napi_mbt_table_remove(napi_mbt_environment *owner, napi_mbt_resource *resource) {
+    if (!owner->resource_table_cap) return;
+    size_t mask = owner->resource_table_cap - 1;
+    size_t idx = napi_mbt_hash_ptr(resource) & mask;
+    for (size_t step = 0; step < owner->resource_table_cap; ++step) {
+        napi_mbt_resource *cur = owner->resource_table[idx];
+        if (!cur) return;
+        if (cur == resource) {
+            owner->resource_table[idx] = NAPI_MBT_TOMBSTONE;
+            owner->resource_table_count--;
+            owner->resource_table_tombstones++;
+            return;
+        }
+        idx = (idx + 1) & mask;
+    }
+}
+
+static napi_mbt_resource *napi_mbt_lookup_resource(napi_mbt_environment *owner, const void *pointer) {
+    if (!owner || !pointer || pointer == (const void *)NAPI_MBT_TOMBSTONE || !owner->resource_table_cap) return NULL;
+    size_t mask = owner->resource_table_cap - 1;
+    size_t idx = napi_mbt_hash_ptr(pointer) & mask;
+    for (size_t step = 0; step < owner->resource_table_cap; ++step) {
+        napi_mbt_resource *cur = owner->resource_table[idx];
+        if (!cur) return NULL;
+        if (cur == pointer) return cur;
+        idx = (idx + 1) & mask;
+    }
+    return NULL;
+}
+
 static void napi_mbt_unlink_resource(napi_mbt_resource *resource) {
     if (!resource->owner) return;
+    napi_mbt_environment *owner = resource->owner;
+    napi_mbt_table_remove(owner, resource);
+    if (resource->kind == 3 && resource->type >= 0 && (size_t)resource->type < owner->constructor_capacity && owner->constructors[resource->type] == resource) {
+        owner->constructors[resource->type] = NULL;
+    }
     if (resource->previous) resource->previous->next = resource->next;
-    else resource->owner->resources = resource->next;
+    else owner->resources = resource->next;
     if (resource->next) resource->next->previous = resource->previous;
     resource->owner = NULL;
     resource->next = resource->previous = NULL;
@@ -156,6 +260,14 @@ static void napi_mbt_cleanup_environment(void *data) {
     napi_mbt_environment *previous = napi_mbt_active;
     napi_mbt_active = owner;
     owner->closing = true;
+    if (owner->iterator_factory_ref) {
+        (void)napi_delete_reference(owner->env, owner->iterator_factory_ref);
+        owner->iterator_factory_ref = NULL;
+    }
+    if (owner->stream_factory_ref) {
+        (void)napi_delete_reference(owner->env, owner->stream_factory_ref);
+        owner->stream_factory_ref = NULL;
+    }
     napi_mbt_flush_resources(owner);
     while (owner->resources) {
         napi_mbt_resource *resource = owner->resources;
@@ -165,19 +277,27 @@ static void napi_mbt_cleanup_environment(void *data) {
         // Live JS/MoonBit wrappers own the container; their finalizer frees it.
         // No wrapper keeps the environment alive after shutdown.
     }
+    if (napi_mbt_tls_env == owner) napi_mbt_tls_env = NULL;
     napi_mbt_environment **entry = &napi_mbt_environments;
     while (*entry && *entry != owner) entry = &(*entry)->next;
     if (*entry) *entry = owner->next;
     napi_mbt_active = previous == owner ? NULL : previous;
     napi_mbt_environment_count--;
+    free(owner->constructors);
+    free(owner->resource_table);
     free(owner);
     napi_mbt_unlock();
 }
 
 int napi_mbt_enter(napi_env env, void **previous) {
     napi_mbt_lock();
-    napi_mbt_environment *owner = napi_mbt_environments;
-    while (owner && owner->env != env) owner = owner->next;
+    napi_mbt_environment *owner = (napi_mbt_tls_env && napi_mbt_tls_env->env == env)
+        ? napi_mbt_tls_env
+        : NULL;
+    if (!owner) {
+        owner = napi_mbt_environments;
+        while (owner && owner->env != env) owner = owner->next;
+    }
 #if NAPI_VERSION >= 3
     if (!owner) {
         owner = (napi_mbt_environment *)calloc(1, sizeof(*owner));
@@ -195,6 +315,7 @@ int napi_mbt_enter(napi_env env, void **previous) {
         napi_mbt_unlock();
         return 1005;
     }
+    if (owner) napi_mbt_tls_env = owner;
     *previous = napi_mbt_active;
     napi_mbt_active = owner;
     if (!napi_mbt_initialized) {
@@ -217,6 +338,10 @@ static napi_mbt_resource *napi_mbt_new_resource(napi_env env, int kind, int type
     if (!napi_mbt_active || napi_mbt_active->env != env || napi_mbt_active->closing) return NULL;
     napi_mbt_resource *resource = (napi_mbt_resource *)calloc(1, sizeof(*resource));
     if (!resource) return NULL;
+    if (!napi_mbt_table_insert(napi_mbt_active, resource)) {
+        free(resource);
+        return NULL;
+    }
     resource->owner = napi_mbt_active;
     resource->kind = kind;
     resource->type = type;
@@ -249,15 +374,14 @@ static void napi_mbt_native_finalizer(napi_env env, void *data, void *hint) {
     napi_mbt_free_resource((napi_mbt_resource *)data);
 }
 
-// Lookup compares an untrusted napi_unwrap pointer against our own registry
+// Lookup compares an untrusted napi_unwrap pointer against our own O(1) registry
 // before dereferencing it. Other addons' wrapped objects are never cast.
 static int napi_mbt_find_instance(napi_env env, napi_value value, int type, bool allow_disposed, napi_mbt_resource **result) {
     if (!napi_mbt_active || napi_mbt_active->env != env) return 1005;
     void *pointer = NULL;
     napi_status status = napi_unwrap(env, value, &pointer);
     if (status != napi_ok) return status == napi_pending_exception ? (int)status : 1007;
-    napi_mbt_resource *resource = napi_mbt_active->resources;
-    while (resource && resource != pointer) resource = resource->next;
+    napi_mbt_resource *resource = napi_mbt_lookup_resource(napi_mbt_active, pointer);
     if (!resource || resource->kind != 1 || resource->type != type) return 1007;
     if (!allow_disposed) {
         int checked = napi_mbt_check_resource(resource, env);
@@ -300,10 +424,24 @@ MOONBIT_FFI_EXPORT int napi_mbt_class_dispose(napi_env env, napi_value receiver,
 }
 
 int napi_mbt_save_constructor(napi_env env, napi_value constructor, int type) {
+    if (!napi_mbt_active || napi_mbt_active->env != env || type < 0) return napi_generic_failure;
+    size_t index = (size_t)type;
+    if (index >= napi_mbt_active->constructor_capacity) {
+        size_t next_cap = napi_mbt_active->constructor_capacity ? napi_mbt_active->constructor_capacity : 8;
+        while (next_cap <= index) next_cap *= 2;
+        napi_mbt_resource **resized = (napi_mbt_resource **)realloc(
+            napi_mbt_active->constructors, sizeof(*resized) * next_cap);
+        if (!resized) return napi_generic_failure;
+        memset(resized + napi_mbt_active->constructor_capacity, 0,
+            sizeof(*resized) * (next_cap - napi_mbt_active->constructor_capacity));
+        napi_mbt_active->constructors = resized;
+        napi_mbt_active->constructor_capacity = next_cap;
+    }
     napi_mbt_resource *resource = napi_mbt_new_resource(env, 3, type);
     if (!resource) return napi_generic_failure;
     napi_status status = napi_create_reference(env, constructor, 1, &resource->reference);
     if (status != napi_ok) { napi_mbt_free_resource(resource); return (int)status; }
+    napi_mbt_active->constructors[index] = resource;
     return napi_ok;
 }
 
@@ -319,9 +457,9 @@ int napi_mbt_construct_pending(napi_env env, napi_value receiver, int type, bool
 
 MOONBIT_FFI_EXPORT int napi_mbt_class_create(napi_env env, void *payload, int type, napi_value *result) {
     if (!napi_mbt_active || napi_mbt_active->env != env) return 1005;
-    napi_mbt_resource *constructor = napi_mbt_active->resources;
-    while (constructor && !(constructor->kind == 3 && constructor->type == type && !constructor->disposed)) constructor = constructor->next;
-    if (!constructor) return 1007;
+    if (type < 0 || (size_t)type >= napi_mbt_active->constructor_capacity) return 1007;
+    napi_mbt_resource *constructor = napi_mbt_active->constructors[type];
+    if (!constructor || constructor->disposed) return 1007;
     napi_value function;
     napi_status status = napi_get_reference_value(env, constructor->reference, &function);
     if (status != napi_ok) return (int)status;

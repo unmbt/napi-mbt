@@ -55,7 +55,7 @@ test "strict parser rejects unsupported and malformed exports" {
   for
     source in [
       "#export_name\npub fn f() -> Unit { () }", "pub fn broken(", "#export_name(\"class\")\npub fn f() -> Unit { () }",
-      "#export_name(\"x\")\npub fn f(a : Unknown) -> Unit { () }", "#export_name(\"x\")\npub fn f(a~ : Int) -> Unit { () }",
+      "#export_name(\"x\")\npub fn f(a : Unknown) -> Unit { () }",
     ] {
     try @generator.parse_source(source, "invalid.mbt") catch {
       _ => ()
@@ -63,6 +63,98 @@ test "strict parser rejects unsupported and malformed exports" {
       _ => fail("Expected rejection")
     }
   }
+}
+
+///|
+test "labeled and optional parameters generate valid calls and optional TS signatures" {
+  let parsed = @generator.parse_source(
+    "/// Add values.\n#export_name(\"compute\")\npub fn compute(base~ : Int, step? : Int = 2, note? : String) -> Int { ignore(note); base + step }",
+    "labeled.mbt",
+  )
+  let exports_mbt = rendered(parsed, "napi_exports.mbt")
+  assert_true(exports_mbt.contains("let p0 : Int32 = napi_from_value(env, a0)"))
+  assert_true(
+    exports_mbt.contains("let p1 : Option[Int32] = napi_from_value(env, a1)"),
+  )
+  assert_true(
+    exports_mbt.contains("let p2 : Option[String] = napi_from_value(env, a2)"),
+  )
+  assert_true(exports_mbt.contains("compute(base=p0, step?=p1, note?=p2)"))
+  let dts = rendered(parsed, "index.d.ts")
+  assert_true(
+    dts.contains(
+      "compute(base: number, step?: (number | null | undefined), note?: (string | null | undefined)): number;",
+    ),
+  )
+  let c_glue = rendered(parsed, "napi_glue.c")
+  assert_true(c_glue.contains("if (argc < 1)"))
+}
+
+///|
+test "enum value directives and doc class/module_exports directives render and strip @napi comments" {
+  let source =
+    #|/// Custom HTTP role.
+    #|/// @napi value("admin")
+    #|/// @napi value("user")
+    #|
+    #|/// Http mode.
+    #|pub(all) enum Role {
+    #|  /// @napi value("admin-role")
+    #|  Admin
+    #|  /// @napi value("guest-role")
+    #|  Guest
+    #|}
+    #|
+    #|/// Box doc.
+    #|/// @napi class("Box")
+    #|pub struct NativeBox { mut v : Int }
+    #|/// @napi constructor
+    #|pub fn NativeBox::new(v~ : Int) -> NativeBox { { v, } }
+    #|/// @napi getter("value")
+    #|pub fn NativeBox::get_value(self : NativeBox) -> Int { self.v }
+    #|/// @napi setter("value")
+    #|pub fn NativeBox::set_value(self : NativeBox, v : Int) -> Unit { self.v = v }
+    #|/// Increments internal value.
+    #|/// @napi method("bump")
+    #|pub fn NativeBox::inc(self : NativeBox, delta? : Int = 1) -> Int { self.v += delta; self.v }
+    #|/// @napi static("fromDefault")
+    #|pub fn NativeBox::make() -> NativeBox { { v: 7 } }
+    #|
+    #|/// @napi module_exports
+    #|pub fn init_exports(env : NapiEnv, exports : NapiObject) -> Unit raise {
+    #|  exports.set(env, "version", set_String(env, "1.0.0"))
+    #|}
+    #|
+    #|/// Read role.
+    #|#export_name("echoRole")
+    #|pub fn echo_role(r : Role) -> Role { r }
+    #|
+  let clean_source = source.replace_all(
+    old="/// Custom HTTP role.\n/// @napi value(\"admin\")\n/// @napi value(\"user\")\n\n",
+    new="",
+  )
+  let parsed = @generator.parse_source(clean_source, "directives.mbt")
+  assert_eq(parsed.classes.length(), 1)
+  assert_eq(parsed.classes[0].name, "Box")
+  assert_true(parsed.module_exports is Some(_))
+  assert_true(parsed.native_exports().contains("napi_mbt_module_exports"))
+  let dts = rendered(parsed, "index.d.ts")
+  assert_true(!dts.contains("@napi"))
+  assert_true(
+    dts.contains("export type Role = \"admin-role\" | \"guest-role\";"),
+  )
+  assert_true(dts.contains("export class Box {"))
+  assert_true(dts.contains("get value(): number;"))
+  assert_true(dts.contains("set value(value: number);"))
+  assert_true(
+    dts.contains("bump(delta?: (number | null | undefined)): number;"),
+  )
+  assert_true(dts.contains("static fromDefault(): Box;"))
+  let exports_mbt = rendered(parsed, "napi_exports.mbt")
+  assert_true(exports_mbt.contains("\"admin-role\" =>"))
+  assert_true(exports_mbt.contains("napi_mbt_module_exports"))
+  let c_glue = rendered(parsed, "napi_glue.c")
+  assert_true(c_glue.contains("napi_mbt_module_exports(env, exports)"))
 }
 
 ///|
@@ -140,4 +232,20 @@ test "signature comments and async text do not change syntax" {
       _ => fail("Expected rejection")
     }
   }
+}
+
+///|
+test "derive attribute on exported struct parses cleanly" {
+  let source =
+    #|#derive(Debug)
+    #|pub(all) struct DerivedRecord {
+    #|  label : String
+    #|  count : Int
+    #|}
+    #|
+    #|#export_name("echo_derived")
+    #|pub fn echo_derived(item : DerivedRecord) -> DerivedRecord { item }
+  let parsed = @generator.parse_source(source, "derived.mbt")
+  assert_eq(parsed.exports.length(), 1)
+  assert_eq(parsed.types.length(), 1)
 }

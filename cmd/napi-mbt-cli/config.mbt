@@ -1,7 +1,7 @@
 ///|
 let supported_targets : Array[String] = [
-  "win32-x64-msvc", "darwin-x64", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
-  "linux-x64-musl", "linux-arm64-musl",
+  "win32-x64-msvc", "darwin-x64", "darwin-arm64", "darwin-universal", "linux-x64-gnu",
+  "linux-arm64-gnu", "linux-x64-musl", "linux-arm64-musl",
 ]
 
 ///|
@@ -93,11 +93,13 @@ async fn write_json(path : String, value : Json) -> Unit {
 struct Config {
   napi_version : Int32
   builder : String
+  runtime : String
   targets : Array[String]
   features : Array[String]
   cjs : Bool
   esm : Bool
   classes : Array[@generator.ClassConfig]
+  module_exports : String?
   native_tasks : Array[(String, String)]
   worker_tasks : Array[String]
   worker_pool : Json
@@ -129,8 +131,8 @@ fn parse_config(value : Json) -> Config raise {
   let items = object(value)
   for key in items.keys() {
     if ![
-        "$schema", "napiVersion", "builder", "targets", "features", "cjs", "esm",
-        "classes", "nativeTasks", "workerTasks", "workerPool",
+        "$schema", "napiVersion", "builder", "runtime", "targets", "features", "cjs",
+        "esm", "classes", "moduleExports", "nativeTasks", "workerTasks", "workerPool",
       ].contains(key) {
       fail("Unknown napi-mbt.json field: \{key}")
     }
@@ -151,6 +153,10 @@ fn parse_config(value : Json) -> Config raise {
   if !["auto", "cmake", "gcc", "clang", "msvc"].contains(builder) {
     fail("Unknown builder: \{builder}")
   }
+  let runtime = str(items, "runtime", "vendored")
+  if !["vendored", "package"].contains(runtime) {
+    fail("Unknown runtime mode: \{runtime}")
+  }
   let targets = unique_strings(items, "targets")
   for target in targets {
     if !supported_targets.contains(target) {
@@ -167,6 +173,11 @@ fn parse_config(value : Json) -> Config raise {
     }
   }
   let classes = class_configurations(items.get("classes"))
+  let module_exports = match items.get("moduleExports") {
+    None | Some(Null) => None
+    Some(String(name)) if !name.is_empty() => Some(name)
+    _ => fail("moduleExports must be a non-empty string")
+  }
   let native_tasks = native_task_configurations(items.get("nativeTasks"))
   let worker_tasks = unique_strings(items, "workerTasks")
   let worker_pool = worker_pool_configuration(items.get("workerPool"))
@@ -182,11 +193,13 @@ fn parse_config(value : Json) -> Config raise {
   {
     napi_version: version,
     builder,
+    runtime,
     targets,
     features,
     cjs,
     esm,
     classes,
+    module_exports,
     native_tasks,
     worker_tasks,
     worker_pool,

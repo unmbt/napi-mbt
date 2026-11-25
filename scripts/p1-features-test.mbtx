@@ -1,0 +1,78 @@
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
+
+///|
+async fn checked(binary : String, args : Array[String]) -> Unit {
+  @async.with_timeout(120000, () => {
+    let _proc_res = @process.run(binary, args, stdout=Collect, stderr=Collect)
+    if _proc_res.exit_code != 0 { fail(_proc_res.stdout_text() + _proc_res.stderr_text()) }
+  })
+}
+
+///|
+async fn main {
+  let root = @fs.realpath(".")
+  let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  let temp = @fs.tmpdir(prefix="napi-mbt-p1-")
+  defer @fs.remove(temp, recursive=true)
+  let dir = temp + "/addon"
+  checked(binary, ["init", dir, "--name", "p1-package-addon", "--runtime", "package"])
+  assert_true(!@fs.exists(dir + "/napi_runtime_version.mbt"))
+  assert_true(!@fs.exists(dir + "/stub.c"))
+  assert_true(@fs.read_text(dir + "/napi-mbt.json").contains("\"package\""))
+  let root_posix = root.replace_all(old="\\", new="/")
+  @fs.write_text(temp + "/moon.work", "members = [\n  \"./addon\",\n  \"\{root_posix}\",\n]\n")
+  let config : Json = {
+    "napiVersion": 7,
+    "runtime": "package",
+    "classes": [
+      {
+        "name": "Boxed",
+        "type": "Boxed",
+        "constructor": "Boxed::new",
+        "methods": { "get": "Boxed::get" },
+      },
+    ],
+  }
+  @fs.write_text(dir + "/napi-mbt.json", config.stringify())
+  let source =
+    #|///|
+    #|pub(all) struct LeftItem { count : Int }
+    #|///|
+    #|pub(all) struct RightItem { label : String }
+    #|///|
+    #|pub struct Boxed { value : Int }
+    #|///|
+    #|pub fn Boxed::new(value : Int) -> Boxed { { value, } }
+    #|///|
+    #|pub fn Boxed::get(self : Boxed) -> Int { self.value }
+    #|///|
+    #|#export_name("eitherPrimitive")
+    #|pub fn either_primitive(
+    #|  x : @napi.NapiEither[Int, String],
+    #|) -> @napi.NapiEither[Int, String] {
+    #|  x
+    #|}
+    #|///|
+    #|#export_name("eitherStruct")
+    #|pub fn either_struct(
+    #|  x : @napi.NapiEither[LeftItem, RightItem],
+    #|) -> @napi.NapiEither[LeftItem, RightItem] {
+    #|  x
+    #|}
+    #|///|
+    #|#export_name("eitherBox")
+    #|pub fn either_box(x : @napi.NapiEither[Boxed, String]) -> Int {
+    #|  match x {
+    #|    A(boxed) => boxed.value
+    #|    B(s) => s.length()
+    #|  }
+    #|}
+    #|
+  @fs.write_text(dir + "/lib.mbt", source)
+  checked(binary, ["build", dir, "--release"])
+  let target = @fs.readdir(dir + "/artifacts")[0]
+  checked("node", ["scripts/p1-features.test.cjs", dir + "/artifacts/" + target + "/napi_mbt.node"])
+  println("P1 NapiEither and package runtime checks passed")
+}

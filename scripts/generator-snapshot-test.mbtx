@@ -1,9 +1,14 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String]) -> Unit {
-  let (status, out, err) = @process.collect_output(binary, args)
-  if status != 0 { fail(out.text() + err.text()) }
+  let _proc_res = @process.run(binary, args, stdout=Collect, stderr=Collect)
+  let status = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if status != 0 { fail(out + err) }
 }
 
 ///|
@@ -11,22 +16,22 @@ async fn main {
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let update = @env.args().contains("--update")
   let temp = @fs.tmpdir(prefix="napi-mbt-snapshot-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   checked(binary, ["init", temp + "/project", "--name", "snapshot-fixture"])
   let dir = temp + "/project"
-  let workflow = @fs.read_file(dir + "/.github/workflows/build.yml").text()
+  let workflow = @fs.read_text(dir + "/.github/workflows/build.yml")
   assert_true(workflow.contains("GITHUB_PATH"))
   assert_true(workflow.contains("if: runner.os != 'Windows'"))
   assert_true(workflow.contains("if: runner.os == 'Windows'"))
-  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
-  @fs.write_file(dir + "/lib.mbt", "///|\n#export_name(\"public_name\")\npub fn internal_name(a : Int32, text : String, flag : Bool, d : Double, data : Bytes, view : NapiBufferView) -> String raise { text }\n///|\n#export_name(\"noop\")\npub fn noop() -> Unit { () }\n")
+  @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":7}")
+  @fs.write_text(dir + "/lib.mbt", "///|\n#export_name(\"public_name\")\npub fn internal_name(a : Int32, text : String, flag : Bool, d : Double, data : Bytes, view : NapiBufferView) -> String raise { text }\n///|\n#export_name(\"noop\")\npub fn noop() -> Unit { () }\n")
   checked(binary, ["generate", dir])
   let expected = "tests/generator-snapshots"
   if update && !@fs.exists(expected) { @fs.mkdir(expected, recursive=true) }
   for name in ["napi_exports.mbt", "napi_glue.c", "index.d.ts", "index.d.cts", "index.d.mts", "index.cjs", "index.mjs", "napi_manifest.json", "package.json", "napi-mbt.schema.json"] {
-    let actual = @fs.read_file(dir + "/" + name).text().replace_all(old="\r\n", new="\n")
-    if update { @fs.write_file(expected + "/" + name + ".snap", actual) }
-    assert_eq(actual, @fs.read_file(expected + "/" + name + ".snap").text().replace_all(old="\r\n", new="\n"), msg=name)
+    let actual = @fs.read_text(dir + "/" + name).replace_all(old="\r\n", new="\n")
+    if update { @fs.write_text(expected + "/" + name + ".snap", actual) }
+    assert_eq(actual, @fs.read_text(expected + "/" + name + ".snap").replace_all(old="\r\n", new="\n"), msg=name)
   }
   checked(binary, ["generate", dir, "--check"])
   println("Complete generator artifact snapshots passed")

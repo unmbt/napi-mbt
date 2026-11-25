@@ -27,7 +27,7 @@ fn class_callbacks(classes : Array[ParsedClass]) -> String {
       let n = parameters.length() + (if item.is_async { 1 } else { 0 })
       let mut required = 0
       for i, p in parameters {
-        if !(p.value_type is OptionType(_)) {
+        if !(p.label is OptionalLabeled) && !(p.value_type is OptionType(_)) {
           required = i + 1
         }
       }

@@ -14,7 +14,7 @@ test "cache command arguments are explicit" {
 ///|
 async test "cache sync retains timestamps, removes stale inputs and rebuilds corrupt metadata" {
   let temp = @fs.tmpdir(prefix="napi-mbt-cache-unit-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let source = temp + "/source"
   let workspace = temp + "/workspace"
   let metadata = temp + "/inputs.json"

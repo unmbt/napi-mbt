@@ -32,20 +32,20 @@
 
 N-API 原始 Promise API 属于 v1；内嵌 async 宿主明确需要 N-API 8 cleanup API。
 结构化值嵌入 bigint/Buffer 时继承更高版本要求。
-`moonbitlang/async` 必须恰好为 0.22.5。
+`moonbitlang/async` 必须恰好为 0.22.10。
 
 所检查 napi-rs CLI 声明 `^20.17.0 || ^22.13.0 || >= 23.5.0`，其核心默认开启
 `napi4` 和 `dyn-symbols`，并非所有 addon 都要求 Node 22。
 napi-mbt 对齐默认 N-API，并区分 CLI 与运行时要求。
 
-CI 固定 Moon/core `0.10.20+65efd5b93`、CMake 4.4.4、构建 Node 26.4.0。
+CI 固定 Moon/core `0.10.22+124d61d05`、CMake 4.4.4、构建 Node 26.4.0。
 CMake 包含当前 Windows runner 使用的 Visual Studio 18 2026 生成器。
 项目检查先于模板校验执行，以下载依赖；`moon update` 只刷新注册表索引。
 `moon run scripts/ci-bootstrap-test.mbtx` 在 Git 源码的无项目缓存临时副本中
 重跑依赖和模板校验。
-对应 moon/moonrun 为 `0.1.20261104 (940aa18)`，启用 `rr_moon_mod,rr_moon_pkg`。
+对应 moon/moonrun 为 `0.1.20261119 (738607b)`。
 固定版本 CI 和 WSL 使用 `moon run scripts/toolchain-check.mbtx` 核验编译器、
-构建器、runner 和 feature flags，与当前 Windows 工具链一致。
+构建器与 runner，与当前 Windows 工具链一致。
 本机 Windows 使用 MSVC 19.44.35211、MSBuild 17.14.14、SDK 10.0.26100.0。
 托管 runner 的编译器/SDK 仍可能更新；`doctor --json` 记录实际选择，构建以真实
 compile/link probe 验收。新 MoonBit 兼容性另设 job。

@@ -1,4 +1,6 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/core/env", "moonbitlang/core/json", "moonbitlang/core/encoding/utf8" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/env", "moonbitlang/core/json", "moonbitlang/core/encoding/utf8" }
+----
 
 ///|
 fn checksum(text : String) -> String {
@@ -9,23 +11,50 @@ fn checksum(text : String) -> String {
 
 ///|
 async fn main {
-  let root = ".mooncakes/moonbitlang/async"
-  if !@fs.exists(root + "/src/internal/event_loop/stdio.mbt") {
-    fail("Missing project dependency moonbitlang/async; run `moon check --target native` before syncing the adapter (`moon update` only refreshes the registry index)")
+  let root = if @fs.exists(".mooncakes/moonbitlang/async/src/internal/event_loop/stdio.mbt") {
+    ".mooncakes/moonbitlang/async"
+  } else if @fs.exists(".repos/moonbitlang/async/0.22.10/src/internal/event_loop/stdio.mbt") {
+    ".repos/moonbitlang/async/0.22.10"
+  } else {
+    fail("Missing moonbitlang/async@0.22.10 source; run `moon fetch moonbitlang/async@0.22.10` before syncing the adapter")
   }
   let resources_path = "internal/assets/data/resources.json"
-  guard @json.parse(@fs.read_file(resources_path).text()) is Object(resources) else { fail("Invalid resources") }
+  guard @json.parse(@fs.read_text(resources_path)) is Object(resources) else { fail("Invalid resources") }
   for key in resources.keys().to_array() {
     if key.has_prefix("async/files/") { resources.remove(key) }
   }
   let files : Array[Json] = []
   let changes : Map[String, Array[(String, String)]] = Map([])
   let additions : Map[String, String] = Map([])
+  let replacements_whole : Map[String, String] = Map([])
+
   let scheduler = "src/internal/coroutine/scheduler.mbt"
-  let initial = "let scheduler : Scheduler = {\n  coro_id: 0,\n  curr_coro: None,\n  run_later: Deque([]),\n  all_coros: Set([]),\n}"
+  let core_sched_block =
+    #|// An intermediate type compiled to `void*` on C backend.
+    #|// Used to work around `-Wincompatible-pointer-types` from the C compiler.
+    #|priv type CoreScheduler
+    #|
+    #|///|
+    #|#warnings("-alert_internal")
+    #|fn CoreScheduler::from_impl(
+    #|  scheduler : @runtime_internal.Scheduler,
+    #|) -> CoreScheduler = "%identity"
+    #|
+    #|///|
+    #|fn from_core_scheduler(x : CoreScheduler) -> Scheduler = "%identity"
+    #|
+    #|///|
+    #|// Here the cast is decomposed into two parts: core type -> void* -> our type.
+    #|// This works around `-Wincompatible-pointer-types` from the C compiler.
+    #|// This is hacky, but the whole runtime sharing mechanism is a big temporary hack,
+    #|// so we choose to live with it here.
+    #|#warnings("-alert_internal")
+    #|let scheduler : Scheduler = from_core_scheduler(
+    #|  CoreScheduler::from_impl(@runtime_internal.get_current_scheduler()),
+    #|)
   changes[scheduler] = [
     ("priv struct Scheduler", "pub struct Scheduler"),
-    (initial, "let scheduler : Ref[Scheduler] = Ref(embedded_new_scheduler())"),
+    (core_sched_block, "let scheduler : Ref[Scheduler] = Ref(embedded_new_scheduler())"),
     ("scheduler.", "scheduler.val."),
   ]
   let scheduler_addition =
@@ -43,43 +72,129 @@ async fn main {
     #|}
     #|
   additions[scheduler] = scheduler_addition
+
   changes["src/internal/coroutine/coroutine.mbt"] = [("scheduler.", "scheduler.val.")]
+
+  let core_loop_block =
+    #|// An intermediate type compiled to `void*` on C backend.
+    #|// Used to work around `-Wincompatible-pointer-types` from the C compiler.
+    #|priv type CoreEventLoop
+    #|
+    #|///|
+    #|#warnings("-alert_internal")
+    #|fn CoreEventLoop::from_impl(
+    #|  scheduler : @runtime_internal.CurrentEventLoop,
+    #|) -> CoreEventLoop = "%identity"
+    #|
+    #|///|
+    #|fn from_core_loop(x : CoreEventLoop) -> Ref[EventLoop?] = "%identity"
+    #|
+    #|///|
+    #|// Here the cast is decomposed into two parts: core type -> void* -> our type.
+    #|// This works around `-Wincompatible-pointer-types` from the C compiler.
+    #|// This is hacky, but the whole runtime sharing mechanism is a big temporary hack,
+    #|// so we choose to live with it here.
+    #|#warnings("-alert_internal")
+    #|let curr_loop : Ref[EventLoop?] = from_core_loop(
+    #|  CoreEventLoop::from_impl(@runtime_internal.get_current_event_loop()),
+    #|)
   changes["src/internal/event_loop/event_loop.mbt"] = [
     ("  bus : EventBus", "  stdio : Map[@fd_util.Fd, IoHandle]\n  stdin_buffer : @io.ReaderBuffer\n  bus : EventBus"),
-    ("    fds: Map([]),", "    fds: Map([]),\n    stdio: Map([]),\n    stdin_buffer: @io.ReaderBuffer::new(),"),
-    ("fn EventLoop::cleanup(self : Self) -> Unit raise {", "fn EventLoop::cleanup(self : Self) -> Unit raise {\n  for _, handle in self.stdio { handle.detach_from_event_loop() }\n  self.stdio.clear()"),
     ("  mut job_id : Int32", "  mut timer_id : Int32\n  mut job_id : Int32"),
-    ("    job_id: 0,", "    timer_id: 0,\n    job_id: 0,"),
-    ("  guard! curr_loop.val is None", "  if curr_loop.val is Some(_) { raise Failure::Failure(\"Nested event loop is not supported by the Node host\") }"),
+    (core_loop_block, "let curr_loop : Ref[EventLoop?] = Ref(None)"),
     ("      let worker = Worker::spawn(job_id, job)", "      let worker = Worker::spawn(job_id, job)\n      if worker.is_null() { @os_error.check_errno(\"Starting async worker\") }"),
-    ("  let extra = PlatformEventLoopExtra::new()", "  errdefer destroy_thread_pool()\n  let extra = PlatformEventLoopExtra::new()"),
   ]
+
   let stdio_path = "src/internal/event_loop/stdio.mbt"
-  let stdio_source = @fs.read_file(root + "/" + stdio_path).text().replace_all(old="\r\n", new="\n")
-  let hook_start = stdio_source.find("  register_hook(").unwrap()
-  let hook_end = stdio_source.find("  handle\n}").unwrap()
-  let globals = stdio_source.find("pub let stdin").unwrap()
-  changes[stdio_path] = [
-    ("let stdio_handles : Map[@fd_util.Fd, IoHandle] = Map([])", "pub fn napi_stdin_buffer() -> @io.ReaderBuffer { curr_loop.val.unwrap().stdin_buffer }"),
-    ("  let fd = get_stdio_handle(id)", "  guard curr_loop.val is Some(evloop) else { fail(\"stdio requires an active async environment\") }\n  let stdio_handles = evloop.stdio\n  let fd = get_stdio_handle(id)"),
-    (stdio_source[hook_start:hook_end].to_owned(), "  evloop.fds[fd] = handle\n"),
-    (stdio_source[globals:].to_owned(), "pub fn napi_stdio(id : Int) -> IoHandle raise { setup_stdio(id, context=\"Opening standard stream\") }\n"),
-  ]
+  let stdio_replacement =
+    #|// Per-environment standard stream handles for the Node host adapter.
+    #|
+    #|///|
+    #|#cfg(target="native")
+    #|#borrow(buf)
+    #|extern "C" fn fstatx_sync(
+    #|  fd : @fd_util.Fd,
+    #|  request : UInt32,
+    #|  buf : FixedArray[Byte],
+    #|  buf_len : Int32,
+    #|) -> Int32 = "moonbitlang_async_fstatx_sync"
+    #|
+    #|///|
+    #|#cfg(target="native")
+    #|fn kind_of_fd_sync(
+    #|  fd : @fd_util.Fd,
+    #|  context~ : String,
+    #|) -> @fd_util.FileKind raise {
+    #|  let buf = FixedArray::make(16, b'\x00')
+    #|  if fstatx_sync(fd, STAT_FILE_KIND, buf, buf.length()) < 0 {
+    #|    @os_error.check_errno(context)
+    #|  }
+    #|  guard! buf is [u32le(_), u32le(mask), i64le(kind)]
+    #|  guard mask == STAT_FILE_KIND else {
+    #|    raise @os_error.OSError(@os_error.errno_ENOTSUP, context~)
+    #|  }
+    #|  @fd_util.FileKind::from_int(kind.to_int())
+    #|}
+    #|
+    #|///|
+    #|#cfg(target="native")
+    #|extern "C" fn get_stdio_handle(id : Int32) -> @fd_util.Fd = "moonbitlang_async_get_stdio_handle"
+    #|
+    #|///|
+    #|pub fn napi_stdin_buffer() -> @io.ReaderBuffer {
+    #|  curr_loop.val.unwrap().stdin_buffer
+    #|}
+    #|
+    #|///|
+    #|fn setup_stdio(id : Int32, context~ : String) -> IoHandle raise {
+    #|  guard curr_loop.val is Some(evloop) else {
+    #|    fail("stdio requires an active async environment")
+    #|  }
+    #|  let stdio_handles = evloop.stdio
+    #|  let fd = get_stdio_handle(id)
+    #|  if !@fd_util.fd_is_valid(fd) {
+    #|    @os_error.check_errno(context)
+    #|  }
+    #|  if stdio_handles.get(fd) is Some(handle) {
+    #|    return handle
+    #|  }
+    #|  let kind = kind_of_fd_sync(fd, context~)
+    #|  let handle = {
+    #|    fd,
+    #|    kind,
+    #|    is_async: false,
+    #|    read: Idle,
+    #|    read_offset: -1,
+    #|    write: Idle,
+    #|    write_offset: -1,
+    #|    console_state: WindowsConsoleBuffer(kind),
+    #|  }
+    #|  stdio_handles[fd] = handle
+    #|  evloop.fds[fd] = handle
+    #|  handle
+    #|}
+    #|
+    #|///|
+    #|pub fn napi_stdio(id : Int) -> IoHandle raise {
+    #|  setup_stdio(id, context="Opening standard stream")
+    #|}
+    #|
+  replacements_whole[stdio_path] = stdio_replacement
+
   let public_stdio = "src/stdio/stdio.mbt"
   changes[public_stdio] = [
     ("  io : Result[@event_loop.IoHandle, Error]\n  read_buf : @io.ReaderBuffer", "  id : Int"),
     ("self.io.unwrap_or_error()", "@event_loop.napi_stdio(self.id)"),
     ("self.io\n  .unwrap_or_error()", "@event_loop.napi_stdio(self.id)"),
     ("self.read_buf", "@event_loop.napi_stdin_buffer()"),
-    ("struct Output(Result[@event_loop.IoHandle, Error])", "struct Output(Int)"),
-    ("self.0.unwrap_or_error()", "@event_loop.napi_stdio(self.0)"),
-    ("self.0\n  .unwrap_or_error()", "@event_loop.napi_stdio(self.0)"),
+    ("  io : Result[@event_loop.IoHandle, Error]\n  lock : @async.Mutex", "  id : Int\n  lock : @async.Mutex"),
     ("  io: @event_loop.stdin,\n  read_buf: @io.ReaderBuffer::new(),", "  id: 0,"),
-    ("pub let stdout : Output = @event_loop.stdout", "pub let stdout : Output = 1"),
-    ("pub let stderr : Output = @event_loop.stderr", "pub let stderr : Output = 2"),
+    ("pub let stdout : Output = { io: @event_loop.stdout, lock: Mutex(), }", "pub let stdout : Output = { id: 1, lock: Mutex(), }"),
+    ("pub let stderr : Output = { io: @event_loop.stderr, lock: Mutex(), }", "pub let stderr : Output = { id: 2, lock: Mutex(), }"),
   ]
+
   let ifname_path = "src/socket/ifname.mbt"
-  let ifname_source = @fs.read_file(root + "/" + ifname_path).text().replace_all(old="\r\n", new="\n")
+  let ifname_source = @fs.read_text(root + "/" + ifname_path).replace_all(old="\r\n", new="\n")
   let ifname_start = ifname_source.find("let global_ifname_socket").unwrap()
   let ifname_end = ifname_source.find("///|\n#borrow(name)").unwrap()
   changes[ifname_path] = [
@@ -87,21 +202,42 @@ async fn main {
     ("  let index = if_nametoindex_ffi(global_ifname_socket.val, os_name)", "  let fd = napi_ifname_socket()\n  defer { if @fd_util.fd_is_valid(fd) { @fd_util.close(fd, kind=Socket, context=\"Closing interface lookup socket\") } }\n  let index = if_nametoindex_ffi(fd, os_name)"),
     ("  let name = if_indextoname_ffi(global_ifname_socket.val, index)", "  let fd = napi_ifname_socket()\n  defer { if @fd_util.fd_is_valid(fd) { @fd_util.close(fd, kind=Socket, context=\"Closing interface lookup socket\") } }\n  let name = if_indextoname_ffi(fd, index)"),
   ]
-  changes["src/internal/event_loop/thread_pool.mbt"] = [("priv type Worker", "priv type Worker\n\n///|\nextern \"C\" fn Worker::is_null(worker : Worker) -> Bool = \"napi_mbt_async_worker_is_null\"")]
+
+  changes["src/internal/event_loop/thread_pool.mbt"] = [
+    ("priv type Worker", "priv type Worker\n\n///|\nextern \"C\" fn Worker::is_null(worker : Worker) -> Bool = \"napi_mbt_async_worker_is_null\""),
+    ("\"moonbit_rt_spawn_worker\"", "\"napi_mbt_async_spawn_worker\""),
+    ("\"moonbit_rt_wake_worker\"", "\"napi_mbt_async_wake_worker\""),
+    ("\"moonbit_rt_cancel_worker\"", "\"napi_mbt_async_cancel_worker\""),
+  ]
+
   changes["src/internal/event_loop/timer.mbt"] = [
-    ("let timer_id : Ref[Int32] = { val: 0, }", "// Timer identifiers belong to the active environment."),
+    ("#warnings(\"-alert_internal\")\nlet timer_id : Ref[Int32] = @runtime_internal.timer_id", "// Timer identifiers belong to the active environment."),
     ("timer_id.val", "evloop.timer_id"),
   ]
-  let thread_pool = "src/internal/event_loop/thread_pool.c"
-  let original = @fs.read_file(root + "/" + thread_pool).text().replace_all(old="\r\n", new="\n")
-  let begin = original.find("struct {\n  int initialized;").unwrap()
-  let end = original.find("#ifndef _WIN32\nint32_t moonbitlang_async_fetch_completion").unwrap()
-  changes[thread_pool] = [(original[begin:end].to_owned(), @fs.read_file("internal/async-adapter/thread_pool.c.patch").text().replace_all(old="\r\n", new="\n") + "\n"), ("return err == EINTR;", "return err == EINTR || err == ECANCELED;")]
+
+  changes["src/internal/event_loop/fs.c"] = [
+    (
+      "void *moonbit_rt_get_current_worker();\n#define moonbitlang_async_get_current_worker moonbit_rt_get_current_worker\n\nint32_t moonbit_rt_enter_cancellable_region(void *worker);\n#define moonbitlang_async_enter_cancellable_region moonbit_rt_enter_cancellable_region\n\nvoid moonbit_rt_leave_cancellable_region(void *worker);\n#define moonbitlang_async_leave_cancellable_region moonbit_rt_leave_cancellable_region",
+      "void *napi_mbt_async_get_current_worker(void);\n#define moonbitlang_async_get_current_worker napi_mbt_async_get_current_worker\n\nint32_t napi_mbt_async_enter_cancellable_region(void *worker);\n#define moonbitlang_async_enter_cancellable_region napi_mbt_async_enter_cancellable_region\n\nvoid napi_mbt_async_leave_cancellable_region(void *worker);\n#define moonbitlang_async_leave_cancellable_region napi_mbt_async_leave_cancellable_region",
+    ),
+  ]
+
+  changes["src/internal/event_loop/thread_pool.c"] = [
+    ("return err == EINTR;", "return err == EINTR || err == ECANCELED;"),
+  ]
+  additions["src/internal/event_loop/thread_pool.c"] =
+    "\n" + @fs.read_text("internal/async-adapter/thread_pool.c.patch").replace_all(old="\r\n", new="\n")
+
+  for path, whole in replacements_whole {
+    let source = @fs.read_text(root + "/" + path).replace_all(old="\r\n", new="\n")
+    files.push({ "path": path, "before": checksum(source), "after": checksum(whole) })
+    resources["async/files/" + path] = Json(whole)
+  }
   for path, replacements in changes {
-    let source = @fs.read_file(root + "/" + path).text().replace_all(old="\r\n", new="\n")
+    let source = @fs.read_text(root + "/" + path).replace_all(old="\r\n", new="\n")
     let mut patched = source
     for (before, after) in replacements {
-      if !patched.contains(before) { fail("Patch mismatch in \{path}") }
+      if !patched.contains(before) { fail("Patch mismatch in \{path}: \{before}") }
       patched = patched.replace_all(old=before, new=after)
     }
     patched += additions.get(path).unwrap_or("")
@@ -109,35 +245,56 @@ async fn main {
     resources["async/files/" + path] = Json(patched)
   }
   let embedded_path = "src/internal/event_loop/napi_embedded.mbt"
-  let embedded = @fs.read_file("internal/async-adapter/embedded.mbt.patch").text().replace_all(old="\r\n", new="\n")
+  let embedded = @fs.read_text("internal/async-adapter/embedded.mbt.patch").replace_all(old="\r\n", new="\n")
   files.push({ "path": embedded_path, "before": null, "after": checksum(embedded) })
   resources["async/files/" + embedded_path] = Json(embedded)
   for (path, text) in [
     ("src/napi_host/moon.pkg", "import { \"moonbitlang/async/internal/event_loop\", \"moonbitlang/async/internal/coroutine\" }\n"),
-    ("src/napi_host/host.mbt", @fs.read_file("internal/async-adapter/host.mbt.patch").text().replace_all(old="\r\n", new="\n")),
+    ("src/napi_host/host.mbt", @fs.read_text("internal/async-adapter/host.mbt.patch").replace_all(old="\r\n", new="\n")),
   ] {
     files.push({ "path": path, "before": null, "after": checksum(text) })
     resources["async/files/" + path] = Json(text)
   }
   let manifest : Json = {
-    "dependency": "moonbitlang/async", "version": "0.22.5", "patchVersion": 7,
+    "dependency": "moonbitlang/async", "version": "0.22.10", "patchVersion": 8,
     "license": "Apache-2.0", "checksum": "fnv1a64-utf8-lf", "files": files,
   }
   resources["async/manifest.json"] = Json(manifest.stringify(indent=2) + "\n")
-  resources["async/LICENSE"] = Json(@fs.read_file(root + "/LICENSE").text().replace_all(old="\r\n", new="\n"))
+  resources["async/LICENSE"] = Json(@fs.read_text(root + "/LICENSE").replace_all(old="\r\n", new="\n"))
   for (path, source) in [("napi_async.h", "napi_async.h"), ("napi_async.mbt", "napi_async.mbt.patch"), ("LIBUV-LICENSE", "LIBUV-LICENSE")] {
-    let text = @fs.read_file("internal/async-adapter/" + source).text().replace_all(old="\r\n", new="\n")
+    let text = @fs.read_text("internal/async-adapter/" + source).replace_all(old="\r\n", new="\n")
     let combined = if path == "napi_async.mbt" {
-      text + "\n" + @fs.read_file("internal/async-adapter/js_promise.mbt.patch").text().replace_all(old="\r\n", new="\n") + "\n" + @fs.read_file("internal/async-adapter/streams.mbt.patch").text().replace_all(old="\r\n", new="\n")
+      text + "\n" + @fs.read_text("internal/async-adapter/js_promise.mbt.patch").replace_all(old="\r\n", new="\n") + "\n" + @fs.read_text("internal/async-adapter/streams.mbt.patch").replace_all(old="\r\n", new="\n")
     } else if path == "napi_async.h" {
-      let factory = @fs.read_file("internal/async-adapter/streams.js").text().replace_all(old="\r\n", new="\n")
-      text + "\nMOONBIT_FFI_EXPORT int napi_mbt_stream_factory(napi_env env, int input, napi_value a, napi_value b, napi_value *result) {\n  napi_value source, factory, receiver, flag;\n  napi_status status = napi_create_string_utf8(env, " + Json(factory).stringify() + ", NAPI_AUTO_LENGTH, &source);\n  if (status == napi_ok) status = napi_run_script(env, source, &factory);\n  if (status == napi_ok) status = napi_get_undefined(env, &receiver);\n  if (status == napi_ok) status = napi_get_boolean(env, input != 0, &flag);\n  napi_value args[] = { flag, a, b };\n  if (status == napi_ok) status = napi_call_function(env, receiver, factory, 3, args, result);\n  return (int)status;\n}\n"
+      let factory = @fs.read_text("internal/async-adapter/streams.js").replace_all(old="\r\n", new="\n")
+      let stream_source =
+        #|MOONBIT_FFI_EXPORT int napi_mbt_stream_factory(napi_env env, int input, napi_value a, napi_value b, napi_value *result) {
+        #|  napi_value factory = NULL, receiver, flag;
+        #|  napi_status status = napi_ok;
+        #|  if (napi_mbt_active && napi_mbt_active->env == env && napi_mbt_active->stream_factory_ref) {
+        #|    status = napi_get_reference_value(env, napi_mbt_active->stream_factory_ref, &factory);
+        #|  } else {
+        #|    napi_value source;
+        #|    status = napi_create_string_utf8(env, __FACTORY_JSON__, NAPI_AUTO_LENGTH, &source);
+        #|    if (status == napi_ok) status = napi_run_script(env, source, &factory);
+        #|    if (status == napi_ok && napi_mbt_active && napi_mbt_active->env == env && !napi_mbt_active->closing) {
+        #|      status = napi_create_reference(env, factory, 1, &napi_mbt_active->stream_factory_ref);
+        #|    }
+        #|  }
+        #|  if (status == napi_ok) status = napi_get_undefined(env, &receiver);
+        #|  if (status == napi_ok) status = napi_get_boolean(env, input != 0, &flag);
+        #|  napi_value args[] = { flag, a, b };
+        #|  if (status == napi_ok) status = napi_call_function(env, receiver, factory, 3, args, result);
+        #|  return (int)status;
+        #|}
+        #|
+      text + "\n" + stream_source.replace_all(old="__FACTORY_JSON__", new=Json(factory).stringify())
     } else { text }
     resources["async/" + path] = Json(combined)
   }
   let output = Json(resources).stringify(indent=2) + "\n"
   if @env.args().contains("--check") {
-    if Json(resources) != @json.parse(@fs.read_file(resources_path).text()) { fail("Embedded async adapter is stale; run scripts/sync-async-adapter.mbtx") }
+    if Json(resources) != @json.parse(@fs.read_text(resources_path)) { fail("Embedded async adapter is stale; run scripts/sync-async-adapter.mbtx") }
   }
-  else { @fs.write_file(resources_path, output) }
+  else { @fs.write_text(resources_path, output) }
 }

@@ -5,6 +5,8 @@ let active_buffer_views : Ref[Int32] = Ref(0)
 pub struct NapiBufferView {
   env : NapiEnv
   value : NapiValue
+  priv data : UnmanagedBuffer
+  priv len : Int32
   mut is_alive : Bool
 }
 
@@ -20,15 +22,32 @@ fn NapiBufferView::validate(
       "Buffer view is no longer valid",
     )
   }
-  let data = Ref(moonbit_dummy_unmanaged_buffer())
-  let len = Ref(0)
-  let status = napi_get_buffer_info(self.env, self.value, data, len)
-  result_from_status(
-    self.env,
-    status,
-    b"Buffer backing store is detached or invalid",
-  )
-  (data.val, len.val)
+  (self.data, self.len)
+}
+
+///|
+pub fn NapiBufferView::to_bytes(self : NapiBufferView) -> Bytes raise NapiError {
+  let (buf, len) = self.validate()
+  napi_copy_bytes(buf, len)
+}
+
+///|
+pub fn NapiBufferView::copy_from_bytes(
+  self : NapiBufferView,
+  src : Bytes,
+  offset~ : Int32 = 0,
+) -> Unit raise NapiError {
+  let (buf, len) = self.validate()
+  let src_len = src.length()
+  if offset < 0 || src_len > len - offset {
+    raise napi_failure(
+      1,
+      RangeError,
+      "ERR_NAPI_BUFFER_BOUNDS",
+      "Buffer view out of bounds",
+    )
+  }
+  buf.copy_from_bytes(offset, src, src_len)
 }
 
 ///|
@@ -110,7 +129,7 @@ pub fn set_Int(env : NapiEnv, val : Int32) -> NapiValue raise NapiError {
 pub fn get_UInt(env : NapiEnv, value : NapiValue) -> UInt32 raise NapiError {
   let number = get_Double(env, value)
   if !(number >= 0.0 && number <= 4294967295.0) ||
-    UInt32::trunc_double(number).to_double() != number {
+    number.to_uint().to_double() != number {
     raise napi_failure(
       1,
       RangeError,
@@ -118,7 +137,7 @@ pub fn get_UInt(env : NapiEnv, value : NapiValue) -> UInt32 raise NapiError {
       "UInt requires a finite integer in [0, 4294967295]",
     )
   }
-  UInt32::trunc_double(number)
+  number.to_uint()
 }
 
 ///|
@@ -213,7 +232,7 @@ pub fn get_NapiBufferView(
   let status = napi_get_buffer_info(env, val, unmanaged, len)
   result_from_status(env, status, b"Invalid argument, expected Buffer")
   active_buffer_views.val += 1
-  { env, value: val, is_alive: true, }
+  { env, value: val, data: unmanaged.val, len: len.val, is_alive: true, }
 }
 
 ///|

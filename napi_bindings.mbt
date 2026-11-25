@@ -89,6 +89,15 @@ extern "c" fn UnmanagedBuffer::store8(
 ) = "moonbit_ptr_store8"
 
 ///|
+#borrow(src)
+extern "c" fn UnmanagedBuffer::copy_from_bytes(
+  self : UnmanagedBuffer,
+  offset : Int32,
+  src : Bytes,
+  length : Int32,
+) = "moonbit_ptr_copy_from_bytes"
+
+///|
 #borrow(data, result, result_data)
 extern "c" fn napi_create_buffer_copy(
   env : NapiEnv,
@@ -99,7 +108,29 @@ extern "c" fn napi_create_buffer_copy(
 ) -> Int32 = "napi_create_buffer_copy"
 
 ///|
-extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
+pub extern "c" fn moonbit_dummy_napi_value() -> NapiValue = "moonbit_dummy_napi_value"
+
+///|
+#borrow(result)
+extern "c" fn napi_is_exception_pending_raw(
+  env : NapiEnv,
+  result : Ref[Int32],
+) -> Int32 = "napi_mbt_is_exception_pending"
+
+///|
+pub fn napi_is_exception_pending(env : NapiEnv) -> Bool raise NapiError {
+  let result = Ref(0)
+  let status = napi_is_exception_pending_raw(env, result)
+  if status != 0 {
+    raise napi_failure(
+      status,
+      Error,
+      "ERR_NAPI_EXCEPTION_PENDING",
+      "Checking pending exception",
+    )
+  }
+  result.val != 0
+}
 
 ///|
 extern "c" fn moonbit_dummy_unmanaged_buffer() -> UnmanagedBuffer = "moonbit_dummy_unmanaged_buffer"

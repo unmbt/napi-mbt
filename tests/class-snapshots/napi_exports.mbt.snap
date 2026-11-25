@@ -37,61 +37,31 @@ pub fn napi_mbt_class_dispose_1(env : NapiEnv, receiver : NapiValue) -> NapiValu
 }
 
 ///|
-fn napi_mbt_read_0(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> Counter raise {
+pub impl FromNapiValue for Counter with from_napi_value(
+  env,
+  value,
+) {
   let handle = napi_class_handle(env, value, 0)
   napi_mbt_class_payload_0(handle)
 }
 
 ///|
-fn napi_mbt_read_1(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> Int32 raise {
-  get_Int(env, value)
-}
-
-///|
-fn napi_mbt_read_2(
-  env : NapiEnv,
-  value : NapiValue,
-  _path : Array[NapiValue],
-) -> Other raise {
+pub impl FromNapiValue for Other with from_napi_value(
+  env,
+  value,
+) {
   let handle = napi_class_handle(env, value, 1)
   napi_mbt_class_payload_1(handle)
 }
 
 ///|
-fn napi_mbt_write_0(
-  env : NapiEnv,
-  value : Int32,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_Int(env, value)
-}
-
-///|
-fn napi_mbt_write_1(
-  env : NapiEnv,
-  value : Counter,
-  _depth : Int32,
-) -> NapiValue raise {
+pub impl ToNapiValue for Counter with to_napi_value(
+  self,
+  env,
+) {
   let result = Ref(moonbit_dummy_napi_value())
-  result_from_status(env, napi_mbt_class_create_0(env, value, 0, result), b"Creating native instance")
+  result_from_status(env, napi_mbt_class_create_0(env, self, 0, result), b"Creating native instance")
   result.val
-}
-
-///|
-fn napi_mbt_write_2(
-  env : NapiEnv,
-  value : Unit,
-  _depth : Int32,
-) -> NapiValue raise {
-  set_Unit(env, value)
 }
 
 ///|
@@ -101,9 +71,9 @@ pub fn napi_mbt_adapter_read_counter(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_0(env, a0, [])
+    let p0 : Counter = napi_from_value(env, a0)
     let result : Int32 = read_counter(p0)
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -117,7 +87,7 @@ pub fn napi_mbt_adapter_read_counter(
 pub fn napi_mbt_adapter_resources(env : NapiEnv) -> NapiValue {
   try {
     let result : Int32 = resources()
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -134,7 +104,7 @@ pub fn napi_mbt_adapter_class_0_construct(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_1(env, a0, [])
+    let p0 : Int32 = napi_from_value(env, a0)
     let result : Counter = Counter::new(p0)
     result_from_status(env, napi_mbt_class_wrap_0(env, receiver, result, 0), b"Wrapping native instance")
     receiver
@@ -153,9 +123,9 @@ pub fn napi_mbt_adapter_class_0_method_0(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_0(env, a0, [])
+    let p0 : Counter = napi_from_value(env, a0)
     let result : Counter = Counter::copy(p0)
-    napi_mbt_write_1(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -172,10 +142,10 @@ pub fn napi_mbt_adapter_class_0_method_1(
   a1 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_0(env, a0, [])
-    let p1 = napi_mbt_read_1(env, a1, [])
+    let p0 : Counter = napi_from_value(env, a0)
+    let p1 : Int32 = napi_from_value(env, a1)
     let result : Int32 = Counter::increment(p0, p1)
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -191,9 +161,9 @@ pub fn napi_mbt_adapter_class_0_get_0(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_0(env, a0, [])
+    let p0 : Counter = napi_from_value(env, a0)
     let result : Int32 = Counter::value(p0)
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -210,10 +180,10 @@ pub fn napi_mbt_adapter_class_0_set_0(
   a1 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_0(env, a0, [])
-    let p1 = napi_mbt_read_1(env, a1, [])
+    let p0 : Counter = napi_from_value(env, a0)
+    let p1 : Int32 = napi_from_value(env, a1)
     let result : Unit = Counter::set_value(p0, p1)
-    napi_mbt_write_2(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -229,9 +199,9 @@ pub fn napi_mbt_adapter_class_0_static_0(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_1(env, a0, [])
+    let p0 : Int32 = napi_from_value(env, a0)
     let result : Counter = Counter::twice(p0)
-    napi_mbt_write_1(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)
@@ -248,7 +218,7 @@ pub fn napi_mbt_adapter_class_1_construct(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_1(env, a0, [])
+    let p0 : Int32 = napi_from_value(env, a0)
     let result : Other = Other::new(p0)
     result_from_status(env, napi_mbt_class_wrap_1(env, receiver, result, 1), b"Wrapping native instance")
     receiver
@@ -267,9 +237,9 @@ pub fn napi_mbt_adapter_class_1_get_0(
   a0 : NapiValue,
 ) -> NapiValue {
   try {
-    let p0 = napi_mbt_read_2(env, a0, [])
+    let p0 : Other = napi_from_value(env, a0)
     let result : Int32 = Other::value(p0)
-    napi_mbt_write_0(env, result, 0)
+    napi_to_value(env, result)
   } catch {
     error => {
       throw_napi_error(env, error)

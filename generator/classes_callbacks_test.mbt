@@ -60,9 +60,48 @@ test "class members use the same value, Set and binary conversions" {
     ),
   )
   let adapters = rendered(source, "napi_exports.mbt")
-  assert_true(adapters.contains("get_NapiDate"))
-  assert_true(adapters.contains("napi_set_values(env, value)"))
-  assert_true(adapters.contains("get_NapiInt8Array"))
+  assert_true(adapters.contains("let p0 : Box = napi_from_value(env, a0)"))
+  assert_true(adapters.contains("let p1 : NapiDate = napi_from_value(env, a1)"))
+  assert_true(
+    adapters.contains("let p2 : NapiSet[Int32] = napi_from_value(env, a2)"),
+  )
+  assert_true(
+    adapters.contains("let p3 : NapiInt8Array = napi_from_value(env, a3)"),
+  )
+  assert_true(adapters.contains("napi_to_value(env, result)"))
+  assert_true(!adapters.contains("napi_mbt_read_0"))
+}
+
+///|
+test "NapiEither types map to TS unions and use traits without extra glue" {
+  let either_source =
+    #|pub struct Counter { mut value : Int }
+    #|pub fn Counter::new(value : Int) -> Counter { { value, } }
+    #|pub fn Counter::add(self : Counter, n : Int) -> Int { self.value += n; self.value }
+    #|#export_name("either_pair")
+    #|pub fn either_pair(x : NapiEither[Int, String], y : Array[NapiEither[Bool, Counter]]) -> NapiEither[Int, Bool] { abort("stub") }
+  let source = @generator.parse_sources([("either.mbt", either_source)], classes=[
+    counter_config(),
+  ])
+  let types = rendered(source, "index.d.ts")
+  assert_true(
+    types.contains(
+      "either_pair(x: (number | string), y: Array<(boolean | Counter)>): (number | boolean);",
+    ),
+  )
+  let adapters = rendered(source, "napi_exports.mbt")
+  assert_true(
+    adapters.contains(
+      "let p0 : NapiEither[Int32, String] = napi_from_value(env, a0)",
+    ),
+  )
+  assert_true(
+    adapters.contains(
+      "let p1 : Array[NapiEither[Bool, Counter]] = napi_from_value(env, a1)",
+    ),
+  )
+  assert_true(adapters.contains("pub impl FromNapiValue for Counter"))
+  assert_true(!adapters.contains("napi_mbt_read_"))
 }
 
 ///|

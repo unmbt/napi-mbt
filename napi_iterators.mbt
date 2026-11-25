@@ -13,7 +13,7 @@ extern "c" fn napi_iterator_current_env(result : Ref[NapiEnv]) -> Int32 = "napi_
 ///|
 pub fn[T] NapiIterator::new(
   next : () -> T? raise,
-  close~ : () -> Unit raise = fn() { () },
+  close~ : () -> Unit raise = () => (),
 ) -> NapiIterator[T] raise NapiError {
   let env = Ref(napi_dummy_env())
   result_from_status(
@@ -64,7 +64,7 @@ extern "c" fn napi_iterator_factory(
 
 ///|
 #warnings("-unused_value")
-fn[T] get_NapiIterator(
+pub fn[T] get_NapiIterator(
   env : NapiEnv,
   value : NapiValue,
   convert : (NapiEnv, NapiValue) -> T raise,
@@ -87,7 +87,7 @@ fn[T] get_NapiIterator(
   errdefer (close.dispose() catch { _ => () })
   NapiIterator::new(
     () => {
-      let item = next.call(napi_array_new(env, 0))
+      let item = next.call_argv([])
       napi_require_object(env, item)
       if get_Bool(env, napi_field_get(env, item, "done", true)) {
         None
@@ -104,7 +104,7 @@ fn[T] get_NapiIterator(
           _ => ()
         }
       }
-      let result = close.call(napi_array_new(env, 0))
+      let result = close.call_argv([])
       next.dispose() catch {
         _ => ()
       }
@@ -118,12 +118,12 @@ fn[T] get_NapiIterator(
 
 ///|
 #warnings("-unused_value")
-fn[T] set_NapiIterator(
+pub fn[T] set_NapiIterator(
   env : NapiEnv,
   value : NapiIterator[T],
   convert : (NapiEnv, T) -> NapiValue raise,
 ) -> NapiValue raise NapiError {
-  let next = napi_closure_new(env, fn(env, _) {
+  let next = napi_closure_new(env, (env, _) => {
     try {
       let result = napi_object_new(env)
       let item = value.next()
@@ -139,7 +139,7 @@ fn[T] set_NapiIterator(
       }
     }
   })
-  let close = napi_closure_new(env, fn(env, _) {
+  let close = napi_closure_new(env, (env, _) => {
     try {
       value.close()
       set_Unit(env, ())

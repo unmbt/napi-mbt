@@ -1,9 +1,14 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String], cwd : String) -> Unit {
-  let (status, out, err) = @process.collect_output(binary, args, cwd~)
-  if status != 0 { fail(out.text() + err.text()) }
+  let _proc_res = @process.run(binary, args, cwd~, stdout=Collect, stderr=Collect)
+  let status = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if status != 0 { fail(out + err) }
 }
 
 ///|
@@ -11,23 +16,23 @@ async fn main {
   let root = @fs.realpath(".")
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-boundary-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let project = temp + "/fixture"
   checked(binary, ["init", project, "--name", "boundary-fixture"], root)
-  @fs.write_file(project + "/napi-mbt.json", "{\"napiVersion\":7}")
-  let mut pkg = @fs.read_file(project + "/moon.pkg").text().replace_all(old="\"stub.c\"", new="\"stub.c\", \"faults.c\"")
+  @fs.write_text(project + "/napi-mbt.json", "{\"napiVersion\":7}")
+  let mut pkg = @fs.read_text(project + "/moon.pkg").replace_all(old="\"stub.c\"", new="\"stub.c\", \"faults.c\"")
   let asan = @env.args().contains("--asan")
   if asan {
     let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/fsanitize=address /Z7" } else { "-fsanitize=address -fno-omit-frame-pointer -g" }
     pkg = pkg.replace_all(old="\"cc-flags\": \"\"", new="\"cc-flags\": \"\{flags}\"").replace_all(old="\"stub-cc-flags\": \"\"", new="\"stub-cc-flags\": \"\{flags}\"")
   }
-  @fs.write_file(project + "/moon.pkg", pkg)
+  @fs.write_text(project + "/moon.pkg", pkg)
   // Inject faults at actual FFI operations without adding test branches to the
   // product runtime. The adapter must preserve the exact original JS exception.
-  let bindings = @fs.read_file(project + "/napi_bindings.mbt").text()
+  let bindings = @fs.read_text(project + "/napi_bindings.mbt")
     .replace_all(old="= \"napi_get_value_double\"", new="= \"fixture_get_double\"")
     .replace_all(old="= \"napi_create_int32\"", new="= \"fixture_create_int32\"")
-  @fs.write_file(project + "/napi_bindings.mbt", bindings)
+  @fs.write_text(project + "/napi_bindings.mbt", bindings)
   let faults =
     #|#include <node_api.h>
     #|#include <moonbit.h>
@@ -50,7 +55,7 @@ async fn main {
     #|  return value == 999 ? napi_generic_failure : napi_create_int32(env, value, out);
     #|}
     #|
-  @fs.write_file(project + "/faults.c", faults)
+  @fs.write_text(project + "/faults.c", faults)
   let source =
     #|///|
     #|let effects : Ref[Int] = Ref(0)
@@ -108,12 +113,12 @@ async fn main {
     #|#export_name("tsfn_failure")
     #|pub fn tsfn_failure() -> Unit raise { ignore(tsfn_status(1, "invalid")) }
     #|
-  @fs.write_file(project + "/lib.mbt", source)
+  @fs.write_text(project + "/lib.mbt", source)
   checked(binary, ["build", project, "--release"], root)
   let targets = @fs.readdir(project + "/artifacts")
   let output = root + "/.napi-mbt/" + (if asan { "boundary-asan" } else { "boundary-smoke" })
   if !@fs.exists(output) { @fs.mkdir(output, recursive=true) }
-  @fs.write_file(output + "/napi_mbt.node", @fs.read_file(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
+  @fs.write_binary(output + "/napi_mbt.node", @fs.read_binary(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
   let register_fault =
     #|#include <node_api.h>
     #|napi_status fixture_create_function(napi_env env, const char *name, size_t length, napi_callback cb, void *data, napi_value *result) {
@@ -121,11 +126,11 @@ async fn main {
     #|  return napi_generic_failure;
     #|}
     #|
-  @fs.write_file(project + "/register_fault.c", register_fault)
+  @fs.write_text(project + "/register_fault.c", register_fault)
   let pkg = pkg.replace_all(old="\"faults.c\"", new="\"faults.c\", \"register_fault.c\"")
     .replace_all(old="\"stub-cc-flags\": \"", new="\"stub-cc-flags\": \"-Dnapi_create_function=fixture_create_function ")
-  @fs.write_file(project + "/moon.pkg", pkg)
+  @fs.write_text(project + "/moon.pkg", pkg)
   checked(binary, ["build", project, "--release"], root)
-  @fs.write_file(output + "/registration-failure.node", @fs.read_file(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
+  @fs.write_binary(output + "/registration-failure.node", @fs.read_binary(project + "/artifacts/" + targets[0] + "/napi_mbt.node"))
   println("Built runtime error-boundary fixture")
 }

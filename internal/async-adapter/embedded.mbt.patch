@@ -3,10 +3,373 @@
 // and C thread pool, and restores the previous context on every exit path.
 
 ///|
+const ReadEvent : Int32 = 1
+
+///|
+const WriteEvent : Int32 = 2
+
+///|
+#cfg(not(platform="windows"))
+const ProcessEvent : Int32 = 4
+
+///|
+extern "C" fn EventBus::new() -> EventBus = "moonbitlang_async_event_bus_create"
+
+///|
+#borrow(self)
+extern "C" fn EventBus::destroy(self : EventBus) -> Unit = "moonbitlang_async_event_bus_destroy"
+
+///|
+#external
+priv type Event
+
+///|
+#borrow(self)
+extern "C" fn EventBus::get_event(self : EventBus, index : Int32) -> Event = "moonbitlang_async_event_list_get"
+
+///|
+extern "C" fn Event::fd(self : Event) -> @fd_util.Fd = "moonbitlang_async_event_get_fd"
+
+///|
+#cfg(not(platform="windows"))
+fn @fd_util.Fd::to_unix(fd : @fd_util.Fd) -> Int32 = "%identity"
+
+///|
+#cfg(not(platform="windows"))
+fn Event::pid(self : Event) -> Int32 {
+  self.fd().to_unix()
+}
+
+///|
+#cfg(not(platform="windows"))
+extern "C" fn Event::events(self : Event) -> Int32 = "moonbitlang_async_event_get_events"
+
+///|
+#cfg(platform="windows")
+extern "C" fn IoResult::event(self : IoResult) -> Int32 = "moonbitlang_async_io_result_get_event"
+
+///|
+#cfg(platform="windows")
+extern "C" fn Event::io_result(self : Event) -> IoResult = "moonbitlang_async_event_get_io_result"
+
+///|
+#cfg(platform="windows")
+extern "C" fn Event::bytes_transferred(self : Event) -> Int32 = "moonbitlang_async_event_get_bytes_transferred"
+
+///|
+#borrow(self)
+extern "C" fn EventBus::wait(self : EventBus, timeout~ : Int32) -> Int32 = "moonbitlang_async_event_bus_wait"
+
+///|
+#borrow(event_bus)
+extern "C" fn init_thread_pool_ffi(event_bus : EventBus) -> @fd_util.Fd = "napi_mbt_async_init_thread_pool"
+
+///|
+extern "C" fn destroy_thread_pool() -> Unit = "napi_mbt_async_destroy_thread_pool"
+
+///|
+extern "C" fn Worker::free(worker : Worker) -> Unit = "napi_mbt_async_free_worker"
+
+///|
+extern "C" fn Worker::enter_idle(worker : Worker) -> Unit = "napi_mbt_async_worker_enter_idle"
+
+///|
+extern "C" fn Worker::check_cancellation_retry(worker : Worker) -> Bool = "napi_mbt_async_worker_check_cancellation_retry"
+
+///|
+#cfg(not(platform="windows"))
+#borrow(notify_recv, output)
+extern "C" fn fetch_completion_ffi(
+  notify_recv : @fd_util.Fd,
+  output : FixedArray[Int32],
+) -> Int32 = "napi_mbt_async_fetch_completion"
+
+///|
+#external
+pub type WakeupCallback
+
+///|
+#external
+pub type WakeupContext
+
+///|
+extern "C" fn waiter_null_ffi() -> @c_buffer.Buffer = "napi_mbt_async_pool_null"
+
+///|
+#borrow(bus)
+extern "C" fn waiter_spawn_ffi(
+  bus : EventBus,
+  wakeup_cb : WakeupCallback,
+  wakeup_ctx : WakeupContext,
+) -> @c_buffer.Buffer = "napi_mbt_event_waiter_spawn"
+
+///|
+extern "C" fn waiter_get_events_ffi(waiter : @c_buffer.Buffer) -> Int32 = "napi_mbt_event_waiter_get_events"
+
+///|
+extern "C" fn waiter_get_event_ffi(
+  waiter : @c_buffer.Buffer,
+  index : Int32,
+) -> Event = "napi_mbt_event_waiter_get_event"
+
+///|
+extern "C" fn waiter_wake_ffi(waiter : @c_buffer.Buffer) -> Unit = "napi_mbt_event_waiter_wake"
+
+///|
+extern "C" fn waiter_terminate_ffi(waiter : @c_buffer.Buffer) -> Unit = "napi_mbt_event_waiter_terminate"
+
+///|
+#cfg(platform="windows")
+extern "C" fn init_WSA_ffi() -> Int32 = "moonbitlang_async_init_WSA"
+
+///|
+#cfg(platform="windows")
+extern "C" fn cleanup_WSA_ffi() -> Int32 = "moonbitlang_async_cleanup_WSA"
+
+///|
+#cfg(platform="windows")
+fn WindowsEventLoopExtra::new() -> WindowsEventLoopExtra raise {
+  if init_WSA_ffi() != 0 {
+    @os_error.check_errno("initialize WSA")
+  }
+  WindowsEventLoopExtra::{ }
+}
+
+///|
+#cfg(platform="windows")
+fn WindowsEventLoopExtra::destroy(_self : WindowsEventLoopExtra) -> Unit {
+  ignore(cleanup_WSA_ffi())
+}
+
+///|
+#cfg(platform="windows")
+fn WindowsEventLoopExtra::cleanup(self : WindowsEventLoopExtra) -> Unit {
+  ignore(self)
+}
+
+///|
+#cfg(platform="windows")
+fn WindowsEventLoopExtra::handle_event(
+  _self : Self,
+  evloop : EventLoop,
+  event : Event,
+) -> Unit {
+  let fd = event.fd()
+  if fd == evloop.notify_recv {
+    let job_id = event.bytes_transferred()
+    evloop.handle_completed_job(job_id)
+  } else {
+    guard evloop.fds.get(fd) is Some(io) else {  }
+    let result = event.io_result()
+    let kind = result.event()
+    if kind is ReadEvent && io.read is Waiting(coro) {
+      coro.wake()
+    } else if kind is WriteEvent && io.write is Waiting(coro) {
+      coro.wake()
+    }
+  }
+}
+
+///|
+#cfg(not(platform="windows"))
+fn UnixEventLoopExtra::new() -> UnixEventLoopExtra {
+  { pids: Map([]), completed_jobs_buffer: FixedArray::make(1024, 0), }
+}
+
+///|
+#cfg(not(platform="windows"))
+fn UnixEventLoopExtra::destroy(self : UnixEventLoopExtra) -> Unit {
+  ignore(self)
+}
+
+///|
+#cfg(not(platform="windows"))
+fn UnixEventLoopExtra::cleanup(self : UnixEventLoopExtra) -> Unit {
+  for _, coro in self.pids {
+    coro.cancel()
+  }
+  self.pids.clear()
+}
+
+///|
+#cfg(not(platform="windows"))
+fn UnixEventLoopExtra::handle_event(
+  self : Self,
+  evloop : EventLoop,
+  event : Event,
+) -> Unit raise {
+  let events = event.events()
+  if (events & ProcessEvent) != 0 {
+    let pid = event.pid()
+    if self.pids.get(pid) is Some(coro) {
+      coro.wake()
+    }
+    return
+  }
+  let fd = event.fd()
+  if fd == evloop.notify_recv {
+    while true {
+      let bytes_transferred = fetch_completion_ffi(
+        evloop.notify_recv,
+        self.completed_jobs_buffer,
+      )
+      if bytes_transferred < 0 {
+        @os_error.check_errno("runtime internal: failed to get completed job")
+      }
+      let n = bytes_transferred / 4
+      for i in 0..<n {
+        evloop.handle_completed_job(self.completed_jobs_buffer[i])
+      }
+      if n < self.completed_jobs_buffer.length() {
+        break
+      }
+    }
+  } else if evloop.fds.get(fd) is Some(handle) {
+    if (events & ReadEvent) != 0 && handle.read is Waiting(coro) {
+      coro.wake()
+    }
+    if (events & WriteEvent) != 0 && handle.write is Waiting(coro) {
+      coro.wake()
+    }
+  }
+}
+
+///|
+fn EventLoop::new(max_worker_count~ : Int32) -> EventLoop raise {
+  let bus = EventBus::new()
+  errdefer bus.destroy()
+  let notify_recv = init_thread_pool_ffi(bus)
+  if !@fd_util.fd_is_valid(notify_recv) {
+    @os_error.check_errno("initialize thread pool")
+  }
+  errdefer destroy_thread_pool()
+  let extra = PlatformEventLoopExtra::new()
+  {
+    bus,
+    fds: Map([]),
+    stdio: Map([]),
+    stdin_buffer: @io.ReaderBuffer::new(),
+    extra,
+    notify_recv,
+    max_worker_count,
+    timer_id: 0,
+    job_id: 0,
+    job_queue: Set([]),
+    idle_workers: Deque([]),
+    running_workers: Map([]),
+    jobs: Map([]),
+    timers: SortedSet([]),
+    main: None,
+    killed_by_signal: None,
+    blocked_tasks: 0,
+  }
+}
+
+///|
+fn EventLoop::destroy(evloop : EventLoop) -> Unit {
+  evloop.bus.destroy()
+  destroy_thread_pool()
+  evloop.extra.destroy()
+}
+
+///|
+fn EventLoop::cleanup(self : Self) -> Unit raise {
+  for _, handle in self.stdio {
+    handle.detach_from_event_loop()
+  }
+  self.stdio.clear()
+  for fd, handle in self.fds {
+    if handle.read is Waiting(coro) {
+      coro.cancel()
+    }
+    if handle.write is Waiting(coro) {
+      coro.cancel()
+    }
+    @fd_util.close(fd, kind=handle.kind, context="runtime internal: close leaking fd")
+  }
+  self.fds.clear()
+  for _, coro in self.jobs {
+    coro.cancel()
+  }
+  self.extra.cleanup()
+  for worker in self.idle_workers {
+    worker.free()
+  }
+}
+
+///|
+fn EventLoop::wait_for_event(self : EventLoop, timeout~ : Int32) -> Int32 raise {
+  let n = self.bus.wait(timeout~)
+  if n < 0 {
+    if @os_error.is_nonblocking_io_error() {
+      return 0
+    }
+    @os_error.check_errno("runtime internal: poll_wait")
+  }
+  n
+}
+
+///|
+fn EventLoop::handle_completed_job(self : Self, job_id : Int32) -> Unit {
+  guard (job_id & (1 << 31)) == 0 else {
+    if self.main is Some(main) {
+      main.cancel()
+    }
+    self.killed_by_signal = Some(job_id ^ (1 << 31))
+  }
+  guard self.running_workers.get(job_id) is Some(worker) else { return }
+  if worker.check_cancellation_retry() {
+    return
+  }
+  self.running_workers.remove(job_id)
+  match self.job_queue.iter().next() {
+    None => {
+      worker.enter_idle()
+      self.idle_workers.push_back(worker)
+    }
+    Some(job) => {
+      self.running_workers[job.job_id] = worker
+      worker.wake(job.job_id, job.job)
+      self.job_queue.remove(job)
+      job.waiter.wake()
+    }
+  }
+  if self.jobs.get(job_id) is Some(coro) {
+    coro.wake()
+  }
+}
+
+///|
+fn EventLoop::get_next_timeout(self : Self) -> Int32 {
+  if @coroutine.has_immediately_ready_task() {
+    0
+  } else if !self.timers.is_empty() {
+    guard! self.timers.iter().head() is Some(first_timer)
+    let timeout = first_timer.expire_time - now()
+    @cmp.maximum(0, timeout.to_int())
+  } else {
+    -1
+  }
+}
+
+///|
+fn EventLoop::handle_timers(self : Self) -> Unit {
+  let now = now()
+  for timer in self.timers {
+    if timer.expire_time <= now {
+      (timer.callback)()
+    } else {
+      break
+    }
+  }
+}
+
+///|
 pub struct EmbeddedLoop {
   priv evloop : EventLoop
   priv scheduler : @coroutine.Scheduler
   priv pool : @c_buffer.Buffer
+  priv mut waiter : @c_buffer.Buffer
   priv mut closed : Bool
   priv mut stepping : Bool
 }
@@ -25,7 +388,14 @@ pub fn EmbeddedLoop::new() -> EmbeddedLoop raise {
   let previous = embedded_pool_swap(embedded_pool_null())
   defer ignore(embedded_pool_swap(previous))
   let evloop = EventLoop::new(max_worker_count=64)
-  { evloop, scheduler: @coroutine.embedded_new_scheduler(), pool: embedded_pool_current(), closed: false, stepping: false }
+  {
+    evloop,
+    scheduler: @coroutine.embedded_new_scheduler(),
+    pool: embedded_pool_current(),
+    waiter: waiter_null_ffi(),
+    closed: false,
+    stepping: false,
+  }
 }
 
 ///|
@@ -41,6 +411,24 @@ fn[T] EmbeddedLoop::activate(self : EmbeddedLoop, f : () -> T raise) -> T raise 
     ignore(embedded_pool_swap(previous_pool))
   }
   f()
+}
+
+///|
+pub fn EmbeddedLoop::enable_wakeup(
+  self : EmbeddedLoop,
+  wakeup_cb : WakeupCallback,
+  wakeup_ctx : WakeupContext,
+) -> Unit raise {
+  self.activate(() => {
+    if !self.waiter.is_null() {
+      return
+    }
+    let waiter = waiter_spawn_ffi(self.evloop.bus, wakeup_cb, wakeup_ctx)
+    if waiter.is_null() {
+      @os_error.check_errno("Spawning async event waiter")
+    }
+    self.waiter = waiter
+  })
 }
 
 ///|
@@ -72,27 +460,44 @@ pub fn EmbeddedLoop::step(self : EmbeddedLoop) -> Int raise {
   self.stepping = true
   defer { self.stepping = false }
   self.activate(() => {
-    let n = self.evloop.wait_for_event(timeout=0)
-    self.evloop.handle_timers()
-    for i in 0..<n {
-      let event = self.evloop.bus.get_event(i)
-      self.evloop.extra.handle_event(self.evloop, event)
+    if !self.waiter.is_null() {
+      let n = waiter_get_events_ffi(self.waiter)
+      if n > 0 {
+        defer waiter_wake_ffi(self.waiter)
+        for i in 0..<n {
+          let event = waiter_get_event_ffi(self.waiter, i)
+          self.evloop.extra.handle_event(self.evloop, event)
+        }
+      } else if n < 0 {
+        @os_error.check_errno("Polling async event waiter")
+      }
+    } else {
+      let n = self.evloop.wait_for_event(timeout=0)
+      for i in 0..<n {
+        let event = self.evloop.bus.get_event(i)
+        self.evloop.extra.handle_event(self.evloop, event)
+      }
     }
+    self.evloop.handle_timers()
     @coroutine.reschedule()
     @coroutine.all_coroutines().length()
   })
 }
 
 ///|
-/// -1 means idle. Timer deadlines and immediately runnable tasks are exact;
-/// pending OS I/O is polled at most two milliseconds later by the host.
+/// -1 means idle (0 coroutines); -3 means waiting on OS I/O via uv_async_t without
+/// polling timer; >= 0 means exact timer deadline in ms.
 pub fn EmbeddedLoop::next_wake(self : EmbeddedLoop) -> Int raise {
   self.activate(() => {
     if @coroutine.all_coroutines().is_empty() { return -1 }
     let timeout = self.evloop.get_next_timeout()
-    if self.evloop.blocked_tasks > 0 {
+    if !self.waiter.is_null() {
+      if timeout < 0 { -3 } else { timeout }
+    } else if self.evloop.blocked_tasks > 0 {
       if timeout < 0 { 2 } else { @cmp.minimum(timeout, 2) }
-    } else { timeout }
+    } else {
+      timeout
+    }
   })
 }
 
@@ -103,6 +508,10 @@ pub fn EmbeddedLoop::close(self : EmbeddedLoop) -> Unit raise {
   self.activate(() => {
     if !@coroutine.all_coroutines().is_empty() || !self.evloop.running_workers.is_empty() {
       raise Failure::Failure("Cannot close embedded async loop with pending work")
+    }
+    if !self.waiter.is_null() {
+      waiter_terminate_ffi(self.waiter)
+      self.waiter = waiter_null_ffi()
     }
     self.evloop.cleanup()
     self.evloop.destroy()

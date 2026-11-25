@@ -1,15 +1,20 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], cwd : String) -> Unit {
-  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args, cwd~))
+  let _proc_res = @async.with_timeout(600000, () => @process.run(program, args, cwd~, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
   if code != 0 {
     fail(
       program + " " + args.join(" ") + " exited with status " + code.to_string() +
-        ":\n" + out.text() + err.text(),
+        ":\n" + out + err,
     )
   }
-  println(out.text())
+  println(out)
 }
 
 ///|
@@ -25,7 +30,7 @@ async fn main {
   // only after the isolated dependency patch has been applied.
   for name in ["moon.mod", "moon.pkg"] {
     if @fs.exists(source + "/" + name) {
-      @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name))
+      @fs.write_binary(destination + "/" + name, @fs.read_binary(source + "/" + name))
     }
   }
   checked("moon", ["check", "--target", "native"], destination)
@@ -33,7 +38,7 @@ async fn main {
   // the installed CLI, so examples cannot silently use a checkout's templates.
   for name in @fs.readdir(source) {
     if @fs.kind(source + "/" + name) != Directory {
-      @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name))
+      @fs.write_binary(destination + "/" + name, @fs.read_binary(source + "/" + name))
     }
   }
   checked(binary, ["build", "--release"], destination)

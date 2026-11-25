@@ -16,9 +16,15 @@ test "collection IR resolves nested types and emits strict tuple and record conv
       assert_true(contents.contains("export type $NapiJson = null"))
     }
     if name == "napi_exports.mbt" {
-      assert_true(contents.contains("ERR_NAPI_TUPLE_LENGTH"))
-      assert_true(contents.contains("napi_object_keys(env, value)"))
-      assert_true(contents.contains("napi_read_json(env, value, _path)"))
+      assert_true(contents.contains("pub impl FromNapiValue for Item"))
+      assert_true(contents.contains("pub impl ToNapiValue for Item"))
+      assert_true(
+        contents.contains(
+          "let p0 : Map[String, (Item, Option[Json])] = napi_from_value(env, a0)",
+        ),
+      )
+      assert_true(contents.contains("napi_to_value(env, result)"))
+      assert_true(!contents.contains("ERR_NAPI_TUPLE_LENGTH"))
     }
   }
 }

@@ -3,7 +3,11 @@ async fn initialize(
   directory : String,
   requested_name : String?,
   force : Bool,
+  runtime~ : String = "vendored",
 ) -> Unit {
+  if !["vendored", "package"].contains(runtime) {
+    fail("Unknown runtime mode: \{runtime}")
+  }
   mkdirp(directory, recursive=true)
   let dir = @fs.realpath(directory)
   let components = dir.replace_all(old="\\", new="/").split("/").to_array()
@@ -31,51 +35,86 @@ async fn initialize(
     "engines": { "pnpm": ">=10" },
   }
   let files : Map[String, String] = Map([])
-  for name, text in @assets.files() {
-    if name.has_prefix("template/") {
-      files[name[9:].to_owned()] = text
+  if runtime == "vendored" {
+    for name, text in @assets.files() {
+      if name.has_prefix("template/") {
+        files[name[9:].to_owned()] = text
+      }
     }
   }
   files["package.json"] = pkg_json.stringify(indent=2) + "\n"
-  files["napi-mbt.json"] = (
-      {
-        "$schema": "./napi-mbt.schema.json",
-        "napiVersion": 4,
-        "builder": "auto",
-        "targets": [
-          "win32-x64-msvc", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
-        ],
-        "features": [],
-        "cjs": true,
-        "esm": true,
-      } : Json).stringify(indent=2) +
-    "\n"
+  let config_fields : Map[String, Json] = {
+    "$schema": "./napi-mbt.schema.json",
+    "napiVersion": 4,
+    "builder": "auto",
+    "targets": [
+      "win32-x64-msvc", "darwin-arm64", "linux-x64-gnu", "linux-arm64-gnu",
+    ],
+    "features": [],
+    "cjs": true,
+    "esm": true,
+  }
+  if runtime == "package" {
+    config_fields["runtime"] = Json(runtime)
+  }
+  files["napi-mbt.json"] = Json(config_fields).stringify(indent=2) + "\n"
   files["bump.config.json"] = (
       { "execute": "napi-mbt-cli build --release && pnpm test", "all": true } :
       Json).stringify(indent=2) +
     "\n"
+  let mod_imports = if runtime == "package" {
+    "\nimport {\n  \"unmbt/napi-mbt@0.3.7\",\n}\n"
+  } else {
+    ""
+  }
   files["moon.mod"] = "name = " +
     Json(name.replace_all(old="@", new="")).stringify() +
-    "\n\nversion = \"0.1.0\"\n\npreferred_target = \"native\"\n\nsupported_targets = \"native\"\n"
-  let moon_package =
-    #|import {
-    #|  "moonbitlang/core/encoding/utf8",
-    #|}
-    #|
-    #|pkgtype(kind: "foreign_library")
-    #|
-    #|options(
-    #|  "native-stub": [ "stub.c", "napi_glue.c" ],
-    #|  link: {
-    #|    "native": {
-    #|      "cc-flags": "",
-    #|      "stub-cc-flags": "",
-    #|      "cc-link-flags": "",
-    #|      "exports": [ ],
-    #|    },
-    #|  },
-    #|)
-    #|
+    "\n\nversion = \"0.1.0\"\n\npreferred_target = \"native\"\n\nsupported_targets = \"native\"\n" +
+    mod_imports
+  let moon_package = if runtime == "package" {
+    (
+      #|import {
+      #|  "moonbitlang/core/encoding/utf8",
+      #|  "unmbt/napi-mbt/runtime" @napi,
+      #|}
+      #|
+      #|pkgtype(kind: "foreign_library")
+      #|
+      #|options(
+      #|  "native-stub": [ "napi_glue.c" ],
+      #|  link: {
+      #|    "native": {
+      #|      "cc-flags": "",
+      #|      "stub-cc-flags": "",
+      #|      "cc-link-flags": "",
+      #|      "exports": [ ],
+      #|    },
+      #|  },
+      #|)
+      #|
+    )
+  } else {
+    (
+      #|import {
+      #|  "moonbitlang/core/encoding/utf8",
+      #|}
+      #|
+      #|pkgtype(kind: "foreign_library")
+      #|
+      #|options(
+      #|  "native-stub": [ "stub.c", "napi_glue.c" ],
+      #|  link: {
+      #|    "native": {
+      #|      "cc-flags": "",
+      #|      "stub-cc-flags": "",
+      #|      "cc-link-flags": "",
+      #|      "exports": [ ],
+      #|    },
+      #|  },
+      #|)
+      #|
+    )
+  }
   files["moon.pkg"] = moon_package
   let lib_mbt =
     #|///|
@@ -102,8 +141,8 @@ async fn initialize(
     #|      - uses: actions/checkout@v4
     #|      - uses: hustcer/setup-moonbit@v1
     #|        with:
-    #|          version: '0.10.20+65efd5b93'
-    #|          core-version: '0.10.20+65efd5b93'
+    #|          version: '0.10.22+124d61d05'
+    #|          core-version: '0.10.22+124d61d05'
     #|      - run: moon install unmbt/napi-mbt/cmd/napi-mbt-cli
     #|      - name: Add Moon binaries to PATH (Unix)
     #|        if: runner.os != 'Windows'

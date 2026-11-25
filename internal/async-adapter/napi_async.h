@@ -2,35 +2,47 @@
  * Allocate with uv_handle_size so no platform struct layout is copied. Node
  * versions supporting N-API 8 provide these APIs in their embedded libuv. */
 #include <stdio.h>
+typedef struct uv_async_s uv_async_t;
 typedef struct uv_timer_s uv_timer_t;
 typedef struct uv_handle_s uv_handle_t;
 typedef struct uv_loop_s uv_loop_t;
 extern size_t uv_handle_size(int type);
 extern void *uv_handle_get_data(const uv_handle_t *);
 extern void uv_handle_set_data(uv_handle_t *, void *);
+extern int uv_async_init(uv_loop_t *, uv_async_t *, void (*)(uv_async_t *));
+extern int uv_async_send(uv_async_t *);
 extern int uv_timer_init(uv_loop_t *, uv_timer_t *);
 extern int uv_timer_start(uv_timer_t *, void (*)(uv_timer_t *), uint64_t, uint64_t);
 extern int uv_timer_stop(uv_timer_t *);
+extern void uv_ref(uv_handle_t *);
+extern void uv_unref(uv_handle_t *);
 extern void uv_close(uv_handle_t *, void (*)(uv_handle_t *));
 
 typedef struct {
     napi_mbt_environment *owner;
     uv_timer_t *timer;
+    uv_async_t *wakeup;
     void *state;
     int32_t (*tick)(void *, int32_t);
     napi_async_cleanup_hook_handle cleanup;
     napi_async_context async_context;
     napi_ref async_resource;
+    int handles_to_close;
     bool closing;
     bool handle_closing;
 } napi_mbt_async_context;
 
 static void napi_mbt_async_timer(uv_timer_t *timer);
+static void napi_mbt_async_wakeup(uv_async_t *wakeup);
 static void napi_mbt_async_begin_close(napi_mbt_environment *owner);
 
 static void napi_mbt_async_handle_closed(uv_handle_t *handle) {
     napi_mbt_async_context *context = uv_handle_get_data(handle);
     napi_mbt_lock();
+    if (--context->handles_to_close > 0) {
+        napi_mbt_unlock();
+        return;
+    }
     napi_mbt_environment *owner = context->owner;
     napi_mbt_environment *previous = napi_mbt_active;
     napi_mbt_active = owner;
@@ -48,6 +60,7 @@ static void napi_mbt_async_handle_closed(uv_handle_t *handle) {
     napi_mbt_active = previous;
     napi_async_cleanup_hook_handle cleanup = context->cleanup;
     free(context->timer);
+    free(context->wakeup);
     free(context);
     if (owner->cleanup_requested) napi_mbt_cleanup_environment(owner);
     if (cleanup) {
@@ -58,9 +71,8 @@ static void napi_mbt_async_handle_closed(uv_handle_t *handle) {
     napi_mbt_unlock();
 }
 
-static void napi_mbt_async_timer(uv_timer_t *timer) {
-    napi_mbt_async_context *context = uv_handle_get_data((uv_handle_t *)timer);
-    napi_mbt_lock();
+static void napi_mbt_async_run_tick(napi_mbt_async_context *context) {
+    if (context->handle_closing) return;
     napi_mbt_environment *previous = napi_mbt_active;
     napi_mbt_active = context->owner;
     napi_handle_scope scope = NULL;
@@ -71,9 +83,9 @@ static void napi_mbt_async_timer(uv_timer_t *timer) {
         if (status == napi_ok) status = napi_get_reference_value(context->owner->env, context->async_resource, &resource);
         /* Opening a callback scope does not check whether Node can still enter
          * JS. During Worker::terminate, Node drains native async work before
-         * running cleanup hooks, so our timer can fire in that interval. Boolean
-         * coercion of our own plain resource cannot execute user code, but does
-         * perform the Node-API execution-state check before opening the scope. */
+         * running cleanup hooks, so our timer/async can fire in that interval.
+         * Boolean coercion of our own plain resource cannot execute user code,
+         * but does perform the Node-API execution-state check before opening. */
         if (status == napi_ok) status = napi_coerce_to_bool(context->owner->env, resource, &runnable);
         if (status == napi_ok) status = napi_open_callback_scope(context->owner->env, resource, context->async_context, &callback_scope);
         if (status != napi_ok) { context->closing = true; context->owner->closing = true; }
@@ -81,13 +93,20 @@ static void napi_mbt_async_timer(uv_timer_t *timer) {
     int delay = context->tick(context->state, context->closing);
     if (delay == -2) {
         context->handle_closing = true;
-        uv_close((uv_handle_t *)timer, napi_mbt_async_handle_closed);
+        (void)uv_timer_stop(context->timer);
+        uv_close((uv_handle_t *)context->timer, napi_mbt_async_handle_closed);
+        uv_close((uv_handle_t *)context->wakeup, napi_mbt_async_handle_closed);
     } else if (delay >= 0) {
-        int status = uv_timer_start(timer, napi_mbt_async_timer, delay ? (uint64_t)delay : 1, 0);
+        uv_ref((uv_handle_t *)context->wakeup);
+        int status = uv_timer_start(context->timer, napi_mbt_async_timer, delay ? (uint64_t)delay : 1, 0);
         if (status != 0) fprintf(stderr, "napi-mbt: async timer failed (%d)\n", status);
+    } else if (delay == -3) {
+        (void)uv_timer_stop(context->timer);
+        uv_ref((uv_handle_t *)context->wakeup);
+    } else {
+        (void)uv_timer_stop(context->timer);
+        uv_unref((uv_handle_t *)context->wakeup);
     }
-    // Arm before draining microtasks: a reentrant export can schedule an earlier
-    // tick, which must not be overwritten by the previously computed delay.
     if (callback_scope) {
         napi_status status = napi_close_callback_scope(context->owner->env, callback_scope);
         if (status != napi_ok) context->owner->cleanup_status = status;
@@ -97,7 +116,27 @@ static void napi_mbt_async_timer(uv_timer_t *timer) {
         if (status != napi_ok) context->owner->cleanup_status = status;
     }
     napi_mbt_active = previous;
+}
+
+static void napi_mbt_async_timer(uv_timer_t *timer) {
+    napi_mbt_async_context *context = uv_handle_get_data((uv_handle_t *)timer);
+    napi_mbt_lock();
+    napi_mbt_async_run_tick(context);
     napi_mbt_unlock();
+}
+
+static void napi_mbt_async_wakeup(uv_async_t *wakeup) {
+    napi_mbt_async_context *context = uv_handle_get_data((uv_handle_t *)wakeup);
+    napi_mbt_lock();
+    napi_mbt_async_run_tick(context);
+    napi_mbt_unlock();
+}
+
+static void napi_mbt_async_wakeup_notify(void *data) {
+    napi_mbt_async_context *context = (napi_mbt_async_context *)data;
+    if (context && context->wakeup && !context->handle_closing) {
+        (void)uv_async_send(context->wakeup);
+    }
 }
 
 static void napi_mbt_async_begin_close(napi_mbt_environment *owner) {
@@ -105,6 +144,7 @@ static void napi_mbt_async_begin_close(napi_mbt_environment *owner) {
     if (context->handle_closing || context->closing) return;
     context->closing = true;
     owner->closing = true;
+    uv_ref((uv_handle_t *)context->wakeup);
     int status = uv_timer_start(context->timer, napi_mbt_async_timer, 0, 0);
     if (status != 0) fprintf(stderr, "napi-mbt: async shutdown timer failed (%d)\n", status);
 }
@@ -126,6 +166,13 @@ MOONBIT_FFI_EXPORT void *napi_mbt_async_get(napi_env env) {
     moonbit_incref(context->state);
     return context->state;
 }
+MOONBIT_FFI_EXPORT void *napi_mbt_async_wakeup_fn(void) {
+    return (void *)&napi_mbt_async_wakeup_notify;
+}
+MOONBIT_FFI_EXPORT void *napi_mbt_async_wakeup_ctx(napi_env env) {
+    if (!napi_mbt_active || napi_mbt_active->env != env) return NULL;
+    return napi_mbt_active->async_context;
+}
 MOONBIT_FFI_EXPORT int napi_mbt_async_attach(napi_env env, void *state, int32_t (*tick)(void *, int32_t)) {
     if (!napi_mbt_active || napi_mbt_active->env != env || napi_mbt_active->closing) return 1004;
     uv_loop_t *event_loop;
@@ -143,28 +190,36 @@ MOONBIT_FFI_EXPORT int napi_mbt_async_attach(napi_env env, void *state, int32_t 
         free(context); return (int)status;
     }
     context->timer = calloc(1, uv_handle_size(13 /* UV_TIMER */));
-    if (!context->timer || uv_timer_init(event_loop, context->timer) != 0) {
+    context->wakeup = calloc(1, uv_handle_size(1 /* UV_ASYNC */));
+    if (!context->timer || !context->wakeup ||
+        uv_timer_init(event_loop, context->timer) != 0 ||
+        uv_async_init(event_loop, context->wakeup, napi_mbt_async_wakeup) != 0) {
         (void)napi_async_destroy(env, context->async_context);
         (void)napi_delete_reference(env, context->async_resource);
-        free(context->timer); free(context); return napi_generic_failure;
+        free(context->timer); free(context->wakeup); free(context); return napi_generic_failure;
     }
+    context->handles_to_close = 2;
     context->owner = napi_mbt_active;
     context->state = state;
     context->tick = tick;
     moonbit_incref(state);
     uv_handle_set_data((uv_handle_t *)context->timer, context);
+    uv_handle_set_data((uv_handle_t *)context->wakeup, context);
+    uv_unref((uv_handle_t *)context->wakeup);
     napi_mbt_active->async_context = context;
     napi_mbt_active->async_close = napi_mbt_async_begin_close;
     status = napi_add_async_cleanup_hook(env, napi_mbt_async_cleanup, context, &context->cleanup);
     if (status != napi_ok) {
         context->handle_closing = true;
         uv_close((uv_handle_t *)context->timer, napi_mbt_async_handle_closed);
+        uv_close((uv_handle_t *)context->wakeup, napi_mbt_async_handle_closed);
     }
     return (int)status;
 }
 MOONBIT_FFI_EXPORT int napi_mbt_async_schedule(napi_env env) {
     if (!napi_mbt_active || napi_mbt_active->env != env || napi_mbt_active->closing) return 1004;
     napi_mbt_async_context *context = napi_mbt_active->async_context;
+    uv_ref((uv_handle_t *)context->wakeup);
     return uv_timer_start(context->timer, napi_mbt_async_timer, 0, 0) == 0 ? napi_ok : napi_generic_failure;
 }
 MOONBIT_FFI_EXPORT int napi_mbt_async_closing(napi_env env) {

@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String]) -> Unit {
-  let (code, out, err) = @async.with_timeout(180000, () => @process.collect_output(program, args))
-  if code != 0 { fail(out.text() + err.text()) }
-  println(out.text())
+  let _proc_res = @async.with_timeout(180000, () => @process.run(program, args, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  println(out)
 }
 
 ///|
@@ -13,7 +18,7 @@ async fn copy(source : String, destination : String) -> Unit {
   for name in @fs.readdir(source) {
     if name == "_build" { continue }
     if @fs.kind(source + "/" + name) == Directory { copy(source + "/" + name, destination + "/" + name) }
-    else { @fs.write_file(destination + "/" + name, @fs.read_file(source + "/" + name)) }
+    else { @fs.write_binary(destination + "/" + name, @fs.read_binary(source + "/" + name)) }
   }
 }
 
@@ -21,14 +26,14 @@ async fn copy(source : String, destination : String) -> Unit {
 async fn main {
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let directory = @fs.tmpdir(prefix="napi-mbt-docs-")
-  defer @fs.rmdir(directory, recursive=true)
+  defer @fs.remove(directory, recursive=true)
   let dir = directory + "/fixture"
   checked(binary, ["init", dir, "--name", "documented-addon"])
-  @fs.write_file(dir + "/moon.mod", "name = \"test/documented-addon\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.5\" }\n")
-  @fs.write_file(dir + "/moon.pkg", @fs.read_file(dir + "/moon.pkg").text().replace_all(old="import {", new="import { \"moonbitlang/async\","))
-  @fs.write_file(dir + "/lib.mbt", @fs.read_file("scripts/fixtures/documented-addon.mbt.txt"))
-  @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
-  copy(".mooncakes/moonbitlang/async", dir + "/.mooncakes/moonbitlang/async")
+  @fs.write_text(dir + "/moon.mod", "name = \"test/documented-addon\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.10\" }\n")
+  @fs.write_text(dir + "/moon.pkg", @fs.read_text(dir + "/moon.pkg").replace_all(old="import {", new="import { \"moonbitlang/async\","))
+  @fs.write_binary(dir + "/lib.mbt", @fs.read_binary("scripts/fixtures/documented-addon.mbt.txt"))
+  @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":8}")
+  copy((if @fs.exists(".mooncakes/moonbitlang/async") { ".mooncakes/moonbitlang/async" } else { ".repos/moonbitlang/async/0.22.10" }), dir + "/.mooncakes/moonbitlang/async")
   checked(binary, ["build", dir, "--release"])
   let target = @fs.readdir(dir + "/artifacts")[0]
   checked("node", ["scripts/docs-examples.test.cjs", dir + "/artifacts/" + target + "/napi_mbt.node"])

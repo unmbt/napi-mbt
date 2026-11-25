@@ -60,7 +60,7 @@ async fn toolchain_signature(
       if @fs.exists(base) {
         for version in @fs.readdir(base, sort=true) {
           sdk[name + "/" + version] = Json(
-            @fs.mtime(base + "/" + version).0.to_string(),
+            @fs.mtime(base + "/" + version).sec().to_string(),
           )
           if name == "Include" {
             for
@@ -117,7 +117,7 @@ async fn toolchain_signature(
   }
   let files : Map[String, Json] = Map([])
   for path in paths {
-    files[path] = Json(content_digest(@fs.read_file(path).binary()))
+    files[path] = Json(content_digest(@fs.read_binary(path)))
   }
   result["files"] = Json(files)
   result["builder"] = Json(builder)

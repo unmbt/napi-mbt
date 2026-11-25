@@ -22,7 +22,14 @@ fn cli_command() -> @argparse.Command {
         "init",
         about="Create the official addon template",
         positionals=[directory],
-        options=[OptionArg("name", long="name", about="Package name")],
+        options=[
+          OptionArg("name", long="name", about="Package name"),
+          OptionArg(
+            "runtime",
+            long="runtime",
+            about="Runtime mode (vendored or package)",
+          ),
+        ],
         flags=[FlagArg("force", long="force", about="Overwrite existing files")],
       ),
       Command(
@@ -93,6 +100,20 @@ fn cli_command() -> @argparse.Command {
         positionals=[directory],
         options=[target],
       ),
+      Command(
+        "universalize",
+        about="Combine darwin-x64 and darwin-arm64 addons into darwin-universal",
+        positionals=[directory],
+        options=[
+          OptionArg("x64", long="x64", about="Path to darwin-x64 addon"),
+          OptionArg("arm64", long="arm64", about="Path to darwin-arm64 addon"),
+          OptionArg(
+            "output",
+            long="output",
+            about="Path for darwin-universal addon",
+          ),
+        ],
+      ),
       Command("targets", about="List supported targets"),
     ],
   )
@@ -100,7 +121,7 @@ fn cli_command() -> @argparse.Command {
 
 ///|
 fn parse_cli(argv : Array[String]) -> Array[String] raise {
-  let matches = cli_command().parse(argv=argv[:])
+  let matches = cli_command().parse(argv~)
   guard matches.subcommand is Some((command, values)) else {
     fail("A subcommand is required")
   }
@@ -109,7 +130,10 @@ fn parse_cli(argv : Array[String]) -> Array[String] raise {
     return normalized
   }
   normalized.push(values.values.get("directory").unwrap()[0])
-  for option in ["name", "target", "output-dir"] {
+  for
+    option in [
+      "name", "target", "output-dir", "runtime", "x64", "arm64", "output",
+    ] {
     if values.values.get(option) is Some([value, ..]) {
       normalized.push("--" + option)
       normalized.push(value)

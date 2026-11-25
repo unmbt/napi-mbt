@@ -20,6 +20,8 @@ fn worker_owned(
     | IteratorType(_) => false
     OptionType(t) | ArrayType(t) | MapType(t) | SetType(t) =>
       worker_owned(t, types, seen)
+    EitherType(a, b) =>
+      worker_owned(a, types, seen) && worker_owned(b, types, seen)
     TupleType(items) => items.all(t => worker_owned(t, types, seen))
     NamedType(name) if !seen.contains(name) => {
       guard types.iter().find_first(t => t.name == name) is Some(definition) else {
@@ -70,13 +72,14 @@ fn worker_snapshot_adapters(
   items : Array[ParsedExport],
   readers : Array[ValueType],
   writers : Array[ValueType],
+  rt~ : String = "",
 ) -> String {
   let out = StringBuilder()
   for item in items {
     let name = "napi_mbt_adapter_" + item.export_name
-    let params = ["env : NapiEnv"]
+    let params = ["env : \{rt}NapiEnv"]
     for i, _ in item.parameters {
-      params.push("a\{i} : NapiValue")
+      params.push("a\{i} : \{rt}NapiValue")
     }
     out.write_string(
       "\n///|\n#export_name(\"" +
@@ -85,29 +88,29 @@ fn worker_snapshot_adapters(
       name +
       "(" +
       params.join(", ") +
-      ") -> NapiValue {\n  try {\n",
+      ") -> \{rt}NapiValue {\n  try {\n",
     )
     // Read all arguments before publishing the snapshot. This runs the same IR
     // converters as ordinary calls without invoking the business function.
     for i, p in item.parameters {
       out.write_string(
-        "    let p\{i} = " +
-        conversion_name(p.value_type, readers, true) +
-        "(env, a\{i}, [])\n",
+        "    let p\{i} : \{p.value_type.moonbit_with(rt)} = " +
+        convert_read_expr(p.value_type, "a\{i}", readers, rt, typed=false) +
+        "\n",
       )
     }
     out.write_string(
-      "    let snapshot = napi_array_new(env, \{item.parameters.length()})\n",
+      "    let snapshot = \{rt}napi_array_new(env, \{item.parameters.length()})\n",
     )
     for i, p in item.parameters {
       out.write_string(
-        "    napi_array_set(env, snapshot, \{i}, " +
-        conversion_name(p.value_type, writers, false) +
-        "(env, p\{i}, 0))\n",
+        "    \{rt}napi_array_set(env, snapshot, \{i}, " +
+        convert_write_expr(p.value_type, "p\{i}", writers, rt) +
+        ")\n",
       )
     }
     out.write_string(
-      "    snapshot\n  } catch { error => { throw_napi_error(env, error); moonbit_dummy_napi_value() } }\n}\n",
+      "    snapshot\n  } catch { error => { \{rt}throw_napi_error(env, error); \{rt}moonbit_dummy_napi_value() } }\n}\n",
     )
   }
   out.to_string()

@@ -1,4 +1,6 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn copy_tree(source : String, destination : String) -> Unit {
@@ -7,7 +9,7 @@ async fn copy_tree(source : String, destination : String) -> Unit {
     let src = source + "/" + name
     let dst = destination + "/" + name
     if @fs.kind(src) == Directory { copy_tree(src, dst) }
-    else { @fs.write_file(dst, @fs.read_file(src)) }
+    else { @fs.write_binary(dst, @fs.read_binary(src)) }
   }
 }
 
@@ -16,16 +18,16 @@ async fn main {
   // Isolate compiler flags and caches; do not patch the developer's toolchain.
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-parser-asan-")
-  defer @fs.rmdir(temp, recursive=true)
-  @fs.write_file(temp + "/moon.mod", "name = \"unmbt/napi-mbt\"\npreferred_target = \"native\"\n")
+  defer @fs.remove(temp, recursive=true)
+  @fs.write_text(temp + "/moon.mod", "name = \"unmbt/napi-mbt\"\npreferred_target = \"native\"\n")
   copy_tree(root + "/internal/syntax", temp + "/internal/syntax")
   copy_tree(root + "/generator", temp + "/generator")
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
   let flags = if windows { "/utf-8 /Z7 /fsanitize=address" } else { "-g -fsanitize=address -fno-omit-frame-pointer" }
   for pkg in ["internal/syntax", "generator"] {
     let path = temp + "/" + pkg + "/moon.pkg"
-    let config = @fs.read_file(path).text()
-    @fs.write_file(path, config.replace_all(old="options(", new="options(link: { \"native\": { \"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\" } }, "))
+    let config = @fs.read_text(path)
+    @fs.write_text(path, config.replace_all(old="options(", new="options(link: { \"native\": { \"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\" } }, "))
   }
   let env = {
     "MOONBIT_NEW_NATIVE": "0", "MOONBIT_ALLOCATOR": "system",
@@ -33,16 +35,22 @@ async fn main {
   }
   if windows {
     let pf = @env.get_env_var("ProgramFiles(x86)").unwrap_or("C:/Program Files (x86)")
-    let (status, out, error) = @process.collect_output(pf + "/Microsoft Visual Studio/Installer/vswhere.exe", ["-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath", "-utf8"])
-    if status != 0 { fail(error.text()) }
-    let installation = out.text().trim().to_owned()
-    let version = @fs.read_file(installation + "/VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt").text().trim().to_owned()
+    let _proc_res = @process.run(pf + "/Microsoft Visual Studio/Installer/vswhere.exe", ["-latest", "-products", "*", "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64", "-property", "installationPath", "-utf8"], stdout=Collect, stderr=Collect)
+    let status = _proc_res.exit_code
+    let out = _proc_res.stdout_text()
+    let error = _proc_res.stderr_text()
+    if status != 0 { fail(error) }
+    let installation = out.trim().to_owned()
+    let version = @fs.read_text(installation + "/VC/Auxiliary/Build/Microsoft.VCToolsVersion.default.txt").trim().to_owned()
     let directory = installation + "/VC/Tools/MSVC/" + version + "/bin/Hostx64/x64"
     assert_true(@fs.exists(directory + "/clang_rt.asan_dynamic-x86_64.dll"), msg="Missing ASan runtime for MSVC " + version)
     env["PATH"] = directory + ";" + @env.get_env_var("PATH").unwrap_or("")
   }
-  let (code, out, err) = @process.collect_output("moon", ["test", "--target", "native", "--release", "internal/syntax", "generator"], cwd=temp, extra_env=env)
-  println(out.text())
-  println(err.text())
+  let _proc_res = @process.run("moon", ["test", "--target", "native", "--release", "internal/syntax", "generator"], cwd=temp, extra_env=env, stdout=Collect, stderr=Collect)
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  println(out)
+  println(err)
   if code != 0 { fail("Parser AddressSanitizer validation failed") }
 }

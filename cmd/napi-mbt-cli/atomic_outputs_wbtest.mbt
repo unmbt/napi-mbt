@@ -1,8 +1,8 @@
 ///|
 async test "check mode performs no writes and rejects stale output" {
   let dir = @fs.tmpdir(prefix="napi-mbt-check-")
-  defer @fs.rmdir(dir, recursive=true)
-  write_file(dir + "/one.txt", "same")
+  defer @fs.remove(dir, recursive=true)
+  write_text_file(dir + "/one.txt", "same")
   let before = @fs.mtime(dir + "/one.txt")
   install_outputs(dir, [("one.txt", "same")], true)
   assert_eq(@fs.mtime(dir + "/one.txt"), before)
@@ -12,16 +12,16 @@ async test "check mode performs no writes and rejects stale output" {
   } noraise {
     _ => fail("Expected stale file rejection")
   }
-  assert_eq(@fs.read_file(dir + "/one.txt").text(), "same")
+  assert_eq(@fs.read_text(dir + "/one.txt"), "same")
   assert_true(!@fs.exists(dir + "/.napi-mbt"))
 }
 
 ///|
 async test "output batch restores earlier files after a later rename fails" {
   let dir = @fs.tmpdir(prefix="napi-mbt-atomic-")
-  defer @fs.rmdir(dir, recursive=true)
-  write_file(dir + "/one.txt", "original")
-  write_file(dir + "/disabled.txt", "restore me")
+  defer @fs.remove(dir, recursive=true)
+  write_text_file(dir + "/one.txt", "original")
+  write_text_file(dir + "/disabled.txt", "restore me")
   try
     install_outputs(
       dir,
@@ -34,10 +34,10 @@ async test "output batch restores earlier files after a later rename fails" {
   } noraise {
     _ => fail("Expected failed installation")
   }
-  assert_eq(@fs.read_file(dir + "/one.txt").text(), "original")
-  assert_eq(@fs.read_file(dir + "/disabled.txt").text(), "restore me")
+  assert_eq(@fs.read_text(dir + "/one.txt"), "original")
+  assert_eq(@fs.read_text(dir + "/disabled.txt"), "restore me")
   assert_true(!@fs.exists(dir + "/missing/two.txt"))
   install_outputs(dir, [("one.txt", "changed"), ("two.txt", "new")], false)
-  assert_eq(@fs.read_file(dir + "/one.txt").text(), "changed")
-  assert_eq(@fs.read_file(dir + "/two.txt").text(), "new")
+  assert_eq(@fs.read_text(dir + "/one.txt"), "changed")
+  assert_eq(@fs.read_text(dir + "/two.txt"), "new")
 }

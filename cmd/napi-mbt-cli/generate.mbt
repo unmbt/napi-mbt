@@ -13,19 +13,21 @@ async fn generate(
   check_package~ : Bool = true,
 ) -> Generated {
   let conf = config(dir)
-  let runtime = read_text(dir + "/napi_runtime_version.mbt")
-  guard runtime.find("=") is Some(equal) &&
-    @json.parse(runtime[equal + 1:].trim().to_owned()) ==
-    Json(@assets.runtime_version()) else {
-    fail("Runtime template version does not match this generator")
+  if conf.runtime == "vendored" {
+    let runtime = read_text(dir + "/napi_runtime_version.mbt")
+    guard runtime.find("=") is Some(equal) &&
+      @json.parse(runtime[equal + 1:].trim().to_owned()) ==
+      Json(@assets.runtime_version()) else {
+      fail("Runtime template version does not match this generator")
+    }
   }
   let excluded = [
     "napi_exports.mbt", "_napi_bindings.mbt", "napi_bindings.mbt", "napi_features.mbt",
     "napi_types.mbt", "napi_runtime.mbt", "napi_error.mbt", "napi_values.mbt", "napi_classes.mbt",
     "napi_callbacks.mbt", "napi_reference.mbt", "napi_collections.mbt", "napi_owned_binary.mbt",
     "napi_arraybuffer.mbt", "napi_dates.mbt", "napi_symbols.mbt", "napi_iterators.mbt",
-    "napi_low_level.mbt", "napi_advanced.mbt", "napi_typed_tsfn.mbt", "napi_native_tasks.mbt",
-    "napi_native_exports.mbt",
+    "napi_low_level.mbt", "napi_advanced.mbt", "napi_typed_tsfn.mbt", "napi_either.mbt",
+    "napi_traits.mbt", "napi_native_tasks.mbt", "napi_native_exports.mbt",
   ]
   let features = conf.features.copy()
   let seen : Map[String, String] = Map([])
@@ -47,7 +49,11 @@ async fn generate(
       features.push("native_tasks")
     }
   }
-  let source = @generator.parse_sources(sources, classes=conf.classes)
+  let source = @generator.parse_sources(
+    sources,
+    classes=conf.classes,
+    module_exports=conf.module_exports,
+  )
   let exports = source.exports
   for feature in source.features {
     if !features.contains(feature) {
@@ -82,6 +88,7 @@ async fn generate(
     cjs=conf.cjs,
     esm=conf.esm,
     worker_tasks=conf.worker_tasks,
+    runtime_prefix=if conf.runtime == "package" { "@napi." } else { "" },
   )
   outputs.append(worker_outputs(source, conf))
   if !conf.native_tasks.is_empty() {

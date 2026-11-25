@@ -14,6 +14,9 @@ fn promise_direction_valid(
     | SetType(t)
     | IteratorType(t)
     | AsyncIteratorType(t) => promise_direction_valid(t, types, read, seen)
+    EitherType(a, b) =>
+      promise_direction_valid(a, types, read, seen) &&
+      promise_direction_valid(b, types, read, seen)
     TupleType(items) =>
       items.all(t => promise_direction_valid(t, types, read, seen))
     CallbackType(params, ret, _) =>

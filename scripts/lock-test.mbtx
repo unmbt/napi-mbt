@@ -1,14 +1,16 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn main {
   let temp = @fs.tmpdir(prefix="napi-mbt-lock-ffi-")
-  defer @fs.rmdir(temp, recursive=true)
-  @fs.write_file(temp + "/moon.mod", "name = \"test/lock\"\npreferred_target = \"native\"\n")
-  @fs.write_file(temp + "/host.c", @fs.read_file("cmd/napi-mbt-cli/host.c"))
+  defer @fs.remove(temp, recursive=true)
+  @fs.write_text(temp + "/moon.mod", "name = \"test/lock\"\npreferred_target = \"native\"\n")
+  @fs.write_binary(temp + "/host.c", @fs.read_binary("cmd/napi-mbt-cli/host.c"))
   let asan = @env.args().contains("--asan")
   let flags = if @env.get_env_var("OS") == Some("Windows_NT") { "/utf-8" + (if asan { " /fsanitize=address /Z7" } else { "" }) } else if asan { "-fsanitize=address -g -fno-omit-frame-pointer" } else { "" }
-  @fs.write_file(temp + "/moon.pkg", "import { \"moonbitlang/core/encoding/utf8\" }\noptions(\"native-stub\": [\"host.c\"], link: {\"native\": {\"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\"}})\n")
+  @fs.write_text(temp + "/moon.pkg", "import { \"moonbitlang/core/encoding/utf8\" }\noptions(\"native-stub\": [\"host.c\"], link: {\"native\": {\"cc-flags\": \"\{flags}\", \"stub-cc-flags\": \"\{flags}\"}})\n")
   let source =
     #|///|
     #|type Lock
@@ -36,7 +38,7 @@ async fn main {
     #|  close(invalid)
     #|}
     #|
-  @fs.write_file(temp + "/lock_wbtest.mbt", source.replace_all(old="\"LOCK_PATH\"", new=Json(temp + "/lock 空格").stringify()).replace_all(old="\"INVALID_PATH\"", new=Json(temp + "/missing/lock").stringify()))
-  let code = @async.with_timeout(120000, () => @process.run("moon", ["test", "--target", "native"], cwd=temp))
+  @fs.write_text(temp + "/lock_wbtest.mbt", source.replace_all(old="\"LOCK_PATH\"", new=Json(temp + "/lock 空格").stringify()).replace_all(old="\"INVALID_PATH\"", new=Json(temp + "/missing/lock").stringify()))
+  let code = @async.with_timeout(120000, () => @process.run("moon", ["test", "--target", "native"], cwd=temp).exit_code)
   assert_eq(code, 0)
 }

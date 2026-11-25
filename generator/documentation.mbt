@@ -1,11 +1,12 @@
 ///|
 fn jsdoc(lines : Array[String], indent~ : String = "") -> String {
-  if lines.is_empty() {
+  let clean = strip_napi_directives(lines)
+  if clean.is_empty() {
     return ""
   }
   indent +
   "/**\n" +
-  lines
+  clean
   .map(line => indent + " * " + line.replace_all(old="*/", new="* / "))
   .join("\n") +
   "\n" +
@@ -42,7 +43,7 @@ pub fn ParsedExport::error_contract(self : ParsedExport) -> Array[String] {
 
 ///|
 fn export_documentation(item : ParsedExport, indent~ : String = "") -> String {
-  let lines = item.documentation.copy()
+  let lines = strip_napi_directives(item.documentation)
   for line in item.error_contract() {
     lines.push((if item.is_async { "@remarks " } else { "@throws " }) + line)
   }

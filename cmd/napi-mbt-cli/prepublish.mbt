@@ -26,14 +26,14 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       )
     }
     validate_artifact(
-      @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
+      @fs.read_binary(artifact_root + "/" + target + "/napi_mbt.node"),
       target,
     )
     verify_receipt(dir, target, artifact_root)
     if target.has_prefix("linux-") {
       ignore(
         validate_linux_libc(
-          @fs.read_file(artifact_root + "/" + target + "/napi_mbt.node").binary(),
+          @fs.read_binary(artifact_root + "/" + target + "/napi_mbt.node"),
           target,
         ),
       )
@@ -71,7 +71,11 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       "name": child_name,
       "version": version,
       "os": [parts[0].to_owned()],
-      "cpu": [parts[1].to_owned()],
+      "cpu": if target == "darwin-universal" {
+        (["x64", "arm64"] : Array[Json])
+      } else {
+        ([parts[1].to_owned()] : Array[Json])
+      },
       "main": "napi_mbt.node",
       "files": ["napi_mbt.node", "licenses"],
       "exports": { ".": "./napi_mbt.node", "./package.json": "./package.json" },
@@ -103,10 +107,10 @@ async fn prepublish(dir : String, target_override : String?) -> Unit {
       child["license"] = license
     }
     if @fs.exists(dir + "/LICENSE") {
-      write_file(path + "/LICENSE", @fs.read_file(dir + "/LICENSE"))
+      write_file(path + "/LICENSE", @fs.read_binary(dir + "/LICENSE"))
     }
     let artifact = artifact_root + "/" + target + "/napi_mbt.node"
-    write_file(path + "/napi_mbt.node", @fs.read_file(artifact))
+    write_file(path + "/napi_mbt.node", @fs.read_binary(artifact))
     write_json(path + "/package.json", Json(child))
     if @fs.exists(path + "/index.mjs") {
       @fs.remove(path + "/index.mjs")

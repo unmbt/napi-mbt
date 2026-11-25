@@ -13,6 +13,7 @@ async fn prepare_package(dir : String, generated : Generated) -> Unit {
     exports,
     generated.config.napi_version,
     windows(),
+    is_package_runtime=generated.config.runtime == "package",
   )
   let overlay = if host_target().has_prefix("linux") {
     let symbols = package_strings(

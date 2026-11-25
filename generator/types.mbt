@@ -13,6 +13,7 @@ pub(all) enum ValueType {
   SymbolType
   SetType(ValueType)
   IteratorType(ValueType)
+  EitherType(ValueType, ValueType)
   JsonType
   JsPromiseType(ValueType)
   AsyncIteratorType(ValueType)
@@ -50,6 +51,8 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
     SymbolType => "NapiSymbol"
     SetType(inner) => "NapiSet[" + inner.runtime_name() + "]"
     IteratorType(inner) => "NapiIterator[" + inner.runtime_name() + "]"
+    EitherType(a, b) =>
+      "NapiEither[" + a.runtime_name() + "," + b.runtime_name() + "]"
     JsonType => "Json"
     JsPromiseType(inner) => "NapiJsPromise[" + inner.runtime_name() + "]"
     AsyncIteratorType(inner) =>
@@ -80,31 +83,81 @@ pub fn ValueType::runtime_name(self : ValueType) -> String {
 }
 
 ///|
-fn ValueType::moonbit(self : ValueType) -> String {
+fn ValueType::moonbit_with(self : ValueType, rt : String) -> String {
   match self {
-    EnvType => "NapiEnv"
-    RawValueType => "NapiValue"
-    ObjectValueType => "NapiObject"
-    FunctionValueType => "NapiFunction"
-    ArrayValueType => "NapiArray"
-    ExternalValueType => "NapiExternal"
+    EnvType => rt + "NapiEnv"
+    RawValueType => rt + "NapiValue"
+    ObjectValueType => rt + "NapiObject"
+    FunctionValueType => rt + "NapiFunction"
+    ArrayValueType => rt + "NapiArray"
+    ExternalValueType => rt + "NapiExternal"
     IntType => "Int32"
-    DateType => "NapiDate"
-    SymbolType => "NapiSymbol"
-    SetType(inner) => "NapiSet[" + inner.moonbit() + "]"
-    IteratorType(inner) => "NapiIterator[" + inner.moonbit() + "]"
-    OptionType(inner) => "Option[" + inner.moonbit() + "]"
-    ArrayType(inner) => "Array[" + inner.moonbit() + "]"
-    MapType(inner) => "Map[String, " + inner.moonbit() + "]"
-    TupleType(items) => "(" + items.map(t => t.moonbit()).join(", ") + ")"
+    DateType => rt + "NapiDate"
+    SymbolType => rt + "NapiSymbol"
+    BufferViewType => rt + "NapiBufferView"
+    OwnedBinaryType(kind) => rt + "Napi" + kind.javascript()
+    SetType(inner) => rt + "NapiSet[" + inner.moonbit_with(rt) + "]"
+    IteratorType(inner) => rt + "NapiIterator[" + inner.moonbit_with(rt) + "]"
+    EitherType(a, b) =>
+      rt + "NapiEither[" + a.moonbit_with(rt) + ", " + b.moonbit_with(rt) + "]"
+    JsPromiseType(inner) => rt + "NapiJsPromise[" + inner.moonbit_with(rt) + "]"
+    AsyncIteratorType(inner) =>
+      rt + "NapiAsyncIterator[" + inner.moonbit_with(rt) + "]"
+    OptionType(inner) => "Option[" + inner.moonbit_with(rt) + "]"
+    ArrayType(inner) => "Array[" + inner.moonbit_with(rt) + "]"
+    MapType(inner) => "Map[String, " + inner.moonbit_with(rt) + "]"
+    TupleType(items) =>
+      "(" + items.map(t => t.moonbit_with(rt)).join(", ") + ")"
     CallbackType(params, ret, throws) =>
       "((" +
-      params.map(p => p.moonbit()).join(", ") +
+      params.map(p => p.moonbit_with(rt)).join(", ") +
       ") -> " +
-      ret.moonbit() +
+      ret.moonbit_with(rt) +
       (if throws { " raise" } else { "" }) +
       ")"
     _ => self.runtime_name()
+  }
+}
+
+///|
+fn ValueType::supports_trait(self : ValueType, read : Bool) -> Bool {
+  match self {
+    IntType
+    | UIntType
+    | FloatType
+    | DoubleType
+    | BoolType
+    | StringType
+    | BytesType
+    | Int64Type
+    | UInt64Type
+    | JsonType
+    | DateType
+    | SymbolType
+    | ObjectValueType
+    | FunctionValueType
+    | ArrayValueType
+    | ExternalValueType
+    | OwnedBinaryType(_)
+    | NamedType(_)
+    | ClassType(_, _, _)
+    | UnitType => true
+    BufferViewType => read
+    OptionType(inner)
+    | ArrayType(inner)
+    | MapType(inner)
+    | SetType(inner)
+    | IteratorType(inner) => inner.supports_trait(read)
+    EitherType(a, b) => a.supports_trait(read) && b.supports_trait(read)
+    TupleType(items) =>
+      items.length() >= 2 &&
+      items.length() <= 4 &&
+      items.all(item => item.supports_trait(read))
+    EnvType
+    | RawValueType
+    | JsPromiseType(_)
+    | AsyncIteratorType(_)
+    | CallbackType(_, _, _) => false
   }
 }
 
@@ -127,6 +180,8 @@ fn ValueType::typescript(self : ValueType, input~ : Bool = false) -> String {
       } else {
         "IterableIterator<" + inner.typescript() + ">"
       }
+    EitherType(a, b) =>
+      "(" + a.typescript(input~) + " | " + b.typescript(input~) + ")"
     JsonType => "$NapiJson"
     JsPromiseType(inner) => "Promise<" + inner.typescript(input~) + ">"
     AsyncIteratorType(inner) =>
@@ -190,6 +245,9 @@ fn parse_value_type(
     }
     text = text[1:text.length() - 1].to_owned()
   }
+  if text.has_prefix("@napi.") {
+    text = text[6:].to_owned()
+  }
   if text.has_prefix("(") {
     let close = matching_paren(text)
     if close > 0 && text[close + 1:].has_prefix("->") {
@@ -219,6 +277,16 @@ fn parse_value_type(
       fail("\{location}: borrowed BufferView cannot be nested")
     }
     return OptionType(inner)
+  }
+  if text.has_prefix("NapiEither[") && text.has_suffix("]") {
+    let args = split_type_arguments(text[11:text.length() - 1].to_owned())
+    guard args is [left, right] else {
+      fail("\{location}: NapiEither requires two type arguments")
+    }
+    return EitherType(
+      parse_value_type(left, location, true),
+      parse_value_type(right, location, true),
+    )
   }
   if text.has_prefix("Map[") && text.has_suffix("]") {
     let args = split_type_arguments(text[4:text.length() - 1].to_owned())
@@ -296,9 +364,17 @@ fn parse_value_type(
 }
 
 ///|
+pub(all) enum ParameterLabel {
+  Positional
+  Labeled
+  OptionalLabeled
+}
+
+///|
 pub(all) struct Variant {
   name : String
   parameters : Array[Parameter]
+  js_value : String?
 }
 
 ///|

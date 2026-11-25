@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String]) -> String {
-  let (code, out, err) = @async.with_timeout(300000, () => @process.collect_output(binary, args))
-  if code != 0 { fail(out.text() + err.text()) }
-  out.text()
+  let _proc_res = @async.with_timeout(300000, () => @process.run(binary, args, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  out
 }
 
 ///|
@@ -12,16 +17,16 @@ async fn main {
   let label = @env.args().get(1).unwrap_or("current")
   guard !label.is_empty() && label.iter().all(c => (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-') else { fail("Use an alphanumeric benchmark label") }
   let directory = ".napi-mbt/benchmarks/" + label
-  @fs.mkdir(directory, recursive=true, allow_exist=true)
+  @fs.mkdir(directory, recursive=true, allow_existing=true)
   if @env.args().contains("--record") {
-    @fs.mkdir("docs/benchmarks", recursive=true, allow_exist=true)
-    @fs.write_file("docs/benchmarks/" + label + ".json", @fs.read_file(directory + "/results.json"))
+    @fs.mkdir("docs/benchmarks", recursive=true, allow_existing=true)
+    @fs.write_binary("docs/benchmarks/" + label + ".json", @fs.read_binary(directory + "/results.json"))
     return
   }
   if @env.args().contains("--capture") {
     let target = @fs.readdir("artifacts")[0]
-    @fs.write_file(directory + "/sync.node", @fs.read_file("artifacts/" + target + "/napi_mbt.node"))
-    @fs.write_file(directory + "/async.node", @fs.read_file(".napi-mbt/async-exports/napi_mbt.node"))
+    @fs.write_binary(directory + "/sync.node", @fs.read_binary("artifacts/" + target + "/napi_mbt.node"))
+    @fs.write_binary(directory + "/async.node", @fs.read_binary(".napi-mbt/async-exports/napi_mbt.node"))
     println("Captured benchmark binaries: " + directory)
     return
   }
@@ -30,7 +35,7 @@ async fn main {
   if @env.args().contains("--build") {
     let binary = @fs.realpath("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe")
     let temp = @fs.tmpdir(prefix="napi-mbt-benchmark-")
-    defer @fs.rmdir(temp, recursive=true)
+    defer @fs.remove(temp, recursive=true)
     ignore(checked(binary, ["init", temp + "/fixture", "--name", "benchmark-fixture"]))
     for index in 0..<4 {
       let start = @env.now()
@@ -39,6 +44,6 @@ async fn main {
     }
   }
   let report : Json = { "label": label, "runtime": runtime, "builds": builds }
-  @fs.write_file(directory + "/results.json", report.stringify(indent=2) + "\n")
+  @fs.write_text(directory + "/results.json", report.stringify(indent=2) + "\n")
   println(report.stringify(indent=2))
 }

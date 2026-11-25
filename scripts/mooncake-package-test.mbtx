@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], cwd : String) -> String {
-  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output(program, args, cwd~))
-  if code != 0 { fail(program + " " + args.join(" ") + "\n" + out.text() + err.text()) }
-  out.text()
+  let _proc_res = @async.with_timeout(600000, () => @process.run(program, args, cwd~, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(program + " " + args.join(" ") + "\n" + out + err) }
+  out
 }
 
 ///|
@@ -39,7 +44,7 @@ async fn native_path(temp : String, original : String, windows : Bool) -> String
 async fn main {
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-mooncake-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   println(checked("moon", ["package", "--target-dir", temp + "/build"], root))
   let directory = temp + "/build/publish"
   let archives = @fs.readdir(directory).filter(name => name.has_suffix(".zip"))
@@ -57,7 +62,7 @@ async fn main {
   }
   if windows { ignore(checked("tar", ["-xf", archive, "-C", unpacked], root)) }
   else { ignore(checked("unzip", ["-q", archive, "-d", unpacked], root)) }
-  assert_eq(@fs.read_file(unpacked + "/moon.mod").binary(), @fs.read_file(root + "/moon.mod").binary())
+  assert_eq(@fs.read_binary(unpacked + "/moon.mod"), @fs.read_binary(root + "/moon.mod"))
   for path in ["internal/assets/data/resources.json", "internal/syntax/VENDOR.md", "cmd/napi-mbt-cli/main.mbt", "LICENSE"] {
     assert_true(@fs.exists(unpacked + "/" + path), msg="Missing packaged source: " + path)
   }
@@ -67,7 +72,7 @@ async fn main {
   defer @env.set_env_var("PATH", old_path)
   @env.set_env_var("PATH", path)
   for program in ["node", "npm"] {
-    try @process.collect_output(program, ["--version"], cwd=temp) catch { _ => () }
+    try ignore(@process.run(program, ["--version"], cwd=temp, stdout=Collect, stderr=Collect)) catch { _ => () }
     noraise { _ => fail(program + " remained available during native installation") }
   }
   let install = temp + "/installed CLI 空格"
@@ -75,7 +80,7 @@ async fn main {
   let binary = install + (if windows { "/napi-mbt-cli.exe" } else { "/napi-mbt-cli" })
   assert_true(@fs.exists(binary))
   // The installed executable must contain its parser, headers and templates.
-  @fs.rmdir(unpacked, recursive=true)
+  @fs.remove(unpacked, recursive=true)
   let consumer = temp + "/consumer outside checkout 空格"
   println(checked(binary, ["init", consumer, "--name", "packed-addon"], temp))
   println(checked(binary, ["doctor", consumer, "--json"], temp))
@@ -86,7 +91,7 @@ async fn main {
     println(checked("node", [file], consumer))
   }
   for extension in ["mts", "cts"] {
-    @fs.write_file(consumer + "/consumer." + extension,
+    @fs.write_text(consumer + "/consumer." + extension,
       "import addon, { mbt_add } from './index." + (if extension == "mts" { "mjs" } else { "cjs" }) + "';\nconst result: number = addon.mbt_add(1, 2) + mbt_add(3, 4);\n// @ts-expect-error invalid argument\nmbt_add('1', 2);\n")
   }
   for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {

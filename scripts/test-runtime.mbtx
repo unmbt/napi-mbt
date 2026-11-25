@@ -1,4 +1,6 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn main {
@@ -15,14 +17,14 @@ async fn main {
       environment["PATH"] = directory + (if @env.get_env_var("OS") == Some("Windows_NT") { ";" } else { ":" }) + @env.get_env_var("PATH").unwrap_or("")
     }
   }
-  let status = @async.with_timeout(if asan { 180000 } else { 60000 }, () => @process.run("node", node_args, extra_env=environment))
+  let status = @async.with_timeout(if asan { 180000 } else { 60000 }, () => @process.run("node", node_args, extra_env=environment).exit_code)
   if status != 0 { fail("Runtime tests failed with exit status \{status}") }
   if structured && !asan {
     for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
       let files = if mode == "NodeNext" { ["scripts/structured-types.test.mts", "scripts/structured-types.test.cts"] } else { ["scripts/structured-types.test.mts"] }
       let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution]
       args.append(files)
-      let status = @async.with_timeout(60000, () => @process.run("node", args))
+      let status = @async.with_timeout(60000, () => @process.run("node", args).exit_code)
       if status != 0 { fail("Structured TypeScript consumer failed") }
     }
   }

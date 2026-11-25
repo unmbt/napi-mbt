@@ -96,15 +96,22 @@ int napi_mbt_call_function_array(napi_env env, napi_value function, napi_value r
     uint32_t count = 0;
     status = napi_get_array_length(env, args, &count);
     if (status != napi_ok) return (int)status;
-    napi_value *argv = count ? (napi_value *)malloc(sizeof(*argv) * count) : NULL;
-    if (count && !argv) return (int)napi_generic_failure;
+    napi_value stack_argv[8];
+    napi_value *argv = count <= 8 ? stack_argv : (napi_value *)malloc(sizeof(*argv) * count);
+    if (count > 8 && !argv) return (int)napi_generic_failure;
     for (uint32_t i = 0; i < count; ++i) {
         status = napi_get_element(env, args, i, &argv[i]);
-        if (status != napi_ok) { free(argv); return (int)status; }
+        if (status != napi_ok) { if (count > 8) free(argv); return (int)status; }
     }
-    status = napi_call_function(env, receiver, function, count, argv, result);
-    free(argv);
+    status = napi_call_function(env, receiver, function, count, count ? argv : NULL, result);
+    if (count > 8) free(argv);
     return (int)status;
+}
+
+MOONBIT_FFI_EXPORT
+int napi_mbt_call_function_argv(napi_env env, napi_value function, napi_value receiver, int32_t argc, napi_value *argv, napi_value *result) {
+    if (argc < 0) return (int)napi_invalid_arg;
+    return (int)napi_call_function(env, receiver, function, (size_t)argc, argc ? argv : NULL, result);
 }
 
 MOONBIT_FFI_EXPORT
@@ -115,15 +122,22 @@ int napi_mbt_new_instance_array(napi_env env, napi_value function, napi_value ar
     uint32_t count = 0;
     status = napi_get_array_length(env, args, &count);
     if (status != napi_ok) return (int)status;
-    napi_value *argv = count ? (napi_value *)malloc(sizeof(*argv) * count) : NULL;
-    if (count && !argv) return (int)napi_generic_failure;
+    napi_value stack_argv[8];
+    napi_value *argv = count <= 8 ? stack_argv : (napi_value *)malloc(sizeof(*argv) * count);
+    if (count > 8 && !argv) return (int)napi_generic_failure;
     for (uint32_t i = 0; i < count; ++i) {
         status = napi_get_element(env, args, i, &argv[i]);
-        if (status != napi_ok) { free(argv); return (int)status; }
+        if (status != napi_ok) { if (count > 8) free(argv); return (int)status; }
     }
-    status = napi_new_instance(env, function, count, argv, result);
-    free(argv);
+    status = napi_new_instance(env, function, count, count ? argv : NULL, result);
+    if (count > 8) free(argv);
     return (int)status;
+}
+
+MOONBIT_FFI_EXPORT
+int napi_mbt_new_instance_argv(napi_env env, napi_value function, int32_t argc, napi_value *argv, napi_value *result) {
+    if (argc < 0) return (int)napi_invalid_arg;
+    return (int)napi_new_instance(env, function, (size_t)argc, argc ? argv : NULL, result);
 }
 
 MOONBIT_FFI_EXPORT
@@ -686,6 +700,10 @@ MOONBIT_FFI_EXPORT void moonbit_ptr_store8(unsigned char* ptr, int offset, int v
     ptr[offset] = val;
 }
 
+MOONBIT_FFI_EXPORT void moonbit_ptr_copy_from_bytes(unsigned char* ptr, int32_t offset, moonbit_bytes_t src, int32_t length) {
+    if (length > 0) memcpy(ptr + offset, src, (size_t)length);
+}
+
 MOONBIT_FFI_EXPORT int moonbit_napi_value_kind(napi_env env, napi_value value, int *result) {
     napi_valuetype kind;
     napi_status status = napi_typeof(env, value, &kind);
@@ -874,26 +892,42 @@ MOONBIT_FFI_EXPORT int napi_mbt_iterator_current_env(napi_env *result) {
 
 MOONBIT_FFI_EXPORT int napi_mbt_iterator_factory(
     napi_env env, int input, napi_value next, napi_value close, napi_value *result) {
-    const char *source =
-        "((input, next, close) => {"
-        " if (input) {"
-        "  if (next == null || typeof next[Symbol.iterator] !== 'function') throw new TypeError('Expected Iterable');"
-        "  const iterator = next[Symbol.iterator]();"
-        "  return { next() { const r = iterator.next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); return r; },"
-        "    close() { if (iterator && typeof iterator.return === 'function') iterator.return(); } };"
-        " }"
-        " let ended = false;"
-        " return { [Symbol.iterator]() { return this; },"
-        "  next() { if (ended) return {done:true}; const r = next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); if (r.done) { ended = true; next = null; close = null; } return r; },"
-        "  close() { if (!ended) { ended = true; const f = close; next = close = null; if (f) f(); } },"
-        "  return(value) { this.close(); return {done:true, value}; } };"
-        "})";
-    napi_value script, factory, undefined, flag, args[3];
-    napi_status status = napi_create_string_utf8(env, source, NAPI_AUTO_LENGTH, &script);
-    if (status == napi_ok) status = napi_run_script(env, script, &factory);
+    napi_value factory = NULL, undefined, flag, args[3];
+    napi_status status = napi_ok;
+    if (napi_mbt_active && napi_mbt_active->env == env && napi_mbt_active->iterator_factory_ref) {
+        status = napi_get_reference_value(env, napi_mbt_active->iterator_factory_ref, &factory);
+    } else {
+        const char *source =
+            "((input, next, close) => {"
+            " if (input) {"
+            "  if (next == null || typeof next[Symbol.iterator] !== 'function') throw new TypeError('Expected Iterable');"
+            "  const iterator = next[Symbol.iterator]();"
+            "  return { next() { const r = iterator.next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); return r; },"
+            "    close() { if (iterator && typeof iterator.return === 'function') iterator.return(); } };"
+            " }"
+            " let ended = false;"
+            " return { [Symbol.iterator]() { return this; },"
+            "  next() { if (ended) return {done:true}; const r = next(); if (!r || typeof r !== 'object') throw new TypeError('Invalid iterator result'); if (r.done) { ended = true; next = null; close = null; } return r; },"
+            "  close() { if (!ended) { ended = true; const f = close; next = close = null; if (f) f(); } },"
+            "  return(value) { this.close(); return {done:true, value}; } };"
+            "})";
+        napi_value script;
+        status = napi_create_string_utf8(env, source, NAPI_AUTO_LENGTH, &script);
+        if (status == napi_ok) status = napi_run_script(env, script, &factory);
+        if (status == napi_ok && napi_mbt_active && napi_mbt_active->env == env && !napi_mbt_active->closing) {
+            status = napi_create_reference(env, factory, 1, &napi_mbt_active->iterator_factory_ref);
+        }
+    }
     if (status == napi_ok) status = napi_get_undefined(env, &undefined);
     if (status == napi_ok) status = napi_get_boolean(env, input != 0, &flag);
     args[0] = flag; args[1] = next; args[2] = close;
     if (status == napi_ok) status = napi_call_function(env, undefined, factory, 3, args, result);
+    return (int)status;
+}
+
+int napi_mbt_is_exception_pending(napi_env env, int32_t *result) {
+    bool pending = false;
+    napi_status status = napi_is_exception_pending(env, &pending);
+    if (status == napi_ok && result != NULL) *result = pending ? 1 : 0;
     return (int)status;
 }

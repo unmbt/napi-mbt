@@ -8,9 +8,9 @@ import {
 // Values
 pub fn parse_source(String, String) -> ParsedSource raise
 
-pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig]) -> ParsedSource raise
+pub fn parse_sources(Array[(String, String)], classes? : Array[ClassConfig], module_exports? : String?) -> ParsedSource raise
 
-pub fn render(ParsedSource, String, Int32, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String]) -> Array[(String, String)] raise
+pub fn render(ParsedSource, String, Int32, package_version~ : String, cjs? : Bool, esm? : Bool, worker_tasks? : Array[String], runtime_prefix? : String) -> Array[(String, String)] raise
 
 // Errors
 
@@ -63,6 +63,13 @@ pub(all) struct ClassProperty {
 pub(all) struct Parameter {
   name : String
   value_type : ValueType
+  label : ParameterLabel
+}
+
+pub(all) enum ParameterLabel {
+  Positional
+  Labeled
+  OptionalLabeled
 }
 
 pub(all) struct ParsedClass {
@@ -94,6 +101,7 @@ pub(all) struct ParsedSource {
   features : Array[String]
   types : Array[TypeDefinition]
   classes : Array[ParsedClass]
+  module_exports : ParsedExport?
 }
 pub fn ParsedSource::native_exports(Self) -> Array[String]
 
@@ -125,6 +133,7 @@ pub(all) enum ValueType {
   SymbolType
   SetType(ValueType)
   IteratorType(ValueType)
+  EitherType(ValueType, ValueType)
   JsonType
   JsPromiseType(ValueType)
   AsyncIteratorType(ValueType)
@@ -150,6 +159,7 @@ pub fn ValueType::runtime_name(Self) -> String
 pub(all) struct Variant {
   name : String
   parameters : Array[Parameter]
+  js_value : String?
 }
 
 // Type aliases

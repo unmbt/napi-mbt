@@ -163,6 +163,33 @@ pub fn napi_check_depth(depth : Int32) -> Unit raise NapiError {
 }
 
 ///|
+let napi_cycle_stack : Array[NapiValue] = []
+
+///|
+let napi_write_depth : Ref[Int32] = Ref(0)
+
+///|
+pub fn[T] napi_with_cycle_guard(
+  env : NapiEnv,
+  value : NapiValue,
+  f : () -> T raise,
+) -> T raise {
+  napi_enter_value(env, value, napi_cycle_stack)
+  defer ignore(napi_cycle_stack.pop())
+  f()
+}
+
+///|
+pub fn[T] napi_with_depth_guard(f : () -> T raise) -> T raise {
+  napi_check_depth(napi_write_depth.val)
+  napi_write_depth.val += 1
+  defer {
+    napi_write_depth.val -= 1
+  }
+  f()
+}
+
+///|
 pub fn napi_array_length(
   env : NapiEnv,
   value : NapiValue,

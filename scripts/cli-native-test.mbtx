@@ -1,20 +1,22 @@
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs",
+  "moonbitlang/core/async/process",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
 
 ///|
 async fn checked(program : String, args : Array[String], cwd : String, env : Map[String, String]) -> String {
-  let (code, out, err) = @process.collect_output(program, args, cwd~, extra_env=env)
-  if code != 0 { fail("\{program} \{args.join(" ")} failed: \{out.text()}\{err.text()}") }
-  out.text()
+  let res = @process.run(program, args, cwd~, extra_env=env, stdout=Collect, stderr=Collect)
+  if res.exit_code != 0 { fail("\{program} \{args.join(" ")} failed: \{res.stdout_text()}\{res.stderr_text()}") }
+  res.stdout_text()
 }
 ///|
 async fn rejected(binary : String, args : Array[String], cwd : String, env : Map[String, String]) -> Unit {
-  let (code, _, _) = @process.collect_output(binary, args, cwd~, extra_env=env)
+  let code = @process.run(binary, args, cwd~, extra_env=env, stdout=Collect, stderr=Collect).exit_code
   assert_true(code != 0, msg="Expected failure: " + args.join(" "))
 }
 ///|
@@ -52,7 +54,7 @@ async fn no_node_environment(temp : String) -> Map[String, String] {
 async fn main {
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-no-node-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let archive = temp + "/release"
   ignore(checked("moon", ["run", "scripts/package-cli.mbtx", archive], root, Map([])))
   let unpacked = temp + "/unpacked"
@@ -66,7 +68,7 @@ async fn main {
   @env.set_env_var("PATH", env["PATH"])
   defer @env.set_env_var("PATH", old_path)
   for name in ["node", "npm"] {
-    try @process.collect_output(name, ["--version"], cwd=temp, extra_env=env) catch { _ => () } noraise { _ => fail("\{name} remained executable") }
+    try ignore(@process.run(name, ["--version"], cwd=temp, extra_env=env, stdout=Collect, stderr=Collect)) catch { _ => () } noraise { _ => fail("\{name} remained executable") }
   }
   println("Verified node/npm are unavailable")
   let install_dir = temp + "/installed"
@@ -89,48 +91,48 @@ async fn main {
     assert_true(checked(executable, ["targets"], temp, env).contains("win32-x64-msvc"))
     let conflict = dir + " conflict"
     @fs.mkdir(conflict)
-    @fs.write_file(conflict + "/test", "existing file")
+    @fs.write_text(conflict + "/test", "existing file")
     rejected(executable, ["init", conflict], temp, env)
     assert_true(!@fs.exists(conflict + "/package.json"))
     ignore(checked(executable, ["init", dir, "--name", "native-fixture"], temp, { "PATH": "" }))
-    let source = @fs.read_file(dir + "/lib.mbt").text()
+    let source = @fs.read_text(dir + "/lib.mbt")
     rejected(executable, ["init", dir], temp, env)
-    assert_eq(@fs.read_file(dir + "/lib.mbt").text(), source)
-    let failed_doctor = @process.collect_output(executable, ["doctor", dir, "--json"], cwd=temp, extra_env={ "PATH": "" })
-    assert_true(failed_doctor.0 != 0)
-    assert_true(@json.parse(failed_doctor.1.text()) is { "ok": false, "error": String(_), .. })
+    assert_eq(@fs.read_text(dir + "/lib.mbt"), source)
+    let failed_doctor = @process.run(executable, ["doctor", dir, "--json"], cwd=temp, extra_env={ "PATH": "" }, stdout=Collect, stderr=Collect)
+    assert_true(failed_doctor.exit_code != 0)
+    assert_true(@json.parse(failed_doctor.stdout_text()) is { "ok": false, "error": String(_), .. })
     let report = @json.parse(checked(executable, ["doctor", dir, "--json"], temp, env))
     assert_true(report is { "ok": true, "toolchain": { "probe": "passed", .. }, .. })
     ignore(checked(executable, ["init", dir, "--name", "native-fixture", "--force"], temp, env))
     ignore(checked(executable, ["generate", dir, "--check"], temp, { "PATH": "" }))
     rejected(executable, ["prepublish", dir], temp, { "PATH": "" })
     assert_true(!@fs.exists(dir + "/npm"))
-    let expected = @fs.read_file(dir + "/index.d.ts").text()
-    @fs.write_file(dir + "/lib.mbt", source.replace_all(old="\n", new="\r\n"))
+    let expected = @fs.read_text(dir + "/index.d.ts")
+    @fs.write_text(dir + "/lib.mbt", source.replace_all(old="\n", new="\r\n"))
     ignore(checked(executable, ["generate", dir, "--check"], temp, env))
-    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), expected)
-    @fs.write_file(dir + "/index.d.ts", "dirty")
+    assert_eq(@fs.read_text(dir + "/index.d.ts"), expected)
+    @fs.write_text(dir + "/index.d.ts", "dirty")
     rejected(executable, ["generate", dir, "--check"], temp, env)
-    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
-    @fs.write_file(dir + "/lib.mbt", b"\xff")
-    let malformed = @process.collect_output(executable, ["generate", dir], cwd=temp, extra_env=env)
-    assert_true(malformed.0 != 0)
-    assert_true(malformed.2.text().contains("File is not valid UTF-8: ") && malformed.2.text().contains("lib.mbt"))
-    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
-    @fs.write_file(dir + "/lib.mbt", "pub fn broken(\r\n")
+    assert_eq(@fs.read_text(dir + "/index.d.ts"), "dirty")
+    @fs.write_binary(dir + "/lib.mbt", b"\xff")
+    let malformed = @process.run(executable, ["generate", dir], cwd=temp, extra_env=env, stdout=Collect, stderr=Collect)
+    assert_true(malformed.exit_code != 0)
+    assert_true(malformed.stderr_text().contains("File is not valid UTF-8: ") && malformed.stderr_text().contains("lib.mbt"))
+    assert_eq(@fs.read_text(dir + "/index.d.ts"), "dirty")
+    @fs.write_text(dir + "/lib.mbt", "pub fn broken(\r\n")
     rejected(executable, ["generate", dir], temp, env)
-    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
-    @fs.write_file(dir + "/lib.mbt", source)
-    @fs.write_file(dir + "/duplicate.mbt", source)
+    assert_eq(@fs.read_text(dir + "/index.d.ts"), "dirty")
+    @fs.write_text(dir + "/lib.mbt", source)
+    @fs.write_text(dir + "/duplicate.mbt", source)
     rejected(executable, ["generate", dir], temp, env)
     @fs.remove(dir + "/duplicate.mbt")
     rejected(executable, ["generate", dir, "--generator=node"], temp, env)
-    let config = @fs.read_file(dir + "/napi-mbt.json").text().replace_all(old="\"napiVersion\": 4", new="\"napiVersion\": 7")
-    @fs.write_file(dir + "/napi-mbt.json", "{\"napiVersion\":1,\"features\":[\"bigint\"]}")
+    let config = @fs.read_text(dir + "/napi-mbt.json").replace_all(old="\"napiVersion\": 4", new="\"napiVersion\": 7")
+    @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":1,\"features\":[\"bigint\"]}")
     rejected(executable, ["generate", dir], temp, env)
-    @fs.write_file(dir + "/napi-mbt.json", config)
+    @fs.write_text(dir + "/napi-mbt.json", config)
     rejected(executable, ["build", dir], temp, { "PATH": "" })
-    assert_eq(@fs.read_file(dir + "/index.d.ts").text(), "dirty")
+    assert_eq(@fs.read_text(dir + "/index.d.ts"), "dirty")
     let extra =
       #|
       #|///|
@@ -151,46 +153,46 @@ async fn main {
       #|#export_name("save_failure")
       #|pub fn save_failure(buf : NapiBufferView) -> Unit raise { saved.val = Some(buf); fail("saved failure") }
       #|
-    @fs.write_file(dir + "/lib.mbt", source + extra)
+    @fs.write_text(dir + "/lib.mbt", source + extra)
     ignore(checked(executable, ["generate", dir], temp, env))
-    let before = @fs.read_file(dir + "/moon.pkg").text()
+    let before = @fs.read_text(dir + "/moon.pkg")
     ignore(checked(executable, ["build", dir, "--dry-run"], temp, env))
-    assert_eq(@fs.read_file(dir + "/moon.pkg").text(), before)
+    assert_eq(@fs.read_text(dir + "/moon.pkg"), before)
     rejected(executable, ["build", dir, "--target=not-a-target"], temp, env)
     if @env.get_env_var("OS") == Some("Windows_NT") {
-      @fs.write_file(dir + "/napi-mbt.json", "{\"builder\":\"gcc\"}")
+      @fs.write_text(dir + "/napi-mbt.json", "{\"builder\":\"gcc\"}")
       rejected(executable, ["build", dir], temp, env)
-      @fs.write_file(dir + "/napi-mbt.json", config)
+      @fs.write_text(dir + "/napi-mbt.json", config)
     }
-    let stub = @fs.read_file(dir + "/stub.c").text()
-    @fs.write_file(dir + "/stub.c", "#error expected child compiler failure\n")
+    let stub = @fs.read_text(dir + "/stub.c")
+    @fs.write_text(dir + "/stub.c", "#error expected child compiler failure\n")
     rejected(executable, ["build", dir, "--release"], temp, env)
-    @fs.write_file(dir + "/stub.c", stub)
+    @fs.write_text(dir + "/stub.c", stub)
     ignore(checked(executable, ["build", dir, "--release"], temp, env))
-    assert_eq(@fs.read_file(dir + "/moon.pkg").text(), before)
+    assert_eq(@fs.read_text(dir + "/moon.pkg"), before)
     assert_true(!@fs.exists(dir + "/_build"))
     if label == "release" { ignore(checked(executable, ["build", dir], temp, env)) }
     let pkg_path = dir + "/package.json"
-    guard @json.parse(@fs.read_file(pkg_path).text()) is Object(pkg) else { fail("Invalid fixture package") }
+    guard @json.parse(@fs.read_text(pkg_path)) is Object(pkg) else { fail("Invalid fixture package") }
     pkg["custom"] = { "preserve": true }
     pkg["optionalDependencies"] = { "unrelated": "1.0.0", "native-fixture-old": "0.0.1" }
-    @fs.write_file(pkg_path, Json(pkg).stringify(indent=2))
+    @fs.write_text(pkg_path, Json(pkg).stringify(indent=2))
     rejected(executable, ["prepublish", dir, "--target=invalid"], temp, env)
     let target = @fs.readdir(dir + "/artifacts")[0]
     ignore(checked(executable, ["prepublish", dir, "--target", target], temp, env))
-    let published = @json.parse(@fs.read_file(pkg_path).text())
+    let published = @json.parse(@fs.read_text(pkg_path))
     assert_true(published is { "custom": { "preserve": True, .. }, "optionalDependencies": { "unrelated": String("1.0.0"), "native-fixture-old": String("0.0.1"), .. }, .. })
-    let prepared = @fs.read_file(pkg_path).text()
+    let prepared = @fs.read_text(pkg_path)
     ignore(checked(executable, ["prepublish", dir, "--target", target], temp, env))
-    assert_eq(@fs.read_file(pkg_path).text(), prepared)
+    assert_eq(@fs.read_text(pkg_path), prepared)
     assert_true(!@fs.exists(dir + "/node_modules"))
     // Preserve just the load-test payload for the subsequent, separate Node job.
     let smoke = root + "/.napi-mbt/native-smoke/" + label
     if !@fs.exists(smoke) { @fs.mkdir(smoke, recursive=true) }
-    for name in ["index.cjs", "index.mjs"] { @fs.write_file(smoke + "/" + name, @fs.read_file(dir + "/" + name)) }
+    for name in ["index.cjs", "index.mjs"] { @fs.write_binary(smoke + "/" + name, @fs.read_binary(dir + "/" + name)) }
     for target in @fs.readdir(dir + "/artifacts") {
       if !@fs.exists(smoke + "/artifacts/" + target) { @fs.mkdir(smoke + "/artifacts/" + target, recursive=true) }
-      @fs.write_file(smoke + "/artifacts/" + target + "/napi_mbt.node", @fs.read_file(dir + "/artifacts/" + target + "/napi_mbt.node"))
+      @fs.write_binary(smoke + "/artifacts/" + target + "/napi_mbt.node", @fs.read_binary(dir + "/artifacts/" + target + "/napi_mbt.node"))
     }
   }
   println("Native CLI contracts passed without Node/npm")

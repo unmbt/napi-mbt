@@ -69,8 +69,7 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_pin(napi_env env, napi_value value, napi
     void *pointer = NULL;
     int status = napi_unwrap(env, value, &pointer);
     if (status != napi_ok) return status;
-    napi_mbt_resource *resource = napi_mbt_active->resources;
-    while (resource && resource != pointer) resource = resource->next;
+    napi_mbt_resource *resource = napi_mbt_lookup_resource(napi_mbt_active, pointer);
     if (!resource || resource->kind != 2) return 1007;
     /* This reference borrows the container; its JS wrapper is retained by a
      * separate NapiReference until the pin has been disposed. */
@@ -83,10 +82,9 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_unpin(napi_mbt_callback_ref *reference) 
     napi_mbt_resource *resource = reference->resource;
     reference->resource = NULL;
     if (!resource) return napi_ok;
-    /* After teardown the borrowed pointer may be stale. Compare it against the
-     * current owner's registry before touching it. */
-    napi_mbt_resource *entry = napi_mbt_active ? napi_mbt_active->resources : NULL;
-    while (entry && entry != resource) entry = entry->next;
+    /* After teardown the borrowed pointer may be stale. Verify against the
+     * active owner's registry before touching it. */
+    napi_mbt_resource *entry = napi_mbt_lookup_resource(napi_mbt_active, resource);
     return entry ? napi_mbt_dispose_resource(entry) : napi_ok;
 }
 
@@ -96,8 +94,7 @@ MOONBIT_FFI_EXPORT int napi_mbt_closure_inert(napi_env env, napi_value value) {
     void *pointer = NULL;
     int status = napi_unwrap(env, value, &pointer);
     if (status != napi_ok) return status;
-    napi_mbt_resource *resource = napi_mbt_active->resources;
-    while (resource && resource != pointer) resource = resource->next;
+    napi_mbt_resource *resource = napi_mbt_lookup_resource(napi_mbt_active, pointer);
     if (!resource || resource->kind != 2) return 1007;
     resource->inert_on_dispose = true;
     return napi_ok;
@@ -162,15 +159,29 @@ MOONBIT_FFI_EXPORT int napi_mbt_callback_call(napi_mbt_callback_ref *callback, n
     status = napi_get_array_length(env, args, &count);
     if (status != napi_ok) return (int)status;
     if (count > SIZE_MAX / sizeof(napi_value)) return napi_invalid_arg;
-    napi_value *values = count ? malloc(sizeof(*values) * count) : NULL;
-    if (count && !values) return napi_generic_failure;
+    napi_value stack_values[8];
+    napi_value *values = count <= 8 ? stack_values : malloc(sizeof(*values) * count);
+    if (count > 8 && !values) return napi_generic_failure;
     for (uint32_t i = 0; i < count; ++i) {
         status = napi_get_element(env, args, i, &values[i]);
-        if (status != napi_ok) { free(values); return (int)status; }
+        if (status != napi_ok) { if (count > 8) free(values); return (int)status; }
     }
-    status = napi_call_function(env, receiver, function, count, values, result);
-    free(values);
+    status = napi_call_function(env, receiver, function, count, count ? values : NULL, result);
+    if (count > 8) free(values);
     return (int)status;
+}
+
+MOONBIT_FFI_EXPORT int napi_mbt_callback_call_argv(napi_mbt_callback_ref *callback, int32_t argc, napi_value *argv, napi_value *result) {
+    if (argc < 0) return napi_invalid_arg;
+    napi_env env;
+    int checked = napi_mbt_callback_env(callback, &env);
+    if (checked != napi_ok) return checked;
+    napi_value function, receiver;
+    napi_status status = napi_get_reference_value(env, callback->resource->reference, &function);
+    if (status != napi_ok) return (int)status;
+    status = napi_get_undefined(env, &receiver);
+    if (status != napi_ok) return (int)status;
+    return (int)napi_call_function(env, receiver, function, (size_t)argc, argc ? argv : NULL, result);
 }
 
 MOONBIT_FFI_EXPORT int napi_mbt_arguments_length(napi_mbt_arguments *args) { return (int)args->count; }
@@ -195,6 +206,8 @@ static napi_value napi_mbt_closure_call(napi_env env, napi_callback_info info) {
     napi_mbt_arguments args = {0, NULL};
     napi_mbt_resource *resource = NULL;
     napi_value result = NULL;
+    napi_value stack_values[8];
+    napi_value *heap_values = NULL;
     checked = napi_get_cb_info(env, info, &args.count, NULL, NULL, (void **)&resource);
     if (checked != napi_ok) goto done;
     checked = napi_mbt_check_resource(resource, env);
@@ -204,10 +217,17 @@ static napi_value napi_mbt_closure_call(napi_env env, napi_callback_info info) {
     }
     if (checked != napi_ok) goto done;
     if (args.count > INT32_MAX || args.count > SIZE_MAX / sizeof(napi_value)) { checked = napi_invalid_arg; goto done; }
-    args.values = args.count ? malloc(sizeof(napi_value) * args.count) : NULL;
-    if (args.count && !args.values) { checked = napi_generic_failure; goto done; }
-    checked = napi_get_cb_info(env, info, &args.count, args.values, NULL, NULL);
-    if (checked != napi_ok) goto done;
+    if (args.count <= 8) {
+        args.values = stack_values;
+    } else {
+        heap_values = malloc(sizeof(napi_value) * args.count);
+        if (!heap_values) { checked = napi_generic_failure; goto done; }
+        args.values = heap_values;
+    }
+    if (args.count) {
+        checked = napi_get_cb_info(env, info, &args.count, args.values, NULL, NULL);
+        if (checked != napi_ok) goto done;
+    }
     // FuncRef arguments are borrowed. Pin the closure across the call, including
     // reentrant dispose which clears resource->payload, then release our pin.
     void *payload = resource->payload;
@@ -215,7 +235,7 @@ static napi_value napi_mbt_closure_call(napi_env env, napi_callback_info info) {
     result = resource->trampoline(payload, env, &args);
     moonbit_decref(payload);
 done:
-    free(args.values);
+    free(heap_values);
     if (checked != napi_ok) result = napi_mbt_closure_error(env, checked);
     napi_mbt_leave(previous);
     return result;
@@ -229,8 +249,7 @@ static napi_value napi_mbt_closure_dispose(napi_env env, napi_callback_info info
     void *pointer = NULL;
     checked = napi_get_cb_info(env, info, NULL, NULL, &receiver, NULL);
     if (checked == napi_ok) checked = napi_unwrap(env, receiver, &pointer);
-    napi_mbt_resource *resource = napi_mbt_active->resources;
-    while (resource && resource != pointer) resource = resource->next;
+    napi_mbt_resource *resource = napi_mbt_lookup_resource(napi_mbt_active, pointer);
     if (!resource || resource->kind != 2) checked = 1007;
     if (checked == napi_ok) checked = napi_mbt_dispose_resource(resource);
     if (checked == napi_ok) checked = napi_get_undefined(env, &result);

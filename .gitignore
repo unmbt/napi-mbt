@@ -3,6 +3,7 @@ _build/
 target/
 target
 .mooncakes/
+.repos/
 .moonagent/
 node_modules/
 node.lib

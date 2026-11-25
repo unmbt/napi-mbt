@@ -15,7 +15,7 @@ async fn NativeToolchain::close(self : NativeToolchain) -> Unit {
   if @fs.exists(self.workspace + "/msbuild") {
     @fs.remove(self.workspace + "/msbuild")
   }
-  @fs.rmdir(self.workspace, recursive=true)
+  @fs.remove(self.workspace, recursive=true)
 }
 
 ///|
@@ -63,7 +63,7 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
     if @fs.exists(probe + "/msbuild") {
       @fs.remove(probe + "/msbuild")
     }
-    @fs.rmdir(probe, recursive=true)
+    @fs.remove(probe, recursive=true)
   })
   if windows() {
     let (root, version) = visual_studio(dir)
@@ -163,14 +163,13 @@ async fn detect_toolchain(dir : String, builder : String) -> NativeToolchain {
         "Native toolchain compile/link probe failed for \{host_target()}. Check the selected compiler, MSBuild and platform SDK.\n\{error}",
       )
   }
-  let details = @fs.read_file(probe + "/build/toolchain.txt")
-    .text()
+  let details = @fs.read_text(probe + "/build/toolchain.txt")
     .split("\n")
     .to_array()
   if host_target().has_prefix("linux-") {
     report["dynamicDependencies"] = Json(
       validate_linux_libc(
-        @fs.read_file(probe + "/build/probe").binary(),
+        @fs.read_binary(probe + "/build/probe"),
         host_target(),
       ),
     )

@@ -1,10 +1,15 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn checked(binary : String, args : Array[String]) -> Unit {
   @async.with_timeout(120000, () => {
-    let (code, out, err) = @process.collect_output(binary, args)
-    if code != 0 { fail(out.text() + err.text()) }
+    let _proc_res = @process.run(binary, args, stdout=Collect, stderr=Collect)
+    let code = _proc_res.exit_code
+    let out = _proc_res.stdout_text()
+    let err = _proc_res.stderr_text()
+    if code != 0 { fail(out + err) }
   })
 }
 
@@ -12,19 +17,19 @@ async fn checked(binary : String, args : Array[String]) -> Unit {
 async fn main {
   let binary = @fs.realpath(@env.args().get(1).unwrap_or("_build/native/debug/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   let temp = @fs.tmpdir(prefix="napi-mbt-loader-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let dir = temp + "/project 空格"
   checked(binary, ["init", dir, "--name", "loader-fixture"])
   let source = StringBuilder()
-  source.write_string(@fs.read_file(dir + "/lib.mbt").text())
+  source.write_string(@fs.read_text(dir + "/lib.mbt"))
   for i, name in ["failure", "addon", "path", "fs", "require", "createRequire", "fileURLToPath", "directoryName", "target", "requiredNapi"] {
     source.write_string("\n///|\n#export_name(\"\{name}\")\npub fn collision_\{i}() -> Int { 42 }\n")
   }
-  @fs.write_file(dir + "/lib.mbt", source.to_string())
+  @fs.write_text(dir + "/lib.mbt", source.to_string())
   checked(binary, ["build", dir, "--release"])
   let target = @fs.readdir(dir + "/artifacts")[0]
   for (mode, cjs, esm) in [("dual", true, true), ("esm", false, true), ("cjs", true, false)] {
-    @fs.write_file(dir + "/napi-mbt.json", ({ "napiVersion": 4, "cjs": cjs, "esm": esm } : Json).stringify())
+    @fs.write_text(dir + "/napi-mbt.json", ({ "napiVersion": 4, "cjs": cjs, "esm": esm } : Json).stringify())
     checked(binary, ["generate", dir])
     checked(binary, ["generate", dir, "--check"])
     // A mode change invalidates the build receipt, including generated loaders.
@@ -39,11 +44,11 @@ async fn main {
     let source = "import { mbt_add } from 'loader-fixture';\nconst value: number = mbt_add(1, 2);\n// @ts-expect-error wrong argument type\nmbt_add('one', 2);\n// @ts-expect-error missing argument\nmbt_add(1);\n"
     let args = ["node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--module", "NodeNext", "--moduleResolution", "NodeNext"]
     if cjs {
-      @fs.write_file(consumer + "/check.cts", source)
+      @fs.write_text(consumer + "/check.cts", source)
       args.push(consumer + "/check.cts")
     }
     if esm {
-      @fs.write_file(consumer + "/check.mts", source + "import addon from 'loader-fixture';\nconst other: number = addon.mbt_add(1, 2);\n")
+      @fs.write_text(consumer + "/check.mts", source + "import addon from 'loader-fixture';\nconst other: number = addon.mbt_add(1, 2);\n")
       args.push(consumer + "/check.mts")
     }
     checked("node", args)

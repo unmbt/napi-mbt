@@ -28,7 +28,7 @@ pub fn NapiSymbol::new(
 
 ///|
 #warnings("-unused_value")
-fn get_NapiSymbol(
+pub fn get_NapiSymbol(
   env : NapiEnv,
   value : NapiValue,
 ) -> NapiSymbol raise NapiError {
@@ -47,7 +47,7 @@ fn get_NapiSymbol(
 
 ///|
 #warnings("-unused_value")
-fn set_NapiSymbol(
+pub fn set_NapiSymbol(
   env : NapiEnv,
   value : NapiSymbol,
 ) -> NapiValue raise NapiError {

@@ -81,6 +81,8 @@ fn class_type(value : ValueType, configs : Array[ClassConfig]) -> ValueType {
     AsyncIteratorType(inner) => AsyncIteratorType(class_type(inner, configs))
     ArrayType(inner) => ArrayType(class_type(inner, configs))
     MapType(inner) => MapType(class_type(inner, configs))
+    EitherType(a, b) =>
+      EitherType(class_type(a, configs), class_type(b, configs))
     TupleType(items) => TupleType(items.map(item => class_type(item, configs)))
     CallbackType(params, ret, throws) =>
       CallbackType(
@@ -103,6 +105,7 @@ fn class_function(
     parameters: item.parameters.map(p => {
       name: p.name,
       value_type: class_type(p.value_type, configs),
+      label: p.label,
     }),
     return_type: class_type(item.return_type, configs),
     throws: item.throws,
@@ -260,6 +263,9 @@ pub fn ParsedSource::native_exports(self : ParsedSource) -> Array[String] {
   }
   for cls in self.classes {
     result.push("napi_mbt_class_dispose_\{cls.id}")
+  }
+  if self.module_exports is Some(_) {
+    result.push("napi_mbt_module_exports")
   }
   result
 }

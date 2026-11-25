@@ -10,12 +10,15 @@ fn adapter_checksum(text : String) -> String {
 ///|
 /// Only call on a copied build workspace. Validate all upstream files before
 /// applying any replacements; never patch the user's dependency cache.
-async fn patch_async_dependency(workspace : String) -> Unit {
+async fn patch_async_dependency(
+  workspace : String,
+  is_package_runtime~ : Bool = false,
+) -> Unit {
   let assets = @assets.files()
   let root = workspace + "/.mooncakes/moonbitlang/async"
   if !@fs.exists(root + "/moon.mod") {
     fail(
-      "Async exports require moonbitlang/async@0.22.5; run moon add moonbitlang/async@0.22.5 first",
+      "Async exports require moonbitlang/async@0.22.10; run moon add moonbitlang/async@0.22.10 first",
     )
   }
   let manifest = read_text(root + "/moon.mod")
@@ -28,9 +31,9 @@ async fn patch_async_dependency(workspace : String) -> Unit {
       break
     }
   }
-  if version != Some("0.22.5") {
+  if version != Some("0.22.10") {
     fail(
-      "Async adapter requires exactly moonbitlang/async 0.22.5; found " +
+      "Async adapter requires exactly moonbitlang/async 0.22.10; found " +
       version.unwrap_or("no version"),
     )
   }
@@ -50,11 +53,9 @@ async fn patch_async_dependency(workspace : String) -> Unit {
     let target = root + "/" + path
     match before {
       String(checksum) => {
-        let source = @fs.read_file(target)
-          .text()
-          .replace_all(old="\r\n", new="\n")
+        let source = @fs.read_text(target).replace_all(old="\r\n", new="\n")
         if adapter_checksum(source) != checksum {
-          fail("Async 0.22.5 source checksum mismatch: \{path}")
+          fail("Async 0.22.10 source checksum mismatch: \{path}")
         }
       }
       Null =>
@@ -83,7 +84,19 @@ async fn patch_async_dependency(workspace : String) -> Unit {
     ),
   )
   for name in ["napi_async.h", "napi_async.mbt", "LIBUV-LICENSE"] {
-    write_text_file(workspace + "/" + name, assets["async/" + name])
+    let target = if name == "napi_async.h" && is_package_runtime {
+      mkdirp(workspace + "/.napi-mbt/include")
+      workspace + "/.napi-mbt/include/" + name
+    } else {
+      workspace + "/" + name
+    }
+    let text = if name == "napi_async.mbt" && is_package_runtime {
+      "using @napi {\n  type NapiEnv,\n  type NapiValue,\n  type NapiDeferred,\n  napi_promise_new,\n  napi_promise_resolve,\n  napi_promise_reject,\n  napi_failure,\n  result_from_status,\n  throw_napi_error,\n  moonbit_dummy_napi_value,\n  napi_field_get,\n  napi_undefined,\n  get_Bool,\n}\n\n" +
+      assets["async/" + name]
+    } else {
+      assets["async/" + name]
+    }
+    write_text_file(target, text)
   }
   let pkg = read_text(workspace + "/moon.pkg")
   if pkg.contains("@napi_mbt_async") {
@@ -93,9 +106,12 @@ async fn patch_async_dependency(workspace : String) -> Unit {
     workspace + "/moon.pkg",
     append_package_import(pkg, "moonbitlang/async/napi_host", "napi_mbt_async"),
   )
+  let c_target = workspace +
+    "/" +
+    (if is_package_runtime { "napi_glue.c" } else { "stub.c" })
   write_text_file(
-    workspace + "/stub.c",
-    read_text(workspace + "/stub.c") + "\n#include \"napi_async.h\"\n",
+    c_target,
+    read_text(c_target) + "\n#include \"napi_async.h\"\n",
   )
 }
 

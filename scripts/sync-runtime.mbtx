@@ -1,34 +1,45 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
 
 ///|
 async fn main {
   let path = "internal/assets/data/resources.json"
-  guard @json.parse(@fs.read_file(path).text()) is Object(files) else { fail("Invalid resources") }
+  guard @json.parse(@fs.read_text(path)) is Object(files) else { fail("Invalid resources") }
   let check = @env.args().contains("--check")
-  let license = @fs.read_file("LICENSE").text().replace_all(old="\r\n", new="\n")
+  let license = @fs.read_text("LICENSE").replace_all(old="\r\n", new="\n")
   if check && files.get("RUNTIME-LICENSE") != Some(Json(license)) { fail("Runtime license is stale") }
   files["RUNTIME-LICENSE"] = Json(license)
-  let task_runtime = @fs.read_file("internal/async-adapter/native_tasks.mbt.patch").text().replace_all(old="\r\n", new="\n")
+  let task_runtime = @fs.read_text("internal/async-adapter/native_tasks.mbt.patch").replace_all(old="\r\n", new="\n")
   if check && files.get("async/native_tasks.mbt") != Some(Json(task_runtime)) { fail("Native task wrapper is stale") }
   files["async/native_tasks.mbt"] = Json(task_runtime)
   for name in ["napi_native_task.h", "napi_native_task_runtime.h", "napi_worker_lifecycle.h"] {
-    let text = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
+    let text = @fs.read_text(name).replace_all(old="\r\n", new="\n")
     if check && files.get("template/" + name) != Some(Json(text)) { fail("Native task header is stale") }
     files["template/" + name] = Json(text)
   }
   for name in ["pool.cjs", "entry.cjs"] {
-    let text = @fs.read_file("internal/workers/" + name).text().replace_all(old="\r\n", new="\n")
+    let text = @fs.read_text("internal/workers/" + name).replace_all(old="\r\n", new="\n")
     if check && files.get("workers/" + name) != Some(Json(text)) { fail("Worker runtime is stale") }
     files["workers/" + name] = Json(text)
   }
-  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_collections.mbt", "napi_owned_binary.mbt", "napi_arraybuffer.mbt", "napi_owned_binary.h", "napi_dates.mbt", "napi_symbols.mbt", "napi_iterators.mbt", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt", "napi_low_level.mbt", "napi_advanced.mbt", "napi_typed_tsfn.mbt"] {
-    let source = @fs.read_file(name).text().replace_all(old="\r\n", new="\n")
+  if !check && !@fs.exists("runtime") { @fs.mkdir("runtime", recursive=true) }
+  for name in ["napi_types.mbt", "napi_bindings.mbt", "napi_features.mbt", "napi_error.mbt", "napi_values.mbt", "napi_collections.mbt", "napi_owned_binary.mbt", "napi_arraybuffer.mbt", "napi_owned_binary.h", "napi_dates.mbt", "napi_symbols.mbt", "napi_iterators.mbt", "napi_classes.mbt", "napi_callbacks.mbt", "napi_reference.mbt", "napi_either.mbt", "napi_traits.mbt", "napi_callbacks.h", "napi_lifecycle.h", "napi_runtime_version.mbt", "stub.c", "lib.mbt", "napi_low_level.mbt", "napi_advanced.mbt", "napi_typed_tsfn.mbt"] {
+    let source = @fs.read_text(name).replace_all(old="\r\n", new="\n")
     let (target, source) = if name == "lib.mbt" {
       ("napi_runtime.mbt", source)
     } else { (name, source) }
     let key = "template/" + target
     if check && files.get(key) != Some(Json(source)) { fail("Runtime template is stale: \{key}") }
     files[key] = Json(source)
+    let runtime_path = "runtime/" + target
+    if check {
+      if !@fs.exists(runtime_path) || @fs.read_text(runtime_path).replace_all(old="\r\n", new="\n") != source {
+        fail("Runtime package file is stale: \{runtime_path}")
+      }
+    } else {
+      @fs.write_text(runtime_path, source)
+    }
     if name == "napi_runtime_version.mbt" {
       guard source.find("=") is Some(index) else { fail("Invalid runtime version declaration") }
       let version = @json.parse(source[index + 1:].trim().to_owned())
@@ -36,5 +47,5 @@ async fn main {
       files["runtime-version"] = version
     }
   }
-  if !check { @fs.write_file(path, Json(files).stringify(indent=2) + "\n") }
+  if !check { @fs.write_text(path, Json(files).stringify(indent=2) + "\n") }
 }

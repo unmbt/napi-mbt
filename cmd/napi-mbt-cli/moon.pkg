@@ -1,9 +1,8 @@
 import {
   "unmbt/native-toolchain" @native_toolchain,
-  "moonbitlang/async",
-  "moonbitlang/async/process",
-  "moonbitlang/async/fs",
-  "moonbitlang/async/io",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/process",
+  "moonbitlang/core/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/argparse",
   "moonbitlang/core/json",
@@ -29,4 +28,9 @@ dev_build(
 
 options(
   "native-stub": [ "host.c" ],
+  "allow-experimental-packages": [
+    "moonbitlang/core/async",
+    "moonbitlang/core/async/process",
+    "moonbitlang/core/async/fs",
+  ],
 )

@@ -2,6 +2,7 @@
 pub(all) struct Parameter {
   name : String
   value_type : ValueType
+  label : ParameterLabel
 }
 
 ///|
@@ -24,6 +25,7 @@ pub(all) struct ParsedSource {
   features : Array[String]
   types : Array[TypeDefinition]
   classes : Array[ParsedClass]
+  module_exports : ParsedExport?
 }
 
 ///|
@@ -125,15 +127,47 @@ fn parse_signature(
     guard text.find(":") is Some(colon) else {
       fail("\{location}: parameter must have a type")
     }
-    let name = text[:colon].trim().to_owned()
-    let raw_type = text[colon + 1:].trim().to_owned()
+    let lhs = text[:colon].trim().to_owned()
+    let (label, name) = if lhs.has_suffix("~") {
+      (Labeled, lhs[:lhs.length() - 1].trim().to_owned())
+    } else if lhs.has_suffix("?") {
+      (OptionalLabeled, lhs[:lhs.length() - 1].trim().to_owned())
+    } else {
+      (Positional, lhs)
+    }
     if !valid_identifier(name) {
       fail("\{location}: unsupported parameter \{text}")
     }
-    parameters.push({
-      name,
-      value_type: parse_value_type(raw_type, location, true),
-    })
+    let raw_rhs = text[colon + 1:].trim().to_owned()
+    let mut raw_type = raw_rhs
+    let mut has_default = false
+    let mut depth = 0
+    for i, c in raw_rhs {
+      if c == '(' || c == '[' {
+        depth += 1
+      } else if c == ')' || c == ']' {
+        depth -= 1
+      } else if depth == 0 && c == '=' {
+        raw_type = raw_rhs[:i].trim().to_owned()
+        has_default = true
+        break
+      }
+    }
+    if has_default && !(label is OptionalLabeled) {
+      fail("\{location}: default value requires optional parameter \{lhs}")
+    }
+    let parsed_type = parse_value_type(raw_type, location, true)
+    let value_type = if label is OptionalLabeled {
+      if parsed_type is (EnvType | BufferViewType) {
+        fail(
+          "\{location}: optional parameter \{name} cannot have type \{raw_type}",
+        )
+      }
+      OptionType(parsed_type)
+    } else {
+      parsed_type
+    }
+    parameters.push({ name, value_type, label, })
   }
   let return_text = child(node, "return_type")
     .map(n => n.tokens().join(" "))
@@ -243,6 +277,7 @@ pub fn parse_source(source : String, filename : String) -> ParsedSource raise {
 pub fn parse_sources(
   sources : Array[(String, String)],
   classes~ : Array[ClassConfig] = [],
+  module_exports~ : String? = None,
 ) -> ParsedSource raise {
   let exports = []
   let features = []
@@ -271,17 +306,71 @@ pub fn parse_sources(
     }
     visit(tree, filename, exports, features)
   }
+  let (all_classes, resolved_hook_name) = collect_doc_directives(
+    declarations, functions, classes, module_exports,
+  )
+  let resolved_hook = match resolved_hook_name {
+    None => None
+    Some(hook_name) => {
+      guard functions.get(hook_name) is Some((node, filename)) else {
+        fail("Unknown moduleExports function: \{hook_name}")
+      }
+      if !child(node, "visibility")
+        .map(v => v.tokens().contains("pub"))
+        .unwrap_or(false) {
+        fail(
+          "\{filename}:\{node.line()}: moduleExports requires a public function",
+        )
+      }
+      let has_export_name = match child(node, "attributes") {
+        Some(attributes) =>
+          attributes
+          .children()
+          .any(attr => attr.tokens() is ["#", "export_name", ..])
+        None => false
+      }
+      if has_export_name {
+        fail(
+          "\{filename}:\{node.line()}: moduleExports function cannot also use #export_name",
+        )
+      }
+      let parsed = parse_signature(
+        node,
+        filename,
+        "napi_mbt_module_exports",
+        node.line(),
+        FunctionBinding,
+      )
+      if parsed.is_async {
+        fail(
+          "\{filename}:\{node.line()}: moduleExports hook must be synchronous",
+        )
+      }
+      guard parsed.parameters
+        is [
+          { value_type: EnvType, label: Positional, .. },
+          { value_type: ObjectValueType, label: Positional, .. },
+        ] &&
+        parsed.return_type is UnitType else {
+        fail(
+          "\{filename}:\{node.line()}: moduleExports hook must have signature (NapiEnv, NapiObject) -> Unit",
+        )
+      }
+      Some(parsed)
+    }
+  }
   let types : Array[TypeDefinition] = []
   for i, item in exports {
-    exports[i] = class_function(item, classes)
+    exports[i] = class_function(item, all_classes)
   }
   let parsed = {
     exports,
     features,
     types,
-    classes: parse_classes(classes, functions, declarations),
+    classes: parse_classes(all_classes, functions, declarations),
+    module_exports: resolved_hook,
   }
-  if !classes.is_empty() {
+  if !all_classes.is_empty() {
     features.push("class")
   }
   for item in parsed.all_functions() {
@@ -296,7 +385,7 @@ pub fn parse_sources(
         types,
         features,
         location,
-        classes,
+        all_classes,
       )
     }
     resolve_type(
@@ -305,7 +394,7 @@ pub fn parse_sources(
       types,
       features,
       location,
-      classes,
+      all_classes,
     )
   }
   for item in parsed.all_functions() {

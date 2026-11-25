@@ -12,12 +12,12 @@ pub(all) suberror NapiError {
     status~ : Int32,
     kind~ : NapiErrorKind,
     code~ : String,
-    context~ : String
+    context~ : String,
   )
 }
 
 ///|
-fn napi_failure(
+pub fn napi_failure(
   status : Int32,
   kind : NapiErrorKind,
   code : String,
@@ -27,7 +27,7 @@ fn napi_failure(
 }
 
 ///|
-fn result_from_status(
+pub fn result_from_status(
   env : NapiEnv,
   status : Int32,
   msg : Bytes,
@@ -115,7 +115,7 @@ extern "c" fn throw_napi_error_raw(
 ///|
 // The only JS exception boundary. The C side leaves an existing pending
 // exception intact, including errors originating from reentrant JS callbacks.
-fn throw_napi_error(env : NapiEnv, error : Error) -> Unit {
+pub fn throw_napi_error(env : NapiEnv, error : Error) -> Unit {
   if error is NapiError::JavaScriptException(reference) {
     let status = napi_reference_throw(env, reference)
     if status == 0 || status == 10 {

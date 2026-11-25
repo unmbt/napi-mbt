@@ -1,10 +1,11 @@
-///|
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
-  "moonbitlang/async@0.22.5/process",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs",
+  "moonbitlang/core/async/process",
   "moonbitlang/core/json",
 }
+----
 
 ///|
 async fn run(
@@ -17,28 +18,28 @@ async fn run(
     env["GITHUB_REF_TYPE"] = "tag"
     env["GITHUB_REF_NAME"] = value
   }
-  let (code, out, err) = @async.with_timeout(120000, () => {
-    @process.collect_output("moon", args, cwd~, extra_env=env)
+  let res = @async.with_timeout(120000, () => {
+    @process.run("moon", args, cwd~, extra_env=env, stdout=Collect, stderr=Collect)
   })
-  (code, out.text() + err.text())
+  (res.exit_code, res.stdout_text() + res.stderr_text())
 }
 
 ///|
 async fn main {
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-release-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   @fs.mkdir(temp + "/scripts")
-  @fs.write_file(
+  @fs.write_binary(
     temp + "/scripts/release-check.mbtx",
-    @fs.read_file(root + "/scripts/release-check.mbtx"),
+    @fs.read_binary(root + "/scripts/release-check.mbtx"),
   )
-  guard @json.parse(@fs.read_file(root + "/package.json").text()) is
+  guard @json.parse(@fs.read_text(root + "/package.json")) is
     Object(root_manifest) else {
     fail("Invalid root manifest")
   }
   assert_eq(root_manifest.get("private"), Some(Json(true)))
-  guard @json.parse(@fs.read_file(root + "/bump.config.json").text()) is
+  guard @json.parse(@fs.read_text(root + "/bump.config.json")) is
     { "execute": String(execute), "all": True, .. } else {
     fail("Release config must run the Mooncakes preparation hook")
   }
@@ -69,19 +70,19 @@ async fn main {
     #|
     #|snapshots:
     #|  fixture-tool@0.1.1: {}
-  @fs.write_file(temp + "/package.json", manifest.stringify(indent=2) + "\n")
-  @fs.write_file(temp + "/pnpm-lock.yaml", lock + "\n")
+  @fs.write_text(temp + "/package.json", manifest.stringify(indent=2) + "\n")
+  @fs.write_text(temp + "/pnpm-lock.yaml", lock + "\n")
   for version in ["0.2.0", "0.3.0-rc.1"] {
-    @fs.write_file(
+    @fs.write_text(
       temp + "/moon.mod",
       "name = \"test/release\"\nversion = \"\{version}\"\npreferred_target = \"native\"\n",
     )
-    let before_manifest = @fs.read_file(temp + "/package.json").text()
-    let before_lock = @fs.read_file(temp + "/pnpm-lock.yaml").text()
+    let before_manifest = @fs.read_text(temp + "/package.json")
+    let before_lock = @fs.read_text(temp + "/pnpm-lock.yaml")
     let (code, output) = run(["run", "scripts/release-check.mbtx"], temp)
     assert_eq(code, 0, msg=output)
-    assert_eq(@fs.read_file(temp + "/package.json").text(), before_manifest)
-    assert_eq(@fs.read_file(temp + "/pnpm-lock.yaml").text(), before_lock)
+    assert_eq(@fs.read_text(temp + "/package.json"), before_manifest)
+    assert_eq(@fs.read_text(temp + "/pnpm-lock.yaml"), before_lock)
     let (code, output) = run(
       ["run", "scripts/release-check.mbtx", "--write"],
       temp,

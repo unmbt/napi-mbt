@@ -1,23 +1,26 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/process" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/process" }
+----
+
 async fn main {
-  let status = @process.run("moon", ["run", "scripts/release-check-test.mbtx"])
+  let status = @process.run("moon", ["run", "scripts/release-check-test.mbtx"]).exit_code
   if status != 0 { fail("Release preparation regression tests failed") }
-  let status = @process.run("moon", ["run", "scripts/ci-bootstrap-test.mbtx"])
+  let status = @process.run("moon", ["run", "scripts/ci-bootstrap-test.mbtx"]).exit_code
   if status != 0 { fail("Clean dependency bootstrap failed") }
-  let status = @process.run("moon", ["run", "scripts/source-install-test.mbtx"])
+  let status = @process.run("moon", ["run", "scripts/source-install-test.mbtx"]).exit_code
   if status != 0 { fail("Clean source installation failed") }
-  let status = @process.run("moon", ["run", "scripts/build-rules-test.mbtx"])
+  let status = @process.run("moon", ["run", "scripts/build-rules-test.mbtx"]).exit_code
   if status != 0 { fail("Build rule tests failed") }
-  let status = @process.run("moon", ["run", "scripts/generator-snapshot-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  let status = @process.run("moon", ["run", "scripts/generator-snapshot-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]).exit_code
   if status != 0 { fail("Generator snapshot tests failed") }
-  let status = @process.run("moon", ["run", "scripts/cli-native-test.mbtx"])
+  let status = @process.run("moon", ["run", "scripts/cli-native-test.mbtx"]).exit_code
   if status != 0 { fail("Native CLI regression tests failed") }
-  let status = @process.run("moon", ["run", "scripts/unix-symbol-check.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  let status = @process.run("moon", ["run", "scripts/unix-symbol-check.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]).exit_code
   if status != 0 { fail("Unix libc symbol collision regression test failed") }
-  let status = @process.run("moon", ["run", "scripts/build-isolation-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  let status = @process.run("moon", ["run", "scripts/build-isolation-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]).exit_code
   if status != 0 { fail("Isolated native build regression tests failed") }
-  let status = @process.run("moon", ["run", "scripts/runtime-boundary-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  let status = @process.run("moon", ["run", "scripts/runtime-boundary-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]).exit_code
   if status != 0 { fail("Runtime boundary fixture build failed") }
-  let status = @process.run("moon", ["run", "scripts/structured-types-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"])
+  let status = @process.run("moon", ["run", "scripts/structured-types-test.mbtx", "_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"]).exit_code
   if status != 0 { fail("Structured type fixture build failed") }
 }

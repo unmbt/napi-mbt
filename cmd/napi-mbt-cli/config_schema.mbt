@@ -69,6 +69,7 @@ fn config_schema() -> Json raise {
         "enum": ["auto", "cmake", "gcc", "clang", "msvc"],
         "default": "auto",
       },
+      "runtime": { "enum": ["vendored", "package"], "default": "vendored" },
       "targets": {
         "type": "array",
         "uniqueItems": true,
@@ -82,6 +83,7 @@ fn config_schema() -> Json raise {
       "cjs": { "type": "boolean", "default": true },
       "esm": { "type": "boolean", "default": true },
       "classes": class_configuration_schema(),
+      "moduleExports": { "type": "string", "minLength": 1 },
       "workerTasks": {
         "type": "array",
         "uniqueItems": true,

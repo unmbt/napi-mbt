@@ -14,11 +14,20 @@ test "date set iterator and extended typed arrays render end to end" {
       assert_true(text.contains("Uint16Array"))
     }
     if name == "napi_exports.mbt" {
-      assert_true(text.contains("get_NapiDate"))
-      assert_true(text.contains("get_NapiSymbol"))
-      assert_true(text.contains("napi_set_values(env, value)"))
-      assert_true(text.contains("get_NapiIterator"))
-      assert_true(text.contains("get_NapiInt16Array"))
+      assert_true(text.contains("let p0 : NapiDate = napi_from_value(env, a0)"))
+      assert_true(
+        text.contains("let p1 : NapiSymbol = napi_from_value(env, a1)"),
+      )
+      assert_true(
+        text.contains("let p2 : NapiSet[Int32] = napi_from_value(env, a2)"),
+      )
+      assert_true(
+        text.contains("let p3 : NapiIterator[Int32] = napi_from_value(env, a3)"),
+      )
+      assert_true(
+        text.contains("let p4 : NapiInt16Array = napi_from_value(env, a4)"),
+      )
+      assert_true(text.contains("napi_to_value(env, value.4)"))
     }
   }
 }

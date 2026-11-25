@@ -1,22 +1,25 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env", "moonbitlang/core/json" }
+----
+
 async fn main {
   guard @env.args() is [_, asset] else { fail("Expected asset name") }
   let temp = @fs.tmpdir(prefix="napi-mbt-release-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   let name = if @env.get_env_var("OS") == Some("Windows_NT") { "napi-mbt-cli.exe" } else { "napi-mbt-cli" }
-  @fs.write_file(temp + "/" + name, @fs.read_file("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
+  @fs.write_binary(temp + "/" + name, @fs.read_binary("_build/native/release/build/cmd/napi-mbt-cli/napi-mbt-cli.exe"))
   if @env.get_env_var("OS") != Some("Windows_NT") { @fs.chmod(temp + "/" + name, 0o755) }
   @fs.mkdir(temp + "/licenses")
   for name in ["TREE-SITTER-LICENSE", "GRAMMAR-LICENSE"] {
-    @fs.write_file(temp + "/licenses/" + name, @fs.read_file("internal/syntax/vendor/" + name))
+    @fs.write_binary(temp + "/licenses/" + name, @fs.read_binary("internal/syntax/vendor/" + name))
   }
-  @fs.write_file(temp + "/licenses/NAPI-MBT-LICENSE", @fs.read_file("LICENSE"))
-  @fs.write_file(temp + "/licenses/UNICODE-LICENSE", @fs.read_file("internal/syntax/vendor/runtime/unicode/LICENSE"))
-  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is { "NODE-API-LICENSE": String(license), .. } else { fail("Missing bundled license") }
-  @fs.write_file(temp + "/licenses/NODE-API-LICENSE", license)
-  guard @json.parse(@fs.read_file("internal/assets/data/resources.json").text()) is { "async/LICENSE": String(async_license), "async/LIBUV-LICENSE": String(uv_license), .. } else { fail("Missing embedded async licenses") }
-  @fs.write_file(temp + "/licenses/MOONBIT-ASYNC-LICENSE", async_license)
-  @fs.write_file(temp + "/licenses/LIBUV-LICENSE", uv_license)
-  let status = @process.run("tar", ["-czf", asset + ".tar.gz", "-C", temp, "."])
+  @fs.write_binary(temp + "/licenses/NAPI-MBT-LICENSE", @fs.read_binary("LICENSE"))
+  @fs.write_binary(temp + "/licenses/UNICODE-LICENSE", @fs.read_binary("internal/syntax/vendor/runtime/unicode/LICENSE"))
+  guard @json.parse(@fs.read_text("internal/assets/data/resources.json")) is { "NODE-API-LICENSE": String(license), .. } else { fail("Missing bundled license") }
+  @fs.write_text(temp + "/licenses/NODE-API-LICENSE", license)
+  guard @json.parse(@fs.read_text("internal/assets/data/resources.json")) is { "async/LICENSE": String(async_license), "async/LIBUV-LICENSE": String(uv_license), .. } else { fail("Missing embedded async licenses") }
+  @fs.write_text(temp + "/licenses/MOONBIT-ASYNC-LICENSE", async_license)
+  @fs.write_text(temp + "/licenses/LIBUV-LICENSE", uv_license)
+  let status = @process.run("tar", ["-czf", asset + ".tar.gz", "-C", temp, "."]).exit_code
   if status != 0 { fail("Packaging failed") }
 }

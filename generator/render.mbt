@@ -8,6 +8,7 @@ pub fn render(
   cjs~ : Bool = true,
   esm~ : Bool = true,
   worker_tasks~ : Array[String] = [],
+  runtime_prefix~ : String = "",
 ) -> Array[(String, String)] raise {
   validate_ir(source, napi_version)
   let exports = source.exports
@@ -58,7 +59,14 @@ pub fn render(
   let outputs = [
     (
       "napi_exports.mbt",
-      adapters(source.all_functions(), source.types, source.classes, snapshots~),
+      adapters(
+        source.all_functions(),
+        source.types,
+        source.classes,
+        snapshots~,
+        module_exports=source.module_exports,
+        rt=runtime_prefix,
+      ),
     ),
     (
       "napi_glue.c",
@@ -66,6 +74,7 @@ pub fn render(
         exports + snapshots,
         source.classes,
         workers=!worker_tasks.is_empty(),
+        module_exports=source.module_exports is Some(_),
       ),
     ),
     ("index.d.ts", if cjs { types } else { esm_types }),

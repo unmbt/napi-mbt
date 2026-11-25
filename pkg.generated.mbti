@@ -6,7 +6,7 @@ import {
 }
 
 // Values
-pub const NAPI_MBT_RUNTIME_VERSION : String = "14"
+pub const NAPI_MBT_RUNTIME_VERSION : String = "15"
 
 pub fn add(Int32, Int32) -> Int32
 
@@ -38,6 +38,8 @@ pub fn get_NapiBufferView(NapiEnv, NapiValue) -> NapiBufferView raise NapiError
 
 pub fn get_NapiDataView(NapiEnv, NapiValue) -> NapiDataView raise NapiError
 
+pub fn get_NapiDate(NapiEnv, NapiValue) -> NapiDate raise NapiError
+
 pub fn get_NapiFloat32Array(NapiEnv, NapiValue) -> NapiFloat32Array raise NapiError
 
 pub fn get_NapiFloat64Array(NapiEnv, NapiValue) -> NapiFloat64Array raise NapiError
@@ -47,6 +49,10 @@ pub fn get_NapiInt16Array(NapiEnv, NapiValue) -> NapiInt16Array raise NapiError
 pub fn get_NapiInt32Array(NapiEnv, NapiValue) -> NapiInt32Array raise NapiError
 
 pub fn get_NapiInt8Array(NapiEnv, NapiValue) -> NapiInt8Array raise NapiError
+
+pub fn[T] get_NapiIterator(NapiEnv, NapiValue, (NapiEnv, NapiValue) -> T raise) -> NapiIterator[T] raise NapiError
+
+pub fn get_NapiSymbol(NapiEnv, NapiValue) -> NapiSymbol raise NapiError
 
 pub fn get_NapiUint16Array(NapiEnv, NapiValue) -> NapiUint16Array raise NapiError
 
@@ -61,6 +67,8 @@ pub fn get_String(NapiEnv, NapiValue) -> String raise NapiError
 pub fn get_UInt(NapiEnv, NapiValue) -> UInt32 raise NapiError
 
 pub fn get_UInt64(NapiEnv, NapiValue) -> UInt64 raise NapiError
+
+pub fn moonbit_dummy_napi_value() -> NapiValue
 
 pub fn mutate_buffer(NapiBufferView) -> Unit raise NapiError
 
@@ -108,15 +116,21 @@ pub fn napi_external_buffer(NapiEnv, Bytes) -> NapiValue raise NapiError
 
 pub fn napi_external_string_latin1(NapiEnv, Bytes) -> (NapiValue, Bool) raise NapiError
 
+pub fn napi_failure(Int32, NapiErrorKind, String, String) -> NapiError
+
 pub fn napi_field_get(NapiEnv, NapiValue, String, Bool) -> NapiValue raise NapiError
 
 pub fn napi_field_set(NapiEnv, NapiValue, String, NapiValue) -> Unit raise NapiError
+
+pub fn[T : FromNapiValue] napi_from_value(NapiEnv, NapiValue) -> T raise
 
 pub fn napi_get_instance_data(NapiEnv) -> UnmanagedBuffer raise NapiError
 
 pub fn napi_global(NapiEnv) -> NapiValue raise NapiError
 
 pub fn napi_is_detached_arraybuffer(NapiEnv, NapiValue) -> Bool raise NapiError
+
+pub fn napi_is_exception_pending(NapiEnv) -> Bool raise NapiError
 
 pub fn napi_is_nullish(NapiEnv, NapiValue) -> Bool raise NapiError
 
@@ -184,6 +198,8 @@ pub fn napi_threadsafe_function_release(NapiThreadsafeFunction, NapiTsfnReleaseM
 
 pub fn napi_throw_syntax_error(NapiEnv, String, String) -> Unit raise NapiError
 
+pub fn[T : ToNapiValue] napi_to_value(NapiEnv, T) -> NapiValue raise
+
 pub fn napi_type_tag_object(NapiEnv, NapiValue, NapiTypeTag) -> Unit raise NapiError
 
 pub fn napi_undefined(NapiEnv) -> NapiValue raise NapiError
@@ -192,7 +208,13 @@ pub fn napi_value_type(NapiEnv, NapiValue) -> NapiValueType raise NapiError
 
 pub fn napi_version(NapiEnv) -> UInt32 raise NapiError
 
+pub fn[T] napi_with_cycle_guard(NapiEnv, NapiValue, () -> T raise) -> T raise
+
+pub fn[T] napi_with_depth_guard(() -> T raise) -> T raise
+
 pub fn napi_write_json(NapiEnv, @json.Json, Int32) -> NapiValue raise NapiError
+
+pub fn result_from_status(NapiEnv, Int32, Bytes) -> Unit raise NapiError
 
 pub fn roundtrip_bytes(Bytes) -> Bytes
 
@@ -216,6 +238,8 @@ pub fn set_NapiBigUint64Array(NapiEnv, NapiBigUint64Array) -> NapiValue raise Na
 
 pub fn set_NapiDataView(NapiEnv, NapiDataView) -> NapiValue raise NapiError
 
+pub fn set_NapiDate(NapiEnv, NapiDate) -> NapiValue raise NapiError
+
 pub fn set_NapiFloat32Array(NapiEnv, NapiFloat32Array) -> NapiValue raise NapiError
 
 pub fn set_NapiFloat64Array(NapiEnv, NapiFloat64Array) -> NapiValue raise NapiError
@@ -225,6 +249,10 @@ pub fn set_NapiInt16Array(NapiEnv, NapiInt16Array) -> NapiValue raise NapiError
 pub fn set_NapiInt32Array(NapiEnv, NapiInt32Array) -> NapiValue raise NapiError
 
 pub fn set_NapiInt8Array(NapiEnv, NapiInt8Array) -> NapiValue raise NapiError
+
+pub fn[T] set_NapiIterator(NapiEnv, NapiIterator[T], (NapiEnv, T) -> NapiValue raise) -> NapiValue raise NapiError
+
+pub fn set_NapiSymbol(NapiEnv, NapiSymbol) -> NapiValue raise NapiError
 
 pub fn set_NapiUint16Array(NapiEnv, NapiUint16Array) -> NapiValue raise NapiError
 
@@ -241,6 +269,8 @@ pub fn set_UInt(NapiEnv, UInt32) -> NapiValue raise NapiError
 pub fn set_UInt64(NapiEnv, UInt64) -> NapiValue raise NapiError
 
 pub fn set_Unit(NapiEnv, Unit) -> NapiValue raise NapiError
+
+pub fn throw_napi_error(NapiEnv, Error) -> Unit
 
 // Errors
 pub(all) suberror NapiError {
@@ -263,6 +293,8 @@ pub fn NapiArray::length(Self, NapiEnv) -> Int32 raise NapiError
 pub fn NapiArray::new(NapiEnv, Int32) -> Self raise NapiError
 pub fn NapiArray::set(Self, NapiEnv, Int32, NapiValue) -> Unit raise NapiError
 pub fn NapiArray::value(Self) -> NapiValue
+pub impl FromNapiValue for NapiArray
+pub impl ToNapiValue for NapiArray
 
 pub struct NapiArrayBuffer {
   // private fields
@@ -270,6 +302,8 @@ pub struct NapiArrayBuffer {
 pub fn NapiArrayBuffer::byte_length(Self) -> Int32
 pub fn NapiArrayBuffer::from_bytes(Bytes) -> Self
 pub fn NapiArrayBuffer::to_bytes(Self) -> Bytes
+pub impl FromNapiValue for NapiArrayBuffer
+pub impl ToNapiValue for NapiArrayBuffer
 
 pub struct NapiBigInt64Array {
   // private fields
@@ -277,6 +311,8 @@ pub struct NapiBigInt64Array {
 pub fn NapiBigInt64Array::length(Self) -> Int32
 pub fn NapiBigInt64Array::new(Array[Int64]) -> Self
 pub fn NapiBigInt64Array::to_array(Self) -> Array[Int64]
+pub impl FromNapiValue for NapiBigInt64Array
+pub impl ToNapiValue for NapiBigInt64Array
 
 pub struct NapiBigUint64Array {
   // private fields
@@ -284,19 +320,26 @@ pub struct NapiBigUint64Array {
 pub fn NapiBigUint64Array::length(Self) -> Int32
 pub fn NapiBigUint64Array::new(Array[UInt64]) -> Self
 pub fn NapiBigUint64Array::to_array(Self) -> Array[UInt64]
+pub impl FromNapiValue for NapiBigUint64Array
+pub impl ToNapiValue for NapiBigUint64Array
 
 pub struct NapiBufferView {
   env : NapiEnv
   value : NapiValue
   mut is_alive : Bool
+  // private fields
 }
+pub fn NapiBufferView::copy_from_bytes(Self, Bytes, offset? : Int32) -> Unit raise NapiError
 pub fn NapiBufferView::invalidate(Self) -> Unit
 pub fn NapiBufferView::length(Self) -> Int32 raise NapiError
 pub fn NapiBufferView::load8(Self, Int32) -> Int32 raise NapiError
 pub fn NapiBufferView::store8(Self, Int32, Int32) -> Unit raise NapiError
+pub fn NapiBufferView::to_bytes(Self) -> Bytes raise NapiError
+pub impl FromNapiValue for NapiBufferView
 
 pub type NapiCallback
 pub fn NapiCallback::call(Self, NapiValue) -> NapiValue raise NapiError
+pub fn NapiCallback::call_argv(Self, FixedArray[NapiValue]) -> NapiValue raise NapiError
 pub fn NapiCallback::dispose(Self) -> Unit raise NapiError
 pub fn NapiCallback::environment(Self) -> NapiEnv raise NapiError
 pub fn NapiCallback::new(NapiEnv, NapiValue) -> Self raise NapiError
@@ -310,15 +353,26 @@ pub struct NapiDataView {
 pub fn NapiDataView::byte_length(Self) -> Int32
 pub fn NapiDataView::from_bytes(Bytes) -> Self
 pub fn NapiDataView::to_bytes(Self) -> Bytes
+pub impl FromNapiValue for NapiDataView
+pub impl ToNapiValue for NapiDataView
 
 pub struct NapiDate {
   // private fields
 }
 pub fn NapiDate::milliseconds(Self) -> Double
 pub fn NapiDate::new(Double) -> Self
+pub impl FromNapiValue for NapiDate
+pub impl ToNapiValue for NapiDate
 
 #external
 pub type NapiDeferred
+
+pub(all) enum NapiEither[A, B] {
+  A(A)
+  B(B)
+}
+pub impl[A : FromNapiValue, B : FromNapiValue] FromNapiValue for NapiEither[A, B]
+pub impl[A : ToNapiValue, B : ToNapiValue] ToNapiValue for NapiEither[A, B]
 
 #external
 pub type NapiEnv
@@ -348,6 +402,8 @@ pub fn NapiExternal::data(Self, NapiEnv) -> UnmanagedBuffer raise NapiError
 pub fn NapiExternal::from_value(NapiEnv, NapiValue) -> Self raise NapiError
 pub fn NapiExternal::new(NapiEnv, UnmanagedBuffer) -> Self raise NapiError
 pub fn NapiExternal::value(Self) -> NapiValue
+pub impl FromNapiValue for NapiExternal
+pub impl ToNapiValue for NapiExternal
 
 pub struct NapiExternalBuffer {
   // private fields
@@ -362,6 +418,8 @@ pub struct NapiFloat32Array {
 pub fn NapiFloat32Array::length(Self) -> Int32
 pub fn NapiFloat32Array::new(Array[Float]) -> Self
 pub fn NapiFloat32Array::to_array(Self) -> Array[Float]
+pub impl FromNapiValue for NapiFloat32Array
+pub impl ToNapiValue for NapiFloat32Array
 
 pub struct NapiFloat64Array {
   // private fields
@@ -369,6 +427,8 @@ pub struct NapiFloat64Array {
 pub fn NapiFloat64Array::length(Self) -> Int32
 pub fn NapiFloat64Array::new(Array[Double]) -> Self
 pub fn NapiFloat64Array::to_array(Self) -> Array[Double]
+pub impl FromNapiValue for NapiFloat64Array
+pub impl ToNapiValue for NapiFloat64Array
 
 pub struct NapiFunction {
   // private fields
@@ -377,6 +437,8 @@ pub fn NapiFunction::call(Self, NapiEnv, NapiValue, Array[NapiValue]) -> NapiVal
 pub fn NapiFunction::from_value(NapiEnv, NapiValue) -> Self raise NapiError
 pub fn NapiFunction::new_instance(Self, NapiEnv, Array[NapiValue]) -> NapiObject raise NapiError
 pub fn NapiFunction::value(Self) -> NapiValue
+pub impl FromNapiValue for NapiFunction
+pub impl ToNapiValue for NapiFunction
 
 #external
 pub type NapiHandleScope
@@ -395,6 +457,8 @@ pub struct NapiInt16Array {
 pub fn NapiInt16Array::length(Self) -> Int32
 pub fn NapiInt16Array::new(Array[Int32]) -> Self
 pub fn NapiInt16Array::to_array(Self) -> Array[Int32]
+pub impl FromNapiValue for NapiInt16Array
+pub impl ToNapiValue for NapiInt16Array
 
 pub struct NapiInt32Array {
   // private fields
@@ -402,6 +466,8 @@ pub struct NapiInt32Array {
 pub fn NapiInt32Array::length(Self) -> Int32
 pub fn NapiInt32Array::new(Array[Int32]) -> Self
 pub fn NapiInt32Array::to_array(Self) -> Array[Int32]
+pub impl FromNapiValue for NapiInt32Array
+pub impl ToNapiValue for NapiInt32Array
 
 pub struct NapiInt8Array {
   // private fields
@@ -409,6 +475,8 @@ pub struct NapiInt8Array {
 pub fn NapiInt8Array::length(Self) -> Int32
 pub fn NapiInt8Array::new(Array[Int32]) -> Self
 pub fn NapiInt8Array::to_array(Self) -> Array[Int32]
+pub impl FromNapiValue for NapiInt8Array
+pub impl ToNapiValue for NapiInt8Array
 
 pub struct NapiIterator[T] {
   // private fields
@@ -416,6 +484,8 @@ pub struct NapiIterator[T] {
 pub fn[T] NapiIterator::close(Self[T]) -> Unit raise
 pub fn[T] NapiIterator::new(() -> T? raise, close? : () -> Unit raise) -> Self[T] raise NapiError
 pub fn[T] NapiIterator::next(Self[T]) -> T? raise
+pub impl[T : FromNapiValue] FromNapiValue for NapiIterator[T]
+pub impl[T : ToNapiValue] ToNapiValue for NapiIterator[T]
 
 pub struct NapiObject {
   // private fields
@@ -429,6 +499,8 @@ pub fn NapiObject::keys(Self, NapiEnv) -> Array[String] raise NapiError
 pub fn NapiObject::prototype(Self, NapiEnv) -> Self raise NapiError
 pub fn NapiObject::set(Self, NapiEnv, String, NapiValue) -> Unit raise NapiError
 pub fn NapiObject::value(Self) -> NapiValue
+pub impl FromNapiValue for NapiObject
+pub impl ToNapiValue for NapiObject
 
 pub struct NapiPromise {
   promise : NapiValue
@@ -447,11 +519,15 @@ pub struct NapiSet[T] {
 pub fn[T] NapiSet::length(Self[T]) -> Int32
 pub fn[T] NapiSet::new(Array[T]) -> Self[T]
 pub fn[T] NapiSet::to_array(Self[T]) -> Array[T]
+pub impl[T : FromNapiValue] FromNapiValue for NapiSet[T]
+pub impl[T : ToNapiValue] ToNapiValue for NapiSet[T]
 
 pub struct NapiSymbol {
   // private fields
 }
 pub fn NapiSymbol::new(NapiEnv, String) -> Self raise NapiError
+pub impl FromNapiValue for NapiSymbol
+pub impl ToNapiValue for NapiSymbol
 
 #external
 pub type NapiThreadsafeFunction
@@ -494,6 +570,8 @@ pub struct NapiUint16Array {
 pub fn NapiUint16Array::length(Self) -> Int32
 pub fn NapiUint16Array::new(Array[UInt32]) -> Self
 pub fn NapiUint16Array::to_array(Self) -> Array[UInt32]
+pub impl FromNapiValue for NapiUint16Array
+pub impl ToNapiValue for NapiUint16Array
 
 pub struct NapiUint32Array {
   // private fields
@@ -501,6 +579,8 @@ pub struct NapiUint32Array {
 pub fn NapiUint32Array::length(Self) -> Int32
 pub fn NapiUint32Array::new(Array[UInt32]) -> Self
 pub fn NapiUint32Array::to_array(Self) -> Array[UInt32]
+pub impl FromNapiValue for NapiUint32Array
+pub impl ToNapiValue for NapiUint32Array
 
 pub struct NapiUint8Array {
   // private fields
@@ -508,6 +588,8 @@ pub struct NapiUint8Array {
 pub fn NapiUint8Array::length(Self) -> Int32
 pub fn NapiUint8Array::new(Array[Byte]) -> Self
 pub fn NapiUint8Array::to_array(Self) -> Array[Byte]
+pub impl FromNapiValue for NapiUint8Array
+pub impl ToNapiValue for NapiUint8Array
 
 pub struct NapiUint8ClampedArray {
   // private fields
@@ -515,6 +597,8 @@ pub struct NapiUint8ClampedArray {
 pub fn NapiUint8ClampedArray::length(Self) -> Int32
 pub fn NapiUint8ClampedArray::new(Array[Byte]) -> Self
 pub fn NapiUint8ClampedArray::to_array(Self) -> Array[Byte]
+pub impl FromNapiValue for NapiUint8ClampedArray
+pub impl ToNapiValue for NapiUint8ClampedArray
 
 #external
 pub type NapiValue
@@ -538,3 +622,44 @@ pub type UnmanagedBuffer
 // Type aliases
 
 // Traits
+pub(open) trait FromNapiValue {
+  fn from_napi_value(NapiEnv, NapiValue) -> Self raise
+}
+pub impl FromNapiValue for Unit
+pub impl FromNapiValue for Bool
+pub impl FromNapiValue for Int32
+pub impl FromNapiValue for Int64
+pub impl FromNapiValue for UInt32
+pub impl FromNapiValue for UInt64
+pub impl FromNapiValue for Float
+pub impl FromNapiValue for Double
+pub impl FromNapiValue for String
+pub impl[T : FromNapiValue] FromNapiValue for T?
+pub impl FromNapiValue for Bytes
+pub impl[T : FromNapiValue] FromNapiValue for Array[T]
+pub impl[T : FromNapiValue] FromNapiValue for Map[String, T]
+pub impl FromNapiValue for @json.Json
+pub impl[A : FromNapiValue, B : FromNapiValue] FromNapiValue for (A, B)
+pub impl[A : FromNapiValue, B : FromNapiValue, C : FromNapiValue] FromNapiValue for (A, B, C)
+pub impl[A : FromNapiValue, B : FromNapiValue, C : FromNapiValue, D : FromNapiValue] FromNapiValue for (A, B, C, D)
+
+pub(open) trait ToNapiValue {
+  fn to_napi_value(Self, NapiEnv) -> NapiValue raise
+}
+pub impl ToNapiValue for Unit
+pub impl ToNapiValue for Bool
+pub impl ToNapiValue for Int32
+pub impl ToNapiValue for Int64
+pub impl ToNapiValue for UInt32
+pub impl ToNapiValue for UInt64
+pub impl ToNapiValue for Float
+pub impl ToNapiValue for Double
+pub impl ToNapiValue for String
+pub impl[T : ToNapiValue] ToNapiValue for T?
+pub impl ToNapiValue for Bytes
+pub impl[T : ToNapiValue] ToNapiValue for Array[T]
+pub impl[T : ToNapiValue] ToNapiValue for Map[String, T]
+pub impl ToNapiValue for @json.Json
+pub impl[A : ToNapiValue, B : ToNapiValue] ToNapiValue for (A, B)
+pub impl[A : ToNapiValue, B : ToNapiValue, C : ToNapiValue] ToNapiValue for (A, B, C)
+pub impl[A : ToNapiValue, B : ToNapiValue, C : ToNapiValue, D : ToNapiValue] ToNapiValue for (A, B, C, D)

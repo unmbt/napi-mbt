@@ -1,17 +1,22 @@
-import { "moonbitlang/async@0.22.5", "moonbitlang/async@0.22.5/fs", "moonbitlang/async@0.22.5/process", "moonbitlang/core/env" }
+----
+import { "moonbitlang/core/async", "moonbitlang/core/async/fs", "moonbitlang/core/async/process", "moonbitlang/core/env" }
+----
 
 ///|
 async fn checked(args : Array[String]) -> Unit {
-  let (code, out, err) = @async.with_timeout(600000, () => @process.collect_output("moon", args))
-  if code != 0 { fail(out.text() + err.text()) }
-  println(out.text())
+  let _proc_res = @async.with_timeout(600000, () => @process.run("moon", args, stdout=Collect, stderr=Collect))
+  let code = _proc_res.exit_code
+  let out = _proc_res.stdout_text()
+  let err = _proc_res.stderr_text()
+  if code != 0 { fail(out + err) }
+  println(out)
 }
 
 ///|
 async fn main {
   let root = @fs.realpath(".")
   let temp = @fs.tmpdir(prefix="napi-mbt-examples-")
-  defer @fs.rmdir(temp, recursive=true)
+  defer @fs.remove(temp, recursive=true)
   // Install from a packed source tree, not a previously built checkout CLI.
   checked(["package", "--target-dir", temp + "/package"])
   let archives = @fs.readdir(temp + "/package/publish").filter(n => n.has_suffix(".zip"))
@@ -20,16 +25,16 @@ async fn main {
   @fs.mkdir(source)
   let archive = temp + "/package/publish/" + archives[0]
   let windows = @env.get_env_var("OS") == Some("Windows_NT")
-  let status = if windows { @process.run("tar", ["-xf", archive, "-C", source]) } else { @process.run("unzip", ["-q", archive, "-d", source]) }
+  let status = if windows { @process.run("tar", ["-xf", archive, "-C", source]).exit_code } else { @process.run("unzip", ["-q", archive, "-d", source]).exit_code }
   assert_eq(status, 0)
   checked(["install", source + "/cmd/napi-mbt-cli", "--bin", temp + "/bin"])
-  @fs.rmdir(source, recursive=true)
+  @fs.remove(source, recursive=true)
   let binary = temp + "/bin/napi-mbt-cli" + (if windows { ".exe" } else { "" })
   for name in ["hello-addon", "structured-data", "native-class", "callbacks", "async-file", "binary-processing", "native-tasks", "worker-tasks", "streams", "advanced-api"] {
     let destination = temp + "/" + name
     checked(["run", "examples/setup.mbtx", "examples/" + name, destination, binary])
     for (mode, resolution) in [("NodeNext", "NodeNext"), ("ESNext", "Bundler")] {
-      let code = @process.run("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, "--types", "node", "--typeRoots", root + "/node_modules/@types", destination + "/consumer.mts"])
+      let code = @process.run("node", [root + "/node_modules/typescript/bin/tsc", "--noEmit", "--strict", "--target", "ES2020", "--module", mode, "--moduleResolution", resolution, "--types", "node", "--typeRoots", root + "/node_modules/@types", destination + "/consumer.mts"]).exit_code
       assert_eq(code, 0, msg=name + " TypeScript " + mode)
     }
   }

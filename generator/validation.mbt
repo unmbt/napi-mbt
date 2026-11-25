@@ -59,6 +59,10 @@ fn validate_ir(source : ParsedSource, napi_version : Int32) -> Unit raise {
       | MapType(inner)
       | SetType(inner)
       | IteratorType(inner) => check(inner, location, true, read)
+      EitherType(a, b) => {
+        check(a, location, true, read)
+        check(b, location, true, read)
+      }
       TupleType(items) =>
         for item in items {
           check(item, location, true, read)

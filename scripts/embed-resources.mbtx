@@ -1,14 +1,16 @@
+----
 import {
-  "moonbitlang/async@0.22.5",
-  "moonbitlang/async@0.22.5/fs",
+  "moonbitlang/core/async",
+  "moonbitlang/core/async/fs",
   "moonbitlang/core/env",
   "moonbitlang/core/json",
 }
+----
 
 ///|
 async fn main {
   guard @env.args() is [_, input, output] else { fail("Expected input and output") }
-  let json = @fs.read_file(input).text()
+  let json = @fs.read_text(input)
   ignore(@json.parse(json))
   let chunks = []
   let mut start = 0
@@ -19,5 +21,5 @@ async fn main {
     chunks.push(Json(json[start:end].to_owned()).stringify())
     start = end
   }
-  @fs.write_file(output, "// Generated from data/resources.json. Do not edit.\n///|\nlet bundled : String = [\n  " + chunks.join(",\n  ") + ",\n].join(\"\")\n")
+  @fs.write_text(output, "// Generated from data/resources.json. Do not edit.\n///|\nlet bundled : String = [\n  " + chunks.join(",\n  ") + ",\n].join(\"\")\n")
 }
