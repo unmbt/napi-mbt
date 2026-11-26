@@ -31,7 +31,10 @@ async fn main {
   @fs.write_text(dir + "/moon.mod", "name = \"test/async-runtime\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.10\" }\n")
   @fs.write_text(dir + "/moon.pkg", @fs.read_text(dir + "/moon.pkg").replace_all(old="import {", new="import { \"moonbitlang/async\", \"moonbitlang/async/fs\", \"moonbitlang/async/socket\","))
   @fs.write_text(dir + "/napi-mbt.json", "{\"napiVersion\":8,\"features\":[\"async\"]}")
-  copy_tree((if @fs.exists(".mooncakes/moonbitlang/async") { ".mooncakes/moonbitlang/async" } else { ".repos/moonbitlang/async/0.22.10" }), dir + "/.mooncakes/moonbitlang/async")
+  if !@fs.exists(".repos/moonbitlang/async/0.22.10") && !@fs.exists(".mooncakes/moonbitlang/async") {
+    checked("moon", ["fetch", "moonbitlang/async@0.22.10"])
+  }
+  copy_tree((if @fs.exists(".repos/moonbitlang/async/0.22.10") { ".repos/moonbitlang/async/0.22.10" } else { ".mooncakes/moonbitlang/async" }), dir + "/.mooncakes/moonbitlang/async")
   let original = @fs.read_text(dir + "/.mooncakes/moonbitlang/async/src/internal/coroutine/scheduler.mbt")
   let source =
     #|///|

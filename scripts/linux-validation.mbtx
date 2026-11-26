@@ -59,7 +59,7 @@ async fn main {
   ignore(checked(distro, ["tar", "-xf", source, "-C", linux_root]))
   let node_path = @env.get_env_var("NAPI_MBT_LINUX_NODE_DIR").map(path => path + ":").unwrap_or("")
   let environment = ["env", "MOON_HOME=" + toolchain, "PATH=" + toolchain + "/bin:" + node_path + "/usr/local/bin:/usr/bin:/bin:/usr/sbin", "MOONBIT_NEW_NATIVE=0", "MOONBIT_ALLOCATOR=system"]
-  for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "run", "scripts/toolchain-check.mbtx"], ["-C", linux_root, "build", "--target", "native", "cmd/napi-mbt-cli"]] {
+  for args in [["version", "--all"], ["-C", toolchain + "/lib/core", "bundle", "--target", "all"], ["-C", linux_root, "update"], ["-C", linux_root, "fetch", "moonbitlang/async@0.22.10"], ["-C", linux_root, "run", "scripts/toolchain-check.mbtx"], ["-C", linux_root, "build", "--target", "native", "cmd/napi-mbt-cli"]] {
     println(checked(distro, environment + [toolchain + "/bin/moon"] + args))
   }
   println(checked(distro, ["env", "-C", linux_root] + environment[1:].to_owned() + ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts"]))

@@ -53,4 +53,5 @@ jobs:
         run: |
             moon version --all
             moon update
+            moon fetch moonbitlang/async@0.22.10
             moon check --target native --warn-list +73 --deny-warn

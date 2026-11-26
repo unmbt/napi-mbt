@@ -34,7 +34,10 @@ async fn main {
       @fs.write_text(dir + "/moon.mod", "name = \"minimum-fixture\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.10\" }\n")
       @fs.write_text(dir + "/moon.pkg", @fs.read_text(dir + "/moon.pkg").replace_all(old="import {", new="import { \"moonbitlang/async\","))
       @fs.write_text(dir + "/lib.mbt", @fs.read_text(dir + "/lib.mbt") + "\n///|\n#export_name(\"delay\")\npub async fn delay(ms : Int, value : String) -> String { @async.sleep(ms); value }\n")
-      copy_tree((if @fs.exists(".mooncakes/moonbitlang/async") { ".mooncakes/moonbitlang/async" } else { ".repos/moonbitlang/async/0.22.10" }), dir + "/.mooncakes/moonbitlang/async")
+      if !@fs.exists(".repos/moonbitlang/async/0.22.10") && !@fs.exists(".mooncakes/moonbitlang/async") {
+        checked("moon", ["fetch", "moonbitlang/async@0.22.10"])
+      }
+      copy_tree((if @fs.exists(".repos/moonbitlang/async/0.22.10") { ".repos/moonbitlang/async/0.22.10" } else { ".mooncakes/moonbitlang/async" }), dir + "/.mooncakes/moonbitlang/async")
     }
     checked(binary, ["build", dir, "--release"])
     let out = ".napi-mbt/minimum-" + mode

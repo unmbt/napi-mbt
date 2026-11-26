@@ -178,6 +178,7 @@ jobs:
         with:
           node-version: '26.4.0'
       - run: moon update
+      - run: moon fetch moonbitlang/async@0.22.10
       - run: moon run scripts/toolchain-check.mbtx
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon run scripts/sanitizer-test.mbtx
@@ -196,6 +197,7 @@ jobs:
         with:
           node-version: '26'
       - run: moon update
+      - run: moon fetch moonbitlang/async@0.22.10
       - run: moon build --target native --release cmd/napi-mbt-cli
       - run: moon check --target native --warn-list +73 --deny-warn
       - run: moon test --target native cmd/napi-mbt-cli generator internal/syntax internal/assets

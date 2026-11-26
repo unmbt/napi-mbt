@@ -57,12 +57,23 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const cancelled = source.toReadableStream({signal:controller.signal}).getReader();
   const read = cancelled.read(); controller.abort(error);
   await assert.rejects(read,e=>e===error); cancelled.releaseLock();
-  let cancelledInput = 0;
+  let cancelledInput = 0, pulled, onCancel;
+  const pullPromise = new Promise(resolve => { pulled = resolve; });
+  const cancelPromise = new Promise(resolve => { onCancel = resolve; });
   const controller2 = new AbortController();
-  const waiting = a.sum(new ReadableStream({cancel(){cancelledInput++;}}), {signal:controller2.signal});
-  await sleep(10); controller2.abort(error);
+  const waiting = a.sum(new ReadableStream({
+    pull() { pulled(); },
+    cancel() { cancelledInput++; onCancel(); }
+  }, { highWaterMark: 0 }), {signal:controller2.signal});
+  await pullPromise;
+  controller2.abort(error);
   await assert.rejects(waiting,e=>e===error);
-  await sleep(15); assert.equal(cancelledInput,1);
+  await Promise.race([
+    cancelPromise,
+    sleep(1000).then(() => { throw new Error('Timed out waiting for Web stream cancellation'); })
+  ]);
+  await sleep(15);
+  assert.equal(cancelledInput,1);
   console.log('Web stream cancellation passed');
   source = a.binary((async function*(){yield new Uint8Array([1,2]);})());
   assert.deepEqual((await source.next()).value,new Uint8Array([1,2]));

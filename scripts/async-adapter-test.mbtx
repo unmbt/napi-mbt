@@ -18,7 +18,11 @@ async fn main {
   defer @fs.remove(temp, recursive=true)
   @fs.write_text(temp + "/moon.mod", "name = \"test/async-adapter\"\npreferred_target = \"native\"\nimport { \"moonbitlang/async@0.22.10\" }\n")
   @fs.write_text(temp + "/moon.pkg", "import { \"moonbitlang/async/napi_host\", \"moonbitlang/async\", \"moonbitlang/core/env\" }\n")
-  copy_tree((if @fs.exists(".mooncakes/moonbitlang/async") { ".mooncakes/moonbitlang/async" } else { ".repos/moonbitlang/async/0.22.10" }), temp + "/.mooncakes/moonbitlang/async")
+  if !@fs.exists(".repos/moonbitlang/async/0.22.10") && !@fs.exists(".mooncakes/moonbitlang/async") {
+    let _fetch_res = @process.run("moon", ["fetch", "moonbitlang/async@0.22.10"], stdout=Collect, stderr=Collect)
+    if _fetch_res.exit_code != 0 { fail(_fetch_res.stdout_text() + _fetch_res.stderr_text()) }
+  }
+  copy_tree((if @fs.exists(".repos/moonbitlang/async/0.22.10") { ".repos/moonbitlang/async/0.22.10" } else { ".mooncakes/moonbitlang/async" }), temp + "/.mooncakes/moonbitlang/async")
   guard @json.parse(@fs.read_text("internal/assets/data/resources.json")) is Object(resources) else { fail("Invalid resources") }
   for key, value in resources {
     if key.has_prefix("async/files/") {

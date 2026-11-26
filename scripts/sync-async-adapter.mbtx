@@ -11,10 +11,10 @@ fn checksum(text : String) -> String {
 
 ///|
 async fn main {
-  let root = if @fs.exists(".mooncakes/moonbitlang/async/src/internal/event_loop/stdio.mbt") {
-    ".mooncakes/moonbitlang/async"
-  } else if @fs.exists(".repos/moonbitlang/async/0.22.10/src/internal/event_loop/stdio.mbt") {
+  let root = if @fs.exists(".repos/moonbitlang/async/0.22.10/src/internal/event_loop/stdio.mbt") {
     ".repos/moonbitlang/async/0.22.10"
+  } else if @fs.exists(".mooncakes/moonbitlang/async/src/internal/event_loop/stdio.mbt") {
+    ".mooncakes/moonbitlang/async"
   } else {
     fail("Missing moonbitlang/async@0.22.10 source; run `moon fetch moonbitlang/async@0.22.10` before syncing the adapter")
   }
