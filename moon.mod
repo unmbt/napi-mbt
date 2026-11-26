@@ -11,7 +11,7 @@
 
 name = "unmbt/napi-mbt"
 
-version = "0.3.7"
+version = "0.4.0"
 
 readme = "README.md"
 
