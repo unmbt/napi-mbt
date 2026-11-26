@@ -63,7 +63,7 @@ async fn initialize(
       Json).stringify(indent=2) +
     "\n"
   let mod_imports = if runtime == "package" {
-    "\nimport {\n  \"unmbt/napi-mbt@0.3.7\",\n}\n"
+    "\nimport {\n  \"unmbt/napi-mbt@\{VERSION}\",\n}\n"
   } else {
     ""
   }

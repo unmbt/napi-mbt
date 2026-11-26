@@ -95,7 +95,7 @@ async fn stage_package_runtime(
     mkdirp(staged_mod, recursive=true)
     write_text_file(
       staged_mod + "/moon.mod",
-      "name = \"unmbt/napi-mbt\"\n\nversion = \"0.3.7\"\n\npreferred_target = \"native\"\n\nsupported_targets = \"native\"\n",
+      "name = \"unmbt/napi-mbt\"\n\nversion = \"\{VERSION}\"\n\npreferred_target = \"native\"\n\nsupported_targets = \"native\"\n",
     )
     copy_build_workspace(mod_dir + "/runtime", staged_mod + "/runtime", [])
     write_text_file(
